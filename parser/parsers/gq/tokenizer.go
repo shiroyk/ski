@@ -76,7 +76,7 @@ func parseFuncArguments(s string) (*ruleFunc, error) {
 				state = singleQuoteState
 				continue
 			} else if state == singleQuoteState {
-				if s[offset-2] == '\'' {
+				if offset > 1 && s[offset-2] == '\'' {
 					args = append(args, "")
 				}
 				state = commonState
@@ -88,7 +88,7 @@ func parseFuncArguments(s string) (*ruleFunc, error) {
 				state = doubleQuoteState
 				continue
 			} else if state == doubleQuoteState {
-				if s[offset-2] == '"' {
+				if offset > 1 && s[offset-2] == '"' {
 					args = append(args, "")
 				}
 				state = commonState
