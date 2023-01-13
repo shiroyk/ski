@@ -1,0 +1,21 @@
+# Logs
+logs
+*.log
+
+.DS_Store
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+coverage.out
+coverage.html
+
+/data
