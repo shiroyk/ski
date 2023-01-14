@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 )
 
@@ -17,22 +16,19 @@ func TestShortener(t *testing.T) {
 		t.Fatalf("New leveldb: %v", err)
 	}
 
-	url := "http://localhost"
-	headers := map[string]string{
-		"Referer": "http://localhost",
-	}
-	id := s.Set(url, headers)
+	req := `POST http://localhost
+Content-Type: application/json
 
-	u, h, ok := s.Get(id)
+{"key":"foo"}`
+
+	id := s.Set(req)
+
+	h, ok := s.Get(id)
 	if !ok {
 		t.Fatal(fmt.Sprintf("not found: %v", id))
 	}
 
-	if u != url {
-		t.Fatalf("unexpected url: %s", u)
-	}
-
-	if !reflect.DeepEqual(headers, h) {
-		t.Fatalf("unexpected headers: %v", headers)
+	if req != h {
+		t.Fatalf("want: %s, got %s", req, h)
 	}
 }

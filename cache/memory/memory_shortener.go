@@ -4,37 +4,28 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 
-	"github.com/labstack/gommon/log"
 	"github.com/shiroyk/cloudcat/utils"
 	"golang.org/x/exp/slog"
 )
 
-// Shortener is an implementation of cache.Shortener that stores URL and headers in in-memory.
+// Shortener is an implementation of cache.Shortener that stores HTTP request in in-memory.
 type Shortener struct {
-	lruCache *utils.LRUCache[string, entry]
+	lruCache *utils.LRUCache[string, string]
 }
 
-// entry struct URL and headers.
-type entry struct {
-	Url     string
-	Headers map[string]string
-}
-
-// Set returns to shorten identifier for the given URL and headers.
-func (shortener *Shortener) Set(url string, headers map[string]string) string {
-	hash := md5.Sum([]byte(url))
+// Set returns to shorten identifier for the HTTP request.
+func (shortener *Shortener) Set(http string) string {
+	hash := md5.Sum([]byte(http))
 	id := hex.EncodeToString(hash[:])
-	shortener.lruCache.Add(id, entry{Url: url, Headers: headers})
-	log.Debugf("shortener url added %s => %s", id, url)
+	shortener.lruCache.Add(id, http)
+	slog.Debug("shortener url added %s => %s", id, http)
 	return id
 }
 
-// Get returns the original URL and headers for the given identifier.
-func (shortener *Shortener) Get(id string) (url string, headers map[string]string, ok bool) {
-	if e, ok := shortener.lruCache.Get(id); ok {
-		url = e.Url
-		headers = e.Headers
-		return url, headers, true
+// Get returns the original HTTP request for the given identifier.
+func (shortener *Shortener) Get(id string) (http string, ok bool) {
+	if h, ok := shortener.lruCache.Get(id); ok {
+		return h, true
 	}
 	return
 }
@@ -42,9 +33,9 @@ func (shortener *Shortener) Get(id string) (url string, headers map[string]strin
 // NewShortener returns a new Shortener that will store URL and headers in in-memory.
 func NewShortener() *Shortener {
 	s := &Shortener{
-		lruCache: utils.NewLRUCache[string, entry](128),
+		lruCache: utils.NewLRUCache[string, string](128),
 	}
-	s.lruCache.OnEvicted = func(key string, value entry) {
+	s.lruCache.OnEvicted = func(key string, value string) {
 		slog.Debug("shortener clean key %s", key)
 	}
 	return s

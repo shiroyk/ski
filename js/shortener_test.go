@@ -5,10 +5,14 @@ import (
 )
 
 func TestShortener(t *testing.T) {
-	_, err := testVM.RunString(`
-		id = go.shortener.set('http://localhost', {"cookie": "token=123456"});
-		assert.equal(go.shortener.get(id).headers.cookie, "token=123456")
-	`)
+	tpl := `POST http://localhost
+Content-Type: application/json
+
+{\"key\":\"foo\"}`
+	_, err := testVM.RunString(
+		"id = go.shortener.set(`" + tpl + "`);" +
+			"assert.equal(go.shortener.get(id), `" + tpl + "`)",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

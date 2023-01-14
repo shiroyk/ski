@@ -3,7 +3,6 @@ package js
 import (
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/cache"
-	"github.com/spf13/cast"
 )
 
 type jsShortener struct {
@@ -11,16 +10,12 @@ type jsShortener struct {
 }
 
 func (s *jsShortener) Set(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	header := cast.ToStringMapString(call.Argument(1).Export())
-	return vm.ToValue(s.shortener.Set(call.Argument(0).String(), header))
+	return vm.ToValue(s.shortener.Set(call.Argument(0).String()))
 }
 
 func (s *jsShortener) Get(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	if url, headers, ok := s.shortener.Get(call.Argument(0).String()); ok {
-		return vm.ToValue(map[string]any{
-			"url":     url,
-			"headers": headers,
-		})
+	if h, ok := s.shortener.Get(call.Argument(0).String()); ok {
+		return vm.ToValue(h)
 	}
-	return vm.ToValue(map[string]any{})
+	return
 }
