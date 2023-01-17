@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -54,12 +55,18 @@ func (analyzer *Analyzer) processString(ctx *parser.Context, schema *meta.Schema
 	if schema.Type == meta.ArrayType {
 		result = meta.ActEach(schema.Rule, content,
 			func(each any, key string, arg string) ([]string, error) {
-				return parser.GetParser(key).GetStrings(ctx, each, arg)
+				if p, ok := parser.GetParser(key); ok {
+					return p.GetStrings(ctx, each, arg)
+				}
+				return nil, errors.New("can not find parser")
 			})
 	} else {
 		result = meta.ActEach(schema.Rule, content,
 			func(each any, key string, arg string) (string, error) {
-				return parser.GetParser(key).GetString(ctx, each, arg)
+				if p, ok := parser.GetParser(key); ok {
+					return p.GetString(ctx, each, arg)
+				}
+				return "", errors.New("can not find parser")
 			})
 
 		if schema.Type != meta.StringType {
@@ -172,12 +179,18 @@ func processInit(ctx *parser.Context, schema *meta.Schema, content any) []string
 		if schema.Type == meta.ArrayType {
 			elements = meta.ActEach(schema.Init, content,
 				func(each any, key string, arg string) ([]string, error) {
-					return parser.GetParser(key).GetElements(ctx, each, arg)
+					if p, ok := parser.GetParser(key); ok {
+						return p.GetElements(ctx, each, arg)
+					}
+					return nil, errors.New("can not find parser")
 				})
 		} else {
 			elements = []string{meta.ActEach(schema.Init, content,
 				func(each any, key string, arg string) (string, error) {
-					return parser.GetParser(key).GetElement(ctx, each, arg)
+					if p, ok := parser.GetParser(key); ok {
+						return p.GetString(ctx, each, arg)
+					}
+					return "", errors.New("can not find parser")
 				})}
 		}
 

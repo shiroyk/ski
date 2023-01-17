@@ -104,12 +104,10 @@ func assertGetElements(t *testing.T, arg string, assert func([]string) bool) {
 }
 
 func TestParser(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatal(r)
-		}
-	}()
-	c.GetDesc(key)
+	_, ok := c.GetParser(key)
+	if !ok {
+		t.Fatal("parser not registered")
+	}
 
 	contents := []any{nil, 114514, `}{`}
 	for _, ct := range contents {

@@ -1,8 +1,9 @@
 package parser
 
 import (
-	"log"
 	"sync"
+
+	"golang.org/x/exp/slog"
 )
 
 var (
@@ -26,23 +27,19 @@ type Desc struct {
 	Url       string `json:"url"`
 }
 
-func Register(name string, parser Parser) {
-	if _, ok := manager.Load(name); !ok {
-		manager.Store(name, parser)
+func Register(key string, parser Parser) {
+	if _, ok := manager.Load(key); !ok {
+		manager.Store(key, parser)
 	} else {
-		log.Panicf("parser already registed %s", name)
+		slog.Warn("parser %s already registered", key)
 	}
 }
 
-func GetParser(key string) Parser {
+func GetParser(key string) (Parser, bool) {
 	if parser, ok := manager.Load(key); ok {
-		return parser.(Parser)
+		return parser.(Parser), true
 	}
-	panic("unknown parser " + key)
-}
-
-func GetDesc(key string) Desc {
-	return GetParser(key).GetDesc()
+	return nil, false
 }
 
 func GetAllDesc() []Desc {

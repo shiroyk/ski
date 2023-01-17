@@ -2,6 +2,8 @@ package regex
 
 import (
 	"testing"
+
+	c "github.com/shiroyk/cloudcat/parser"
 )
 
 var (
@@ -20,6 +22,13 @@ var (
 		{`/(\p{Sc}\s?)?(\d+\.?((?<=\.)\d+)?)(?(1)|\s?\p{Sc})?/$2/`, `$17.43  €2 16.33  £0.98  0.43   £43   12€  17`, "17.43  2 16.33  0.98  0.43   43   12  17"},
 	}
 )
+
+func TestParser(t *testing.T) {
+	_, ok := c.GetParser(key)
+	if !ok {
+		t.Fatal("parser not registered")
+	}
+}
 
 func TestGetString(t *testing.T) {
 	for _, s := range testCase {

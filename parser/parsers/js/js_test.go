@@ -33,9 +33,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestParser(t *testing.T) {
-	p.GetDesc(key)
-	if r := recover(); r != nil {
-		t.Fatal(r)
+	_, ok := p.GetParser(key)
+	if !ok {
+		t.Fatal("parser not registered")
 	}
 }
 

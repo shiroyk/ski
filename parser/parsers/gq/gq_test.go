@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/shiroyk/cloudcat/meta"
 	c "github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/utils"
 )
@@ -63,6 +64,7 @@ func TestMain(m *testing.M) {
 		Cookie:    memory.NewCookie(),
 		Cache:     memory.NewCache(),
 		Shortener: memory.NewShortener(),
+		Config:    meta.Config{Separator: ", "},
 	})
 	code := m.Run()
 	os.Exit(code)
@@ -113,12 +115,10 @@ func assertGetElements(t *testing.T, arg string, assert func([]string) bool) {
 }
 
 func TestParser(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatal(r)
-		}
-	}()
-	c.GetDesc(key)
+	_, ok := c.GetParser(key)
+	if !ok {
+		t.Fatal("parser not registered")
+	}
 
 	if _, err := gq.GetString(ctx, 0, ``); err == nil {
 		t.Fatal("expected empty error")

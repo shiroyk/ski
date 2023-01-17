@@ -62,9 +62,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestParser(t *testing.T) {
-	c.GetDesc("gq")
-	if r := recover(); r != nil {
-		t.Fatal("Unexpected not register to manager")
+	_, ok := c.GetParser(key)
+	if !ok {
+		t.Fatal("parser not registered")
 	}
 
 	_, err := xpath.GetString(ctx, 1, ``)
