@@ -2,6 +2,7 @@ package di
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 )
 
@@ -64,14 +65,13 @@ func MustResolveNamed[T any](name string) T {
 
 // getNamed returns the type name
 func getName[T any]() string {
-	var t T
+	var v T
 
 	// struct
-	name := fmt.Sprintf("%T", t)
-	if name != "<nil>" {
-		return name
+	if t := reflect.TypeOf(v); t != nil {
+		return t.String()
+	} else {
+		// interface
+		return reflect.TypeOf(new(T)).String()
 	}
-
-	// interface
-	return fmt.Sprintf("%T", new(T))
 }

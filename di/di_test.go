@@ -2,49 +2,25 @@ package di
 
 import (
 	"testing"
-
-	"golang.org/x/exp/maps"
 )
-
-type test struct{}
 
 func TestProvide(t *testing.T) {
 	t.Parallel()
-	defer maps.Clear(services)
 
-	Provide(test{})
-	if _, ok := services[getName[test]()]; !ok {
-		t.Fatalf("Provide must declared value")
-	}
-}
-
-func TestProvideNamed(t *testing.T) {
-	t.Parallel()
-	defer maps.Clear(services)
-
-	ProvideNamed("t", test{})
-	if _, ok := services["t"]; !ok {
-		t.Fatalf("Provide must declared value")
-	}
-}
-
-func TestResolve(t *testing.T) {
-	t.Parallel()
-	defer maps.Clear(services)
-
-	Provide(test{})
-	_, err := Resolve[test]()
+	type test1 interface{}
+	Provide(new(test1))
+	_, err := Resolve[test1]()
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestResolveNamed(t *testing.T) {
+func TestResolve(t *testing.T) {
 	t.Parallel()
-	defer maps.Clear(services)
 
-	ProvideNamed("t", test{})
-	_, err := ResolveNamed[test]("t")
+	type test2 struct{}
+	Provide(test2{})
+	_, err := Resolve[test2]()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,16 +28,16 @@ func TestResolveNamed(t *testing.T) {
 
 func TestMustResolve(t *testing.T) {
 	t.Parallel()
-	defer maps.Clear(services)
 
-	Provide(test{})
-	MustResolve[test]()
+	type test3 interface{}
+	Provide(new(test3))
+	MustResolve[test3]()
 }
 
 func TestMustResolveNamed(t *testing.T) {
 	t.Parallel()
-	defer maps.Clear(services)
 
-	ProvideNamed("t", test{})
-	MustResolveNamed[test]("t")
+	type test4 struct{}
+	ProvideNamed("t", test4{})
+	MustResolveNamed[test4]("t")
 }
