@@ -6,8 +6,11 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
-	"github.com/labstack/gommon/log"
+	"github.com/shiroyk/cloudcat/cache"
+	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/fetcher"
 	"github.com/shiroyk/cloudcat/parser"
+	"golang.org/x/exp/slog"
 )
 
 // CreateVMWithContext instance JS runtime with parser.Context
@@ -18,7 +21,7 @@ func CreateVMWithContext(ctx *parser.Context, content any) *goja.Runtime {
 	req := new(require.Registry)
 	req.Enable(vm)
 	req.RegisterNativeModule("console", console.RequireWithPrinter(console.PrinterFunc(func(s string) {
-		log.Info(s)
+		slog.Info(s)
 	})))
 	console.Enable(vm)
 
@@ -29,10 +32,10 @@ func CreateVMWithContext(ctx *parser.Context, content any) *goja.Runtime {
 		BaseUrl:     ctx.BaseUrl(),
 		RedirectUrl: ctx.RedirectUrl(),
 		Content:     content,
-		Http:        jsHttp{fetch: ctx.Fetcher()},
-		Cache:       jsCache{cache: ctx.Cache()},
-		Cookie:      jsCookie{cookie: ctx.Cookie()},
-		Shortener:   jsShortener{shortener: ctx.Shortener()},
+		Http:        jsHttp{fetch: di.MustResolve[*fetcher.Fetcher]()},
+		Cache:       jsCache{cache: di.MustResolveNamed[cache.Cache]("cache")},
+		Cookie:      jsCookie{cookie: di.MustResolveNamed[cache.Cookie]("cookie")},
+		Shortener:   jsShortener{shortener: di.MustResolveNamed[cache.Shortener]("shortener")},
 	})
 
 	go func() {

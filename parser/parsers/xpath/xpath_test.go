@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/shiroyk/cloudcat/meta"
 	c "github.com/shiroyk/cloudcat/parser"
 )
 
@@ -56,7 +57,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = c.NewContext(&c.Options{})
+	ctx = c.NewContext(&c.Options{Config: meta.Config{Separator: ", "}})
 	code := m.Run()
 	os.Exit(code)
 }
@@ -146,7 +147,9 @@ func TestGetElement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if object != "Google, Github, Golang" {
+	if object != `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>
+<li id="a2"><a href="https://github.com" title="Github page">Github</a></li>
+<li id="a3" class="selected"><a href="https://go.dev" title="Golang page">Golang</a></li>` {
 		t.Fatalf("Unexpected object %s", object)
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	"github.com/labstack/gommon/log"
 	"github.com/shiroyk/cloudcat/utils"
+	"golang.org/x/exp/slog"
 )
 
 type ProxyURLKey int
@@ -47,7 +47,7 @@ func RoundRobinCacheProxy(u string, proxyURLs ...string) func(*http.Request) (*u
 		for i, pu := range proxyURLs {
 			parsedURL, err := url.Parse(pu)
 			if err != nil {
-				log.Infof("proxy url parse: %v", err)
+				slog.Error("proxy url error ", err)
 				return nil
 			}
 			parsedProxyURLs[i] = parsedURL

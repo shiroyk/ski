@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetcher"
 	"github.com/shiroyk/cloudcat/meta"
 	"github.com/shiroyk/cloudcat/parser"
@@ -27,6 +28,7 @@ type Analyzer struct {
 func NewAnalyzer() *Analyzer {
 	return &Analyzer{
 		FormatHandler: new(defaultFormatHandler),
+		fetcher:       di.MustResolve[*fetcher.Fetcher](),
 	}
 }
 

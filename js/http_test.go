@@ -51,8 +51,9 @@ func TestHttp(t *testing.T) {
 	_, _ = testVM.RunString(fmt.Sprintf(`const url = "%s";`, ts.URL))
 
 	testCase := []string{
+		`fa = new Uint8Array([226, 153, 130, 239, 184, 142]).buffer`,
 		`mp = new FormData();
-		 mp.set('file', new Uint8Array([226, 153, 130, 239, 184, 142]).buffer);
+		 mp.set('file', fa);
 		 mp.set('name', 'foo');
 		 assert.equal(go.http.post(url, mp).string(), "♂︎");`,
 		`form = new URLSearchParams({'key': 'holy', 'value': 'fa'});
@@ -64,8 +65,7 @@ func TestHttp(t *testing.T) {
 		`assert.equal(go.http.post(url, {'dark': 'o'}).json()['dark'], "o");`,
 		`assert.equal(go.http.post(url, "post").string(), "post");`,
 		`assert.equal(go.http.request('PUT', url, "put", {"Authorization": "1919810"}).string(), "put");`,
-		`go.cache.setBytes("f1", new Uint8Array([226, 153, 130, 239, 184, 142]).buffer);
-		 assert.equal(go.http.request('PATCH', url, go.cache.getBytes("f1")).string(), "♂︎");`,
+		`assert.equal(go.http.request('PATCH', url, fa).string(), "♂︎");`,
 		`assert.equal(go.http.request('PATCH', url, new Uint8Array([97]).buffer).string(), "a");`,
 		`assert.equal(go.http.request('PATCH', url, "fa", null).string(), "fa");`,
 		`try {
@@ -109,7 +109,7 @@ func TestFormData(t *testing.T) {
 		`mp.set('name', 'foobar');
 		 assert.equal(mp.values().length, 2)`,
 	}
-	
+
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
 			_, err := testVM.RunString(s)

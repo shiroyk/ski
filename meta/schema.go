@@ -38,6 +38,7 @@ func ParseType(s string) Type {
 type Operator string
 
 const (
+	OperatorNil Operator = ""
 	OperatorAnd Operator = "and"
 	OperatorOr  Operator = "or"
 )
@@ -144,7 +145,7 @@ func (schema *Schema) SetInit(action ...Action) *Schema {
 }
 
 func (schema *Schema) AddInit(step ...Step) *Schema {
-	return schema.AddOpInit(OperatorAnd, step...)
+	return schema.AddOpInit(OperatorNil, step...)
 }
 
 func (schema *Schema) AddOpInit(op Operator, step ...Step) *Schema {
@@ -152,8 +153,7 @@ func (schema *Schema) AddOpInit(op Operator, step ...Step) *Schema {
 		schema.Init = make([]Action, 0)
 	}
 
-	slice := append(schema.Init, NewOpAction(op, step...))
-	schema.Init = slice
+	schema.Init = append(schema.Init, NewOpAction(op, step...))
 
 	return schema
 }
@@ -164,7 +164,7 @@ func (schema *Schema) SetRule(action ...Action) *Schema {
 }
 
 func (schema *Schema) AddRule(step ...Step) *Schema {
-	return schema.AddOpRule(OperatorAnd, step...)
+	return schema.AddOpRule(OperatorNil, step...)
 }
 
 func (schema *Schema) AddOpRule(op Operator, step ...Step) *Schema {
@@ -172,8 +172,7 @@ func (schema *Schema) AddOpRule(op Operator, step ...Step) *Schema {
 		schema.Rule = make([]Action, 0)
 	}
 
-	slice := append(schema.Rule, NewOpAction(op, step...))
-	schema.Rule = slice
+	schema.Rule = append(schema.Rule, NewOpAction(op, step...))
 
 	return schema
 }

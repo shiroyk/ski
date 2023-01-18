@@ -10,23 +10,24 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetcher"
 	p "github.com/shiroyk/cloudcat/parser"
 )
 
 var (
-	js  Parser
-	ctx *p.Context
+	jsParser Parser
+	ctx      *p.Context
 )
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+	di.ProvideNamed("cache", memory.NewCache())
+	di.ProvideNamed("cookie", memory.NewCookie())
+	di.ProvideNamed("shortener", memory.NewShortener())
+	di.Provide(fetcher.NewFetcher(&fetcher.Options{}))
 	ctx = p.NewContext(&p.Options{
-		Url:       "http://localhost/home",
-		Cookie:    memory.NewCookie(),
-		Cache:     memory.NewCache(),
-		Shortener: memory.NewShortener(),
-		Fetcher:   fetcher.NewFetcher(&fetcher.Options{}),
+		Url: "http://localhost/home",
 	})
 	code := m.Run()
 	os.Exit(code)
@@ -40,7 +41,7 @@ func TestParser(t *testing.T) {
 }
 
 func TestGetString(t *testing.T) {
-	str, err := js.GetString(ctx, "a", `(async () => go.content + 1)()`)
+	str, err := jsParser.GetString(ctx, "a", `(async () => go.content + 1)()`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestGetString(t *testing.T) {
 }
 
 func TestGetStrings(t *testing.T) {
-	str, err := js.GetStrings(ctx, `["a1"]`,
+	str, err := jsParser.GetStrings(ctx, `["a1"]`,
 		`new Promise((r, j) => {
 				let s = JSON.parse(go.content);
 		   		s.push('a2');
@@ -65,7 +66,7 @@ func TestGetStrings(t *testing.T) {
 }
 
 func TestGetElement(t *testing.T) {
-	ele, err := js.GetElement(ctx, ``,
+	ele, err := jsParser.GetElement(ctx, ``,
 		`go.setVar('size', 1 + 2);go.getVar('size')`)
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +77,8 @@ func TestGetElement(t *testing.T) {
 }
 
 func TestGetElements(t *testing.T) {
-	ele, err := js.GetElements(ctx, ``,
+	t.Parallel()
+	ele, err := jsParser.GetElements(ctx, ``,
 		`[1, 2]`)
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +89,8 @@ func TestGetElements(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	_, err := js.GetString(p.NewContext(&p.Options{
+	t.Parallel()
+	_, err := jsParser.GetString(p.NewContext(&p.Options{
 		Timeout: time.Second * 1,
 	}), ``, `while(true){}`)
 	if err != nil {

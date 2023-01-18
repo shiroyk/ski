@@ -2,12 +2,14 @@ package js
 
 import (
 	"flag"
-	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/cache/memory"
-	"github.com/shiroyk/cloudcat/fetcher"
-	p "github.com/shiroyk/cloudcat/parser"
 	"os"
 	"testing"
+
+	"github.com/dop251/goja"
+	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/fetcher"
+	p "github.com/shiroyk/cloudcat/parser"
 )
 
 var (
@@ -105,12 +107,12 @@ function compareArray(a, b) {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+	di.ProvideNamed("cache", memory.NewCache())
+	di.ProvideNamed("cookie", memory.NewCookie())
+	di.ProvideNamed("shortener", memory.NewShortener())
+	di.Provide(fetcher.NewFetcher(&fetcher.Options{}))
 	ctx = p.NewContext(&p.Options{
-		Url:       "http://localhost/home",
-		Cookie:    memory.NewCookie(),
-		Cache:     memory.NewCache(),
-		Shortener: memory.NewShortener(),
-		Fetcher:   fetcher.NewFetcher(&fetcher.Options{}),
+		Url: "http://localhost/home",
 	})
 	testVM = CreateVMWithContext(ctx, `1919810`)
 	_, _ = testVM.RunProgram(goja.MustCompile("testlib.js", TESTLIB, false))

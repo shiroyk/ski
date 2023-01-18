@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/cache/memory"
 	"github.com/shiroyk/cloudcat/meta"
 	c "github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/utils"
@@ -60,11 +59,8 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	ctx = c.NewContext(&c.Options{
-		Url:       "https://localhost",
-		Cookie:    memory.NewCookie(),
-		Cache:     memory.NewCache(),
-		Shortener: memory.NewShortener(),
-		Config:    meta.Config{Separator: ", "},
+		Url:    "https://localhost",
+		Config: meta.Config{Separator: ", "},
 	})
 	code := m.Run()
 	os.Exit(code)

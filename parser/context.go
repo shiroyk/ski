@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/fetcher"
 	"github.com/shiroyk/cloudcat/meta"
 )
 
@@ -31,13 +29,9 @@ type Context struct {
 }
 
 type Options struct {
-	Fetcher   *fetcher.Fetcher
-	Config    meta.Config
-	Url       string
-	Cookie    cache.Cookie
-	Cache     cache.Cache
-	Shortener cache.Shortener
-	Timeout   time.Duration
+	Config  meta.Config
+	Url     string
+	Timeout time.Duration
 }
 
 func NewContext(opt *Options) *Context {
@@ -156,10 +150,6 @@ func (c *Context) SetValue(key any, value any) {
 	c.value.Store(key, value)
 }
 
-func (c *Context) Fetcher() *fetcher.Fetcher {
-	return c.opt.Fetcher
-}
-
 func (c *Context) Config() meta.Config {
 	return c.opt.Config
 }
@@ -170,16 +160,4 @@ func (c *Context) BaseUrl() string {
 
 func (c *Context) RedirectUrl() string {
 	return c.redirectUrl
-}
-
-func (c *Context) Cookie() cache.Cookie {
-	return c.opt.Cookie
-}
-
-func (c *Context) Cache() cache.Cache {
-	return c.opt.Cache
-}
-
-func (c *Context) Shortener() cache.Shortener {
-	return c.opt.Shortener
 }

@@ -79,7 +79,7 @@ func (p Parser) GetElement(_ *parser.Context, content any, arg string) (string, 
 	}
 
 	str := strings.Builder{}
-	str.WriteString(htmlquery.InnerText(nodes[0]))
+	str.WriteString(htmlquery.OutputHTML(nodes[0], true))
 	for _, node := range nodes[1:] {
 		str.WriteString("\n")
 		str.WriteString(htmlquery.OutputHTML(node, true))
@@ -109,18 +109,18 @@ func (p Parser) GetElements(_ *parser.Context, content any, arg string) ([]strin
 func getHtmlNode(content any, arg string) ([]*html.Node, error) {
 	var err error
 	var node *html.Node
-	switch content := utils.PtrToElem(content).(type) {
+	switch data := utils.PtrToElem(content).(type) {
 	default:
-		return nil, fmt.Errorf("unexpected content type %T", content)
+		return nil, fmt.Errorf("unexpected content type %T", data)
 	case nil:
 		return nil, nil
 	case []string:
-		node, err = html.Parse(strings.NewReader(strings.Join(content, "\n")))
+		node, err = html.Parse(strings.NewReader(strings.Join(data, "\n")))
 		if err != nil {
 			return nil, err
 		}
 	case string:
-		node, err = html.Parse(strings.NewReader(content))
+		node, err = html.Parse(strings.NewReader(data))
 		if err != nil {
 			return nil, err
 		}

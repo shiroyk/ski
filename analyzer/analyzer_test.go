@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/fetcher"
 	. "github.com/shiroyk/cloudcat/meta"
 	"github.com/shiroyk/cloudcat/parser"
 )
@@ -20,7 +21,8 @@ var (
 		AddProperty("object", *NewSchema(ObjectType).
 			AddInit(NewStep("gq", "#main")).
 			AddProperty("string", *NewSchema(StringType).
-				AddRule(NewStep("gq", "#n1"))).
+				AddRule(NewStep("gq", "#n")).
+				AddOpRule(OperatorOr, NewStep("gq", "#n1"))).
 			AddProperty("integer", *NewSchema(IntegerType).
 				AddRule(NewStep("gq", "#n1"))).
 			AddProperty("number", *NewSchema(NumberType).
@@ -80,11 +82,9 @@ var (
 )
 
 func TestAnalyzer(t *testing.T) {
+	di.Provide(fetcher.NewFetcher(&fetcher.Options{}))
 	ctx := parser.NewContext(&parser.Options{
-		Url:       "https://localhost",
-		Cookie:    memory.NewCookie(),
-		Cache:     memory.NewCache(),
-		Shortener: memory.NewShortener(),
+		Url: "https://localhost",
 	})
 	bytes, err := json.Marshal(NewAnalyzer().ExecuteSchema(ctx, schema, content))
 	if err != nil {

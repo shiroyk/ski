@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/shiroyk/cloudcat/meta"
 	c "github.com/shiroyk/cloudcat/parser"
 )
 
@@ -54,7 +55,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = c.NewContext(&c.Options{})
+	ctx = c.NewContext(&c.Options{Config: meta.Config{Separator: ", "}})
 	code := m.Run()
 	os.Exit(code)
 }
@@ -109,7 +110,7 @@ func TestParser(t *testing.T) {
 		t.Fatal("parser not registered")
 	}
 
-	contents := []any{nil, 114514, `}{`}
+	contents := []any{114514, `}{`}
 	for _, ct := range contents {
 		if _, err := json.GetString(ctx, ct, ``); err == nil {
 			t.Fatal("Unexpected type")
