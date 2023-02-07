@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/meta"
 	c "github.com/shiroyk/cloudcat/parser"
 )
 
@@ -57,7 +56,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = c.NewContext(&c.Options{Config: meta.Config{Separator: ", "}})
+	ctx = c.NewContext(c.Options{Config: c.Config{Separator: ", "}})
 	code := m.Run()
 	os.Exit(code)
 }

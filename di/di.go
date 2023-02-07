@@ -1,3 +1,4 @@
+// Package di a simple dependencies injection
 package di
 
 import (
@@ -6,10 +7,7 @@ import (
 	"sync"
 )
 
-var (
-	mu       sync.RWMutex
-	services = make(map[string]any)
-)
+var services = new(sync.Map) //nolint:gochecknoglobals
 
 // Provide save the value
 func Provide[T any](value T) {
@@ -18,14 +16,19 @@ func Provide[T any](value T) {
 
 // ProvideNamed save the value for the name
 func ProvideNamed(name string, value any) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, ok := services[name]; ok {
+	if _, ok := services.LoadOrStore(name, value); ok {
 		panic(fmt.Errorf("value already declared %s", name))
 	}
+}
 
-	services[name] = value
+// Override override the value
+func Override[T any](value T) {
+	services.Store(getName[T](), value)
+}
+
+// OverrideNamed override the value
+func OverrideNamed(name string, value any) {
+	services.Store(name, value)
 }
 
 // Resolve get the value, if not exist returns error
@@ -35,11 +38,11 @@ func Resolve[T any]() (T, error) {
 
 // ResolveNamed get the value for the name if not exist returns error
 func ResolveNamed[T any](name string) (value T, err error) {
-	mu.RLock()
-	defer mu.RUnlock()
-
-	if v, ok := services[name]; ok {
-		return v.(T), nil
+	if v, ok := services.Load(name); ok {
+		if t, ok := v.(T); ok {
+			return t, nil
+		}
+		return value, fmt.Errorf("value type asserted failed")
 	}
 
 	return value, fmt.Errorf("value not declared %s", name)
@@ -70,8 +73,8 @@ func getName[T any]() string {
 	// struct
 	if t := reflect.TypeOf(v); t != nil {
 		return t.String()
-	} else {
-		// interface
-		return reflect.TypeOf(new(T)).String()
 	}
+
+	// interface
+	return reflect.TypeOf(new(T)).String()
 }

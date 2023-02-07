@@ -18,19 +18,6 @@ func init() {
 	parser.Register(key, new(Parser))
 }
 
-func (p Parser) GetDesc() parser.Desc {
-	desc := "Optimized JSON for Go is a high performance parser with a variety of additional JSON tools. " +
-		"OjG is optimized to processing huge data sets where data does not necessarily conform to a fixed structure."
-	return parser.Desc{
-		Key:       key,
-		Name:      "ojg",
-		Version:   "0.0.0",
-		ShortDesc: desc,
-		LongDesc:  desc,
-		Url:       "https://github.com/ohler55/ojg",
-	}
-}
-
 func (p Parser) GetString(ctx *parser.Context, content any, arg string) (string, error) {
 	obj, err := getDoc(content, arg)
 	if err != nil {
@@ -78,7 +65,7 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) ([]str
 func getDoc(content any, arg string) ([]any, error) {
 	var err error
 	var doc any
-	switch data := utils.PtrToElem(content).(type) {
+	switch data := utils.FromPtr(content).(type) {
 	default:
 		return nil, fmt.Errorf("unexpected content type %T", content)
 	case nil:

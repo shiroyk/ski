@@ -11,7 +11,7 @@ type Pair[K comparable, V any] struct {
 	Value V
 }
 
-func PtrToElem[T any](ptr T) (ret T) {
+func FromPtr[T any](ptr T) (ret T) {
 	v := reflect.ValueOf(ptr)
 	if v.Kind() == reflect.Invalid {
 		return
@@ -22,13 +22,21 @@ func PtrToElem[T any](ptr T) (ret T) {
 	return v.Interface().(T)
 }
 
-func ZeroOr[T any](value, defaultValue T) T {
-	if v := reflect.ValueOf(value); v.IsZero() {
+func ZeroOr[T comparable](value, defaultValue T) T {
+	var zero T
+	if zero == value {
 		return defaultValue
 	}
 	return value
 }
 
-func Ptr[T constraints.Ordered](value T) *T {
+func EmptyOr[T any](value, defaultValue []T) []T {
+	if len(value) == 0 {
+		return defaultValue
+	}
+	return value
+}
+
+func ToPtr[T constraints.Ordered](value T) *T {
 	return &value
 }

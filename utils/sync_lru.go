@@ -105,8 +105,7 @@ func (c *LRUCache[K, V]) RemoveOldest() {
 	}
 	c.Lock()
 	defer c.Unlock()
-	ele := c.ll.Back()
-	if ele != nil {
+	if ele := c.ll.Back(); ele != nil {
 		c.removeElement(ele)
 	}
 }

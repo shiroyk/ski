@@ -1,68 +1,109 @@
 package js
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"runtime"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/dop251/goja"
-	"github.com/dop251/goja_nodejs/console"
-	"github.com/dop251/goja_nodejs/require"
-	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/di"
-	"github.com/shiroyk/cloudcat/fetcher"
-	"github.com/shiroyk/cloudcat/parser"
 	"golang.org/x/exp/slog"
 )
 
-// CreateVMWithContext instance JS runtime with parser.Context
-func CreateVMWithContext(ctx *parser.Context, content any) *goja.Runtime {
-	vm := goja.New()
-	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
+const (
+	MaxTimeToWaitGetVM = 500 * time.Millisecond
+	MaxRetriesGetVM    = 3
+)
 
-	req := new(require.Registry)
-	req.Enable(vm)
-	req.RegisterNativeModule("console", console.RequireWithPrinter(console.PrinterFunc(func(s string) {
-		slog.Info(s)
-	})))
-	console.Enable(vm)
+var (
+	defaultScheduler atomic.Value
+	ErrVMPoolClosed  = errors.New("runtime pool is closed")
+)
 
-	_ = vm.Set("FormData", NewFormData)
-	_ = vm.Set("URLSearchParams", NewURLSearchParams)
-	_ = vm.Set("go", jsContext{
-		ctx:         ctx,
-		BaseUrl:     ctx.BaseUrl(),
-		RedirectUrl: ctx.RedirectUrl(),
-		Content:     content,
-		Http:        jsHttp{fetch: di.MustResolve[*fetcher.Fetcher]()},
-		Cache:       jsCache{cache: di.MustResolveNamed[cache.Cache]("cache")},
-		Cookie:      jsCookie{cookie: di.MustResolveNamed[cache.Cookie]("cookie")},
-		Shortener:   jsShortener{shortener: di.MustResolveNamed[cache.Shortener]("shortener")},
-	})
-
-	go func() {
-		// Wait for the context to be done
-		<-ctx.Done()
-		// Interrupt the JS runtime
-		vm.Interrupt(ctx.Err())
-	}()
-
-	return vm
+func init() {
+	defaultScheduler.Store(NewScheduler(Options{InitialCap: 2, MaxCap: runtime.NumCPU()}))
 }
 
-// UnWrapValue unwrap the goja.Value to the raw value
-func UnWrapValue(value goja.Value) any {
-	switch value := value.Export().(type) {
-	default:
-		return value
-	case goja.ArrayBuffer:
-		return value.Bytes()
-	case *goja.Promise:
-		switch value.State() {
-		case goja.PromiseStateRejected:
-			panic(value.Result().String())
-		case goja.PromiseStateFulfilled:
-			return value.Result().Export()
-		default:
-			panic(fmt.Errorf("unexpected promise state: %v", value.State()))
+// SetScheduler makes s the default Scheduler.
+func SetScheduler(s Scheduler) {
+	defaultScheduler.Store(s)
+}
+
+// GetScheduler returns the default Scheduler.
+func GetScheduler() Scheduler {
+	return defaultScheduler.Load().(Scheduler)
+}
+
+func RunString(ctx context.Context, script string) (goja.Value, error) {
+	tr, err := GetScheduler().Get()
+	if err != nil {
+		return nil, err
+	}
+	return tr.RunString(ctx, script)
+}
+
+func Run(ctx context.Context, p Program) (goja.Value, error) {
+	tr, err := GetScheduler().Get()
+	if err != nil {
+		return nil, err
+	}
+	return tr.Run(ctx, p)
+}
+
+type Scheduler interface {
+	Get() (VM, error)
+	Release(VM)
+	Close() error
+}
+
+type Options struct {
+	InitialCap, MaxCap, MaxRetriesGetVM int
+	UseStrict                           bool
+}
+
+type schedulerImpl struct {
+	mu        *sync.Mutex
+	vms       chan VM
+	activeVMs *atomic.Uint64
+	opt       Options
+}
+
+func (c *schedulerImpl) Close() error {
+	close(c.vms)
+	return nil
+}
+
+func NewScheduler(opt Options) Scheduler {
+	return &schedulerImpl{
+		mu:        new(sync.Mutex),
+		vms:       make(chan VM, opt.InitialCap),
+		activeVMs: new(atomic.Uint64),
+		opt:       opt,
+	}
+}
+
+func (c *schedulerImpl) Get() (VM, error) {
+	if c.activeVMs.Load() == 0 {
+		return newVM(c.opt.UseStrict), nil
+	}
+	for i := 1; i <= MaxRetriesGetVM; i++ {
+		select {
+		case rt := <-c.vms:
+			return rt, nil
+		case <-time.After(MaxTimeToWaitGetVM):
+			slog.Warn("Could not get a VM from the buffer for %s", time.Duration(i)*MaxTimeToWaitGetVM)
 		}
 	}
+	return nil, fmt.Errorf(
+		"could not get a VM from the buffer in %s",
+		MaxRetriesGetVM*MaxTimeToWaitGetVM,
+	)
+}
+
+func (c *schedulerImpl) Release(vm VM) {
+	c.vms <- vm
+	c.activeVMs.Add(+1)
 }

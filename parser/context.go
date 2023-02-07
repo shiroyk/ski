@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/shiroyk/cloudcat/meta"
+	"golang.org/x/exp/slog"
 )
 
 const (
@@ -16,30 +16,32 @@ const (
 )
 
 type Context struct {
-	context.Context
 	mu                   sync.Mutex  // protects following fields
 	timer                *time.Timer // Under Context.mu.
 	deadline             time.Time
 	done                 atomic.Value // of chan struct{}, created lazily, closed by first cancel call
 	err                  error        // set to non-nil by the first cancel call
 	cancelFunc           context.CancelFunc
-	opt                  *Options
+	opt                  Options
 	value                *sync.Map
-	baseUrl, redirectUrl string
+	baseURL, redirectURL string
 }
 
 type Options struct {
-	Config  meta.Config
-	Url     string
-	Timeout time.Duration
+	Config Config
+	Logger *slog.Logger
+	Url    string
 }
 
-func NewContext(opt *Options) *Context {
+func NewContext(opt Options) *Context {
 	var d time.Time
-	if opt.Timeout == 0 {
-		d = time.Now().Add(DefaultTimeout)
+	if opt.Config.Timeout > 0 {
+		d = time.Now().Add(opt.Config.Timeout)
 	} else {
-		d = time.Now().Add(opt.Timeout)
+		d = time.Now().Add(DefaultTimeout)
+	}
+	if opt.Logger == nil {
+		opt.Logger = slog.Default()
 	}
 	c := &Context{
 		deadline: d,
@@ -52,9 +54,9 @@ func NewContext(opt *Options) *Context {
 		c.cancelFunc = func() { c.cancel(context.Canceled) }
 		return c
 	}
-	c.redirectUrl = opt.Url
-	if u, err := url.Parse(c.redirectUrl); err == nil {
-		c.baseUrl = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+	c.redirectURL = opt.Url
+	if u, err := url.Parse(c.redirectURL); err == nil {
+		c.baseURL = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -67,11 +69,11 @@ func NewContext(opt *Options) *Context {
 	return c
 }
 
-// closedchan is a reusable-closed channel.
-var closedchan = make(chan struct{})
+// closedC is a reusable-closed channel.
+var closedC = make(chan struct{})
 
 func init() {
-	close(closedchan)
+	close(closedC)
 }
 
 func (c *Context) cancel(err error) {
@@ -86,7 +88,7 @@ func (c *Context) cancel(err error) {
 	c.err = err
 	d, _ := c.done.Load().(chan struct{})
 	if d == nil {
-		c.done.Store(closedchan)
+		c.done.Store(closedC)
 	} else {
 		close(d)
 	}
@@ -150,14 +152,18 @@ func (c *Context) SetValue(key any, value any) {
 	c.value.Store(key, value)
 }
 
-func (c *Context) Config() meta.Config {
+func (c *Context) Config() Config {
 	return c.opt.Config
 }
 
-func (c *Context) BaseUrl() string {
-	return c.baseUrl
+func (c *Context) Logger() *slog.Logger {
+	return c.opt.Logger
 }
 
-func (c *Context) RedirectUrl() string {
-	return c.redirectUrl
+func (c *Context) BaseURL() string {
+	return c.baseURL
+}
+
+func (c *Context) RedirectURL() string {
+	return c.redirectURL
 }

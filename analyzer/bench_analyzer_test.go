@@ -7,7 +7,7 @@ import (
 )
 
 func BenchmarkAnalyzer(b *testing.B) {
-	ctx := parser.NewContext(&parser.Options{Url: "https://localhost"})
+	ctx := parser.NewContext(parser.Options{Url: "https://localhost"})
 	b.StartTimer()
 	analyzer := NewAnalyzer()
 	for i := 0; i < b.N; i++ {

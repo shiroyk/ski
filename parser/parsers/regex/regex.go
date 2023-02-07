@@ -17,17 +17,6 @@ func init() {
 	parser.Register(key, new(Parser))
 }
 
-func (p Parser) GetDesc() parser.Desc {
-	return parser.Desc{
-		Key:       key,
-		Name:      key,
-		Version:   "0.0.0",
-		ShortDesc: "Regexp2 is a feature-rich RegExp engine for Go.",
-		LongDesc:  "Regexp2 is a feature-rich RegExp engine for Go.",
-		Url:       "https://github.com/dlclark/regexp2",
-	}
-}
-
 func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, error) {
 	re, replace, start, count, err := parseRegexp(arg)
 	if err != nil {
@@ -77,20 +66,18 @@ const (
 	flagState
 )
 
-var (
-	reOptMap = map[string]regexp2.RegexOptions{
-		"i": regexp2.IgnoreCase,
-		"m": regexp2.Multiline,
-		"n": regexp2.ExplicitCapture,
-		"c": regexp2.Compiled,
-		"s": regexp2.Singleline,
-		"x": regexp2.IgnorePatternWhitespace,
-		"r": regexp2.RightToLeft,
-		"d": regexp2.Debug,
-		"e": regexp2.ECMAScript,
-		"u": regexp2.Unicode,
-	}
-)
+var reOptMap = map[string]regexp2.RegexOptions{ //nolint:gochecknoglobals
+	"i": regexp2.IgnoreCase,
+	"m": regexp2.Multiline,
+	"n": regexp2.ExplicitCapture,
+	"c": regexp2.Compiled,
+	"s": regexp2.Singleline,
+	"x": regexp2.IgnorePatternWhitespace,
+	"r": regexp2.RightToLeft,
+	"d": regexp2.Debug,
+	"e": regexp2.ECMAScript,
+	"u": regexp2.Unicode,
+}
 
 func parseRegexp(arg string) (re *regexp2.Regexp, replace string, start, count int, err error) {
 	state := commonState
@@ -106,16 +93,14 @@ func parseRegexp(arg string) (re *regexp2.Regexp, replace string, start, count i
 		offset++
 		switch ch {
 		default:
-			if state != flagState {
-				pattern.WriteByte(ch)
-			} else {
+			if state == flagState {
 				if i, ok := reOptMap[string(ch)]; ok {
 					reOpt |= int32(i)
-				} else {
-					if ch >= '0' && ch <= '9' || ch == '-' || ch == ',' {
-						pattern.WriteByte(ch)
-					}
+				} else if ch >= '0' && ch <= '9' || ch == '-' || ch == ',' {
+					pattern.WriteByte(ch)
 				}
+			} else {
+				pattern.WriteByte(ch)
 			}
 		case '\\':
 			if nextCh := arg[offset]; nextCh == '/' {

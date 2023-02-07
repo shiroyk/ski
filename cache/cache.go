@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/shiroyk/cloudcat/cache/memory"
 )
 
 // A Cache interface is used to store bytes.
@@ -587,11 +585,4 @@ func (r *cachingReadCloser) Read(p []byte) (n int, err error) {
 
 func (r *cachingReadCloser) Close() error {
 	return r.R.Close()
-}
-
-// NewMemoryCacheTransport returns a new Transport using the in-memory cache implementation
-func NewMemoryCacheTransport() *Transport {
-	c := memory.NewCache()
-	t := NewTransport(c)
-	return t
 }

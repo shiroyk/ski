@@ -2,6 +2,7 @@ package js
 
 import (
 	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/spf13/cast"
 )
@@ -12,18 +13,6 @@ const key string = "js"
 
 func init() {
 	parser.Register(key, new(Parser))
-}
-
-func (p *Parser) GetDesc() parser.Desc {
-	desc := "Goja is an implementation of ECMAScript 5.1 in pure Go with emphasis on standard compliance and performance."
-	return parser.Desc{
-		Key:       key,
-		Name:      "goja",
-		Version:   "0.0.0",
-		ShortDesc: desc,
-		LongDesc:  desc,
-		Url:       "https://github.com/dop251/goja",
-	}
 }
 
 func (p *Parser) GetString(ctx *parser.Context, content any, arg string) (ret string, err error) {
@@ -50,13 +39,13 @@ func (p *Parser) GetElements(ctx *parser.Context, content any, arg string) ([]st
 	return p.GetStrings(ctx, content, arg)
 }
 
-func runScript(ctx *parser.Context, content any, script string) (ret any, err error) {
-	vm := js.CreateVMWithContext(ctx, content)
-
-	result, err := vm.RunString(script)
+func runScript(ctx *parser.Context, content any, script string) (any, error) {
+	result, err := js.Run(ctx, js.Program{Code: script, Args: map[string]any{
+		"content": content,
+	}})
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return js.UnWrapValue(result), err
+	return common.Unwrap(result)
 }

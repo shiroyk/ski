@@ -1,17 +1,11 @@
 package js
 
 import (
-	"context"
 	"flag"
 	"os"
 	"reflect"
 	"testing"
-	"time"
 
-	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/cache/memory"
-	"github.com/shiroyk/cloudcat/di"
-	"github.com/shiroyk/cloudcat/fetcher"
 	p "github.com/shiroyk/cloudcat/parser"
 )
 
@@ -22,11 +16,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	di.ProvideNamed("cache", memory.NewCache())
-	di.ProvideNamed("cookie", memory.NewCookie())
-	di.ProvideNamed("shortener", memory.NewShortener())
-	di.Provide(fetcher.NewFetcher(&fetcher.Options{}))
-	ctx = p.NewContext(&p.Options{
+	ctx = p.NewContext(p.Options{
 		Url: "http://localhost/home",
 	})
 	code := m.Run()
@@ -41,7 +31,7 @@ func TestParser(t *testing.T) {
 }
 
 func TestGetString(t *testing.T) {
-	str, err := jsParser.GetString(ctx, "a", `(async () => go.content + 1)()`)
+	str, err := jsParser.GetString(ctx, "a", `(async () => content + 1)()`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +43,7 @@ func TestGetString(t *testing.T) {
 func TestGetStrings(t *testing.T) {
 	str, err := jsParser.GetStrings(ctx, `["a1"]`,
 		`new Promise((r, j) => {
-				let s = JSON.parse(go.content);
+				let s = JSON.parse(content);
 		   		s.push('a2');
 				r(s)
 		   });`)
@@ -67,7 +57,7 @@ func TestGetStrings(t *testing.T) {
 
 func TestGetElement(t *testing.T) {
 	ele, err := jsParser.GetElement(ctx, ``,
-		`go.setVar('size', 1 + 2);go.getVar('size')`)
+		`cat.setVar('size', 1 + 2);cat.getVar('size');`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,21 +75,5 @@ func TestGetElements(t *testing.T) {
 	}
 	if !reflect.DeepEqual(ele, []string{"1", "2"}) {
 		t.Fatalf("unexpected result %s", ele)
-	}
-}
-
-func TestTimeout(t *testing.T) {
-	t.Parallel()
-	_, err := jsParser.GetString(p.NewContext(&p.Options{
-		Timeout: time.Second * 1,
-	}), ``, `while(true){}`)
-	if err != nil {
-		if face, ok := err.(*goja.InterruptedError); ok {
-			if e := face.Unwrap(); e != context.DeadlineExceeded {
-				t.Fatalf("unexpected error: %s", e)
-			}
-		} else {
-			t.Fatalf("unexpected error: %s", err)
-		}
 	}
 }

@@ -82,7 +82,6 @@ func parseFuncArguments(s string) (*ruleFunc, error) {
 				state = commonState
 				continue
 			}
-			break
 		case '"':
 			if state == commonState {
 				state = doubleQuoteState
@@ -94,7 +93,6 @@ func parseFuncArguments(s string) (*ruleFunc, error) {
 				state = commonState
 				continue
 			}
-			break
 		case ',':
 			if state == commonState {
 				args = append(args, arg.String())

@@ -18,18 +18,6 @@ func init() {
 	parser.Register(key, new(Parser))
 }
 
-func (p Parser) GetDesc() parser.Desc {
-	desc := "gq brings a syntax and a set of features similar to jQuery to the Go language."
-	return parser.Desc{
-		Key:       key,
-		Name:      "goquery",
-		Version:   "0.0.0",
-		ShortDesc: desc,
-		LongDesc:  desc,
-		Url:       "https://github.com/PuerkitoBio/goquery",
-	}
-}
-
 func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
@@ -80,7 +68,8 @@ func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []
 		}
 	}
 
-	if sel, ok := node.(*goquery.Selection); ok {
+	sel, ok := node.(*goquery.Selection)
+	if ok {
 		str := make([]string, sel.Length())
 		var err error
 		sel.EachWithBreak(func(i int, sel *goquery.Selection) bool {
@@ -91,9 +80,8 @@ func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []
 			return ret, err
 		}
 		return str, nil
-	} else {
-		return cast.ToStringSliceE(node)
 	}
+	return cast.ToStringSliceE(node)
 }
 
 func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret string, err error) {
@@ -144,7 +132,8 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret [
 		}
 	}
 
-	if sel, ok := node.(*goquery.Selection); ok {
+	sel, ok := node.(*goquery.Selection)
+	if ok {
 		objs := make([]string, sel.Length())
 		sel.EachWithBreak(func(i int, sel *goquery.Selection) bool {
 			if objs[i], err = goquery.OuterHtml(sel); err != nil {
@@ -156,14 +145,13 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret [
 			return
 		}
 		return objs, nil
-	} else {
-		return cast.ToStringSliceE(node)
 	}
+	return cast.ToStringSliceE(node)
 }
 
 // getSelection converts content to goquery.Selection
 func getSelection(content any) (*goquery.Selection, error) {
-	switch data := utils.PtrToElem(content).(type) {
+	switch data := utils.FromPtr(content).(type) {
 	default:
 		return nil, fmt.Errorf("unexpected content type %T", data)
 	case nil:

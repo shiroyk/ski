@@ -5,44 +5,43 @@ import (
 	"testing"
 
 	"github.com/shiroyk/cloudcat/di"
-	"github.com/shiroyk/cloudcat/fetcher"
-	. "github.com/shiroyk/cloudcat/meta"
+	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/parser"
 )
 
 var (
-	schema = NewSchema(ObjectType).
-		AddProperty("title", *NewSchema(StringType).
-			AddRule(NewStep("gq", "title"))).
-		AddProperty("href", *NewSchema(StringType).
-			AddRule(NewStep("gq", `.body ul #a1 a -> href`))).
-		AddProperty("home", *NewSchema(StringType).
-			AddRule(NewStep("gq", `.body ul #a2 a -> href`))).
-		AddProperty("object", *NewSchema(ObjectType).
-			AddInit(NewStep("gq", "#main")).
-			AddProperty("string", *NewSchema(StringType).
-				AddRule(NewStep("gq", "#n")).
-				AddOpRule(OperatorOr, NewStep("gq", "#n1"))).
-			AddProperty("integer", *NewSchema(IntegerType).
-				AddRule(NewStep("gq", "#n1"))).
-			AddProperty("number", *NewSchema(NumberType).
-				AddRule(NewStep("gq", "#n2"))).
-			AddProperty("boolean", *NewSchema(BooleanType).
-				AddRule(NewStep("gq", "#n1"))).
-			AddProperty("array", *NewSchema(StringType, ArrayType).
-				AddRule(NewStep("gq", "#n3"))).
-			AddProperty("object", *NewSchema(StringType, ObjectType).
-				AddRule(NewStep("gq", "#n4")))).
-		AddProperty("object1", *NewSchema(ObjectType, NumberType).
-			AddRule(NewStep("gq", `#main #n4`))).
-		AddProperty("array", *NewSchema(ArrayType).
-			AddInit(NewStep("gq", `#main div -> slice(0, 2)`)).
-			AddProperty("n", *NewSchema(NumberType).
-				AddRule(NewStep("gq", `div -> text`)))).
-		AddProperty("array1", *NewSchema(ArrayType, NumberType).
-			AddRule(NewStep("gq", `#main div -> slice(0, 2)`))).
-		AddProperty("array2", *NewSchema(ArrayType, NumberType).
-			AddRule(NewStep("gq", `#main #n3`), NewStep("json", `$.*`)))
+	schema = parser.NewSchema(parser.ObjectType).
+		AddProperty("title", *parser.NewSchema(parser.StringType).
+			AddRule(parser.NewStep("gq", "title"))).
+		AddProperty("href", *parser.NewSchema(parser.StringType).
+			AddRule(parser.NewStep("gq", `.body ul #a1 a -> href`))).
+		AddProperty("home", *parser.NewSchema(parser.StringType).
+			AddRule(parser.NewStep("gq", `.body ul #a2 a -> href`))).
+		AddProperty("object", *parser.NewSchema(parser.ObjectType).
+			AddInit(parser.NewStep("gq", "#main")).
+			AddProperty("string", *parser.NewSchema(parser.StringType).
+				AddRule(parser.NewStep("gq", "#n")).
+				AddOpRule(parser.OperatorOr, parser.NewStep("gq", "#n1"))).
+			AddProperty("integer", *parser.NewSchema(parser.IntegerType).
+				AddRule(parser.NewStep("gq", "#n1"))).
+			AddProperty("number", *parser.NewSchema(parser.NumberType).
+				AddRule(parser.NewStep("gq", "#n2"))).
+			AddProperty("boolean", *parser.NewSchema(parser.BooleanType).
+				AddRule(parser.NewStep("gq", "#n1"))).
+			AddProperty("array", *parser.NewSchema(parser.StringType, parser.ArrayType).
+				AddRule(parser.NewStep("gq", "#n3"))).
+			AddProperty("object", *parser.NewSchema(parser.StringType, parser.ObjectType).
+				AddRule(parser.NewStep("gq", "#n4")))).
+		AddProperty("object1", *parser.NewSchema(parser.ObjectType, parser.NumberType).
+			AddRule(parser.NewStep("gq", `#main #n4`))).
+		AddProperty("array", *parser.NewSchema(parser.ArrayType).
+			AddInit(parser.NewStep("gq", `#main div -> slice(0, 2)`)).
+			AddProperty("n", *parser.NewSchema(parser.NumberType).
+				AddRule(parser.NewStep("gq", `div -> text`)))).
+		AddProperty("array1", *parser.NewSchema(parser.ArrayType, parser.NumberType).
+			AddRule(parser.NewStep("gq", `#main div -> slice(0, 2)`))).
+		AddProperty("array2", *parser.NewSchema(parser.ArrayType, parser.NumberType).
+			AddRule(parser.NewStep("gq", `#main #n3`), parser.NewStep("json", `$.*`)))
 	content = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -82,8 +81,8 @@ var (
 )
 
 func TestAnalyzer(t *testing.T) {
-	di.Provide(fetcher.NewFetcher(&fetcher.Options{}))
-	ctx := parser.NewContext(&parser.Options{
+	di.Provide(fetch.NewFetcher(fetch.Options{}))
+	ctx := parser.NewContext(parser.Options{
 		Url: "https://localhost",
 	})
 	bytes, err := json.Marshal(NewAnalyzer().ExecuteSchema(ctx, schema, content))

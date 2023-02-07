@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/meta"
 	c "github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/utils"
 )
@@ -58,9 +57,9 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = c.NewContext(&c.Options{
+	ctx = c.NewContext(c.Options{
 		Url:    "https://localhost",
-		Config: meta.Config{Separator: ", "},
+		Config: c.Config{Separator: ", "},
 	})
 	code := m.Run()
 	os.Exit(code)
@@ -128,7 +127,7 @@ func TestParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := gq.GetString(ctx, utils.Ptr(`<a href="https://go.dev" title="Golang page">Golang</a>`), ``); err != nil {
+	if _, err := gq.GetString(ctx, utils.ToPtr(`<a href="https://go.dev" title="Golang page">Golang</a>`), ``); err != nil {
 		t.Fatal(err)
 	}
 

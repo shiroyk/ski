@@ -18,20 +18,8 @@ func init() {
 	parser.Register(key, new(Parser))
 }
 
-func (p Parser) GetDesc() parser.Desc {
-	desc := "htmlquery is an XPath query package for HTML, lets you extract data or evaluate from HTML documents by an XPath expression."
-	return parser.Desc{
-		Key:       key,
-		Name:      "htmlquery",
-		Version:   "0.0.0",
-		ShortDesc: desc,
-		LongDesc:  desc,
-		Url:       "https://github.com/antchfx/htmlquery",
-	}
-}
-
 func (p Parser) GetString(ctx *parser.Context, content any, arg string) (string, error) {
-	nodes, err := getHtmlNode(content, arg)
+	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return "", err
 	}
@@ -51,7 +39,7 @@ func (p Parser) GetString(ctx *parser.Context, content any, arg string) (string,
 }
 
 func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
-	nodes, err := getHtmlNode(content, arg)
+	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +57,7 @@ func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string
 }
 
 func (p Parser) GetElement(_ *parser.Context, content any, arg string) (string, error) {
-	nodes, err := getHtmlNode(content, arg)
+	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +77,7 @@ func (p Parser) GetElement(_ *parser.Context, content any, arg string) (string, 
 }
 
 func (p Parser) GetElements(_ *parser.Context, content any, arg string) ([]string, error) {
-	nodes, err := getHtmlNode(content, arg)
+	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -106,14 +94,12 @@ func (p Parser) GetElements(_ *parser.Context, content any, arg string) ([]strin
 	return str, nil
 }
 
-func getHtmlNode(content any, arg string) ([]*html.Node, error) {
+func getHTMLNode(content any, arg string) ([]*html.Node, error) {
 	var err error
 	var node *html.Node
-	switch data := utils.PtrToElem(content).(type) {
+	switch data := utils.FromPtr(content).(type) {
 	default:
 		return nil, fmt.Errorf("unexpected content type %T", data)
-	case nil:
-		return nil, nil
 	case []string:
 		node, err = html.Parse(strings.NewReader(strings.Join(data, "\n")))
 		if err != nil {

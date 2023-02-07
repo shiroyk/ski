@@ -138,16 +138,16 @@ func (BuildInFunc) Attr(_ *parser.Context, content any, args ...string) (any, er
 
 func (BuildInFunc) Href(ctx *parser.Context, content any, _ ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
-		hrefUrl, err := url.Parse(node.AttrOr("href", ""))
+		hrefURL, err := url.Parse(node.AttrOr("href", ""))
 		if err != nil {
 			return nil, err
 		}
 
-		baseUrl, err := url.Parse(ctx.BaseUrl())
+		baseURL, err := url.Parse(ctx.BaseURL())
 		if err != nil {
 			return nil, err
 		}
-		return baseUrl.ResolveReference(hrefUrl), nil
+		return baseURL.ResolveReference(hrefURL), nil
 	}
 
 	return nil, fmt.Errorf("unexpected content type %T", content)
@@ -222,9 +222,8 @@ func (BuildInFunc) Slice(_ *parser.Context, content any, args ...string) (any, e
 				return nil, err
 			}
 			return node.Slice(start, end), nil
-		} else {
-			return node.Eq(start), nil
 		}
+		return node.Eq(start), nil
 	}
 
 	return nil, fmt.Errorf("unexpected type %T", content)

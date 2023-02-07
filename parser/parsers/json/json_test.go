@@ -6,12 +6,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/meta"
 	c "github.com/shiroyk/cloudcat/parser"
 )
 
 var (
-	json    Parser
+	json    Parser //nolint:gochecknoglobals
 	ctx     *c.Context
 	content = `
 {
@@ -55,7 +54,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = c.NewContext(&c.Options{Config: meta.Config{Separator: ", "}})
+	ctx = c.NewContext(c.Options{Config: c.Config{Separator: ", "}})
 	code := m.Run()
 	os.Exit(code)
 }
@@ -105,8 +104,7 @@ func assertGetElements(t *testing.T, arg string, assert func([]string) bool) {
 }
 
 func TestParser(t *testing.T) {
-	_, ok := c.GetParser(key)
-	if !ok {
+	if _, ok := c.GetParser(key); !ok {
 		t.Fatal("parser not registered")
 	}
 
@@ -123,12 +121,14 @@ func TestParser(t *testing.T) {
 }
 
 func TestGetString(t *testing.T) {
+	t.Parallel()
 	assertString(t, `$.store.book[*].author`, func(str string) bool {
 		return str == `Nigel Rees, Evelyn Waugh, Herman Melville, J. R. R. Tolkien`
 	})
 }
 
 func TestGetStrings(t *testing.T) {
+	t.Parallel()
 	assertStrings(t, `$...book[0].price`, func(str []string) bool {
 		return reflect.DeepEqual(str, []string{"8.95"})
 	})
@@ -139,6 +139,7 @@ func TestGetStrings(t *testing.T) {
 }
 
 func TestGetElement(t *testing.T) {
+	t.Parallel()
 	if _, err := json.GetElement(ctx, content, `$$$`); err == nil {
 		t.Fatal("Unexpected path")
 	}
@@ -162,6 +163,7 @@ func TestGetElement(t *testing.T) {
 }
 
 func TestGetElements(t *testing.T) {
+	t.Parallel()
 	assertGetElements(t, `$.store.book[?(@.price < 10)].isbn`, func(obj []string) bool {
 		return obj[0] == `0-553-21311-3`
 	})

@@ -15,7 +15,7 @@ import (
 	"github.com/shiroyk/cloudcat/cache/memory"
 )
 
-var s struct {
+var s struct { //nolint:gochecknoglobals
 	server    *httptest.Server
 	client    http.Client
 	transport *Transport
@@ -28,6 +28,13 @@ type fakeClock struct {
 
 func (c *fakeClock) since(_ time.Time) time.Duration {
 	return c.elapsed
+}
+
+// NewMemoryCacheTransport returns a new Transport using the in-memory cache implementation
+func NewMemoryCacheTransport() *Transport {
+	c := memory.NewCache()
+	t := NewTransport(c)
+	return t
 }
 
 func TestMain(m *testing.M) {
@@ -177,9 +184,10 @@ func resetTest() {
 // TestCacheableMethod ensures that uncacheable method does not get stored
 // in cache and get incorrectly used for a following cacheable method request.
 func TestCacheableMethod(t *testing.T) {
+	t.Parallel()
 	resetTest()
 	{
-		req, err := http.NewRequest("POST", s.server.URL+"/method", nil)
+		req, err := http.NewRequest(http.MethodPost, s.server.URL+"/method", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +212,7 @@ func TestCacheableMethod(t *testing.T) {
 		}
 	}
 	{
-		req, err := http.NewRequest("GET", s.server.URL+"/method", nil)
+		req, err := http.NewRequest(http.MethodGet, s.server.URL+"/method", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -234,6 +242,7 @@ func TestCacheableMethod(t *testing.T) {
 }
 
 func TestDontServeHeadResponseToGetRequest(t *testing.T) {
+	t.Parallel()
 	resetTest()
 	url := s.server.URL + "/"
 	req, err := http.NewRequest(http.MethodHead, url, nil)

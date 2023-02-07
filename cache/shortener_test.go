@@ -1,13 +1,14 @@
 package cache
 
 import (
-	"fmt"
 	"testing"
+	"time"
 
 	"github.com/shiroyk/cloudcat/cache/memory"
 )
 
 func TestShortener(t *testing.T) {
+	t.Parallel()
 	shortener := memory.NewShortener()
 
 	req := `POST http://localhost
@@ -15,11 +16,11 @@ Content-Type: application/json
 
 {"key":"foo"}`
 
-	id := shortener.Set(req)
+	id := shortener.Set(req, time.Second)
 
 	h, ok := shortener.Get(id)
 	if !ok {
-		t.Fatal(fmt.Sprintf("not found: %v", id))
+		t.Fatalf("not found: %v", id)
 	}
 
 	if req != h {
