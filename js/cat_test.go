@@ -38,7 +38,7 @@ func TestCat(t *testing.T) {
 	t.Parallel()
 	parser.Register("test", new(testParser))
 	ctx := parser.NewContext(parser.Options{
-		Url:    "http://localhost/home",
+		URL:    "http://localhost/home",
 		Logger: slog.Default().WithGroup("js"),
 	})
 	vm := newVM(true)

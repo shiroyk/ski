@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/cast"
@@ -9,6 +10,13 @@ import (
 type Config struct {
 	Separator string
 	Timeout   time.Duration
+}
+
+type Source struct {
+	Name    string
+	BaseURL string
+	Timeout time.Duration
+	Header  map[string]string
 }
 
 type Meta struct {
@@ -24,12 +32,10 @@ func (meta *Meta) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 
-	meta.buildMeta(maps)
-
-	return nil
+	return meta.buildMeta(maps)
 }
 
-func (meta *Meta) buildMeta(maps map[string]any) {
+func (meta *Meta) buildMeta(maps map[string]any) (err error) {
 	if source, ok := maps["source"]; ok {
 		meta.Source = source.(*Source)
 	}
@@ -38,112 +44,163 @@ func (meta *Meta) buildMeta(maps map[string]any) {
 		meta.Config = config.(*Config)
 	}
 
-	if object, ok := maps["schema"]; ok {
-		if object, ok := object.(map[string]any); ok {
-			maps = object
-		}
+	if properties, ok := maps["schema"].(map[string]any); ok {
+		maps = properties
 	}
 
 	schema := NewSchema(ObjectType)
-	for field, s := range maps {
-		schema.AddProperty(field, *buildSchema(s))
+	for k, v := range maps {
+		property, err := buildSchema(v)
+		if err != nil {
+			return err
+		}
+		schema.AddProperty(k, property)
 	}
 
 	meta.Schema = schema
+
+	return
 }
 
-func buildStep(object any) []Step {
-	switch object := object.(type) {
-	case []any:
-		actions := make([]Step, 0)
-
-		for _, step := range object {
-			actions = append(actions, buildStep(step)...)
-		}
-
-		return actions
+func toSteps(object any) ([]Step, error) {
+	switch obj := object.(type) {
 	case map[string]any:
 		steps := make([]Step, 0)
-
-		for parser, step := range object {
-			if array, ok := step.([]string); ok {
-				steps = append(steps, NewStep(parser, array...))
-			} else {
-				steps = append(steps, NewStep(parser, cast.ToString(step)))
+		for parser, step := range obj {
+			stepStr, err := cast.ToStringE(step)
+			if err != nil {
+				return nil, err
 			}
+			steps = append(steps, NewStep(parser, stepStr))
 		}
-
-		return steps
+		return steps, nil
+	default:
+		return nil, fmt.Errorf("invalid step %v", obj)
 	}
-	return nil
 }
 
-func buildAction(object any) []Action {
-	switch object := object.(type) {
+func buildStep(object any) ([]Step, error) {
+	switch obj := object.(type) {
 	case []any:
-		actions := make([]Action, len(object))
+		steps := make([]Step, 0)
 
-		for i, action := range object {
-			act := buildAction(action)
-			if len(act) > 0 {
-				actions[i] = act[0]
+		for _, step := range obj {
+			s, err := toSteps(step)
+			if err != nil {
+				return nil, err
 			}
+			steps = append(steps, s...)
 		}
 
-		return actions
-	case map[string]any:
-		if and, ok := object[string(OperatorAnd)]; ok {
-			return []Action{NewOpAction(OperatorAnd, buildStep(and)...)}
-		}
-
-		if or, ok := object[string(OperatorOr)]; ok {
-			return []Action{NewOpAction(OperatorOr, buildStep(or)...)}
-		}
-
-		return []Action{NewAction(buildStep(object)...)}
+		return steps, nil
+	default:
+		return toSteps(obj)
 	}
-
-	return nil
 }
 
-func buildSchema(object any) *Schema {
-	switch object := object.(type) {
+func buildAction(object any) (acts []Action, err error) {
+	switch obj := object.(type) {
 	case []any:
-		schema := NewSchema(StringType)
-		schema.SetRule(buildAction(object)...)
-		return schema
-	case map[string]any:
-		if tp, ok := object["type"]; ok {
-			schema := NewSchema(ParseType(tp.(string)))
-
-			if format, ok := object["format"]; ok {
-				schema.Format = ParseType(format.(string))
-			}
-
-			if init, ok := object["init"]; ok {
-				schema.SetInit(buildAction(init)...)
-			}
-
-			if properties, ok := object["properties"]; ok {
-				if properties, ok := properties.(map[string]any); ok {
-					for field, s := range properties {
-						schema.AddProperty(field, *buildSchema(s))
-					}
+		for _, action := range obj {
+			if op, ok := action.(string); ok {
+				opAct, err := toActionOp(op)
+				if err != nil {
+					return nil, err
 				}
+				acts = append(acts, opAct)
+				continue
 			}
 
-			if rule, ok := object["rule"]; ok {
-				schema.SetRule(buildAction(rule)...)
+			steps, err := buildStep(action)
+			if err != nil {
+				return nil, err
 			}
 
-			return schema
-		} else {
-			schema := NewSchema(StringType)
-			schema.SetRule(buildAction(object)...)
+			acts = append(acts, NewAction(steps...))
+		}
+		return acts, nil
+	case map[string]any:
+		steps, err := buildStep(obj)
+		if err != nil {
+			return nil, err
+		}
 
-			return schema
+		return []Action{NewAction(steps...)}, nil
+	default:
+
+		return nil, fmt.Errorf("invalid action %v", obj)
+	}
+}
+
+func buildStringSchema(obj any) (schema Schema, err error) {
+	schema = *NewSchema(StringType)
+	var act []Action
+	act, err = buildAction(obj)
+	if err != nil {
+		return schema, err
+	}
+	schema.SetRule(act)
+	return
+}
+
+func buildTypedSchema(typed any, obj map[string]any) (schema Schema, err error) {
+	var schemaType SchemaType
+	schemaType, err = ToSchemaType(typed)
+	if err != nil {
+		return
+	}
+	schema = *NewSchema(schemaType)
+
+	if format, ok := obj["format"]; ok {
+		schema.Format, err = ToSchemaType(format)
+		if err != nil {
+			return
 		}
 	}
 
-	return nil
+	if init, ok := obj["init"]; ok {
+		var act []Action
+		act, err = buildAction(init)
+		if err != nil {
+			return schema, err
+		}
+		schema.SetInit(act)
+	}
+
+	if rule, ok := obj["rule"]; ok {
+		var act []Action
+		act, err = buildAction(rule)
+		if err != nil {
+			return schema, err
+		}
+		schema.SetRule(act)
+		return
+	}
+
+	if properties, ok := obj["properties"].(map[string]any); ok {
+		for field, s := range properties {
+			var property Schema
+			property, err = buildSchema(s)
+			if err != nil {
+				return
+			}
+			schema.AddProperty(field, property)
+		}
+	}
+
+	return
+}
+
+func buildSchema(object any) (schema Schema, err error) {
+	switch obj := object.(type) {
+	case []any:
+		return buildStringSchema(obj)
+	case map[string]any:
+		if tp, ok := obj["type"]; ok {
+			return buildTypedSchema(tp, obj)
+		}
+		return buildStringSchema(obj)
+	default:
+		return schema, fmt.Errorf("invalid schema %v", obj)
+	}
 }

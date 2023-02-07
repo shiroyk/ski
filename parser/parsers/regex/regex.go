@@ -66,7 +66,7 @@ const (
 	flagState
 )
 
-var reOptMap = map[string]regexp2.RegexOptions{ //nolint:gochecknoglobals
+var reOptMap = map[string]regexp2.RegexOptions{
 	"i": regexp2.IgnoreCase,
 	"m": regexp2.Multiline,
 	"n": regexp2.ExplicitCapture,

@@ -15,7 +15,7 @@ import (
 	"github.com/shiroyk/cloudcat/cache/memory"
 )
 
-var s struct { //nolint:gochecknoglobals
+var s struct {
 	server    *httptest.Server
 	client    http.Client
 	transport *Transport

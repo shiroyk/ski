@@ -11,7 +11,6 @@ import (
 	_ "github.com/shiroyk/cloudcat/parser/parsers/regex"
 	_ "github.com/shiroyk/cloudcat/parser/parsers/xpath"
 	"github.com/spf13/cast"
-	"golang.org/x/exp/slog"
 )
 
 type Analyzer struct {
@@ -25,7 +24,11 @@ func NewAnalyzer() *Analyzer {
 }
 
 func (analyzer *Analyzer) ExecuteSchema(ctx *parser.Context, schema *parser.Schema, content string) any {
-	defer analyzer.recoverMe()
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.Logger().Error("analyzer error ", r.(error))
+		}
+	}()
 
 	return analyzer.process(ctx, schema, content)
 }
@@ -51,16 +54,16 @@ func (analyzer *Analyzer) processString(ctx *parser.Context, schema *parser.Sche
 		if err != nil {
 			ctx.Logger().Error("process failed", err)
 		}
+	} else {
+		result, err = schema.Rule.GetString(ctx, content)
+		if err != nil {
+			ctx.Logger().Error("process failed", err)
+		}
 
 		if schema.Type != parser.StringType {
 			if result, err = analyzer.FormatHandler.Format(result, schema.Type); err != nil {
 				ctx.Logger().Error("format failed", err)
 			}
-		}
-	} else {
-		result, err = schema.Rule.GetString(ctx, content)
-		if err != nil {
-			ctx.Logger().Error("process failed", err)
 		}
 	}
 
@@ -108,12 +111,6 @@ func (analyzer *Analyzer) processArray(ctx *parser.Context, schema *parser.Schem
 	return nil
 }
 
-func (analyzer *Analyzer) recoverMe() {
-	if r := recover(); r != nil {
-		slog.Error("analyzer error %s", r.(error))
-	}
-}
-
 func (analyzer *Analyzer) processInit(ctx *parser.Context, schema *parser.Schema, content any) []string {
 	if schema.Init == nil || len(schema.Init) == 0 {
 		switch data := content.(type) {
@@ -142,13 +139,15 @@ func (analyzer *Analyzer) processInit(ctx *parser.Context, schema *parser.Schema
 	return []string{element}
 }
 
+// FormatHandler schema property formatter
 type FormatHandler interface {
-	Format(data any, format parser.Type) (any, error)
+	// Format the data to the given parser.SchemaType
+	Format(data any, format parser.SchemaType) (any, error)
 }
 
 type defaultFormatHandler struct{}
 
-func (f defaultFormatHandler) Format(data any, format parser.Type) (any, error) {
+func (f defaultFormatHandler) Format(data any, format parser.SchemaType) (any, error) {
 	switch data := data.(type) {
 	case string:
 		switch format {

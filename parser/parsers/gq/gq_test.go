@@ -58,7 +58,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	ctx = c.NewContext(c.Options{
-		Url:    "https://localhost",
+		URL:    "https://localhost",
 		Config: c.Config{Separator: ", "},
 	})
 	code := m.Run()

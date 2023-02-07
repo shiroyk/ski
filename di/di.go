@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-var services = new(sync.Map) //nolint:gochecknoglobals
+var services = new(sync.Map)
 
 // Provide save the value
 func Provide[T any](value T) {
@@ -66,7 +66,7 @@ func MustResolveNamed[T any](name string) T {
 	return value
 }
 
-// getNamed returns the type name
+// getName returns the type name
 func getName[T any]() string {
 	var v T
 

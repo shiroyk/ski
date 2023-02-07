@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	mx         sync.RWMutex //nolint:gochecknoglobals
+	mx         sync.RWMutex
 	extensions = make(map[ExtensionType]map[string]*Extension)
 )
 

@@ -15,6 +15,7 @@ const (
 	DefaultTimeout = time.Minute
 )
 
+// Context The Parser context
 type Context struct {
 	mu                   sync.Mutex  // protects following fields
 	timer                *time.Timer // Under Context.mu.
@@ -27,12 +28,14 @@ type Context struct {
 	baseURL, redirectURL string
 }
 
+// Options The Context options
 type Options struct {
 	Config Config
 	Logger *slog.Logger
-	Url    string
+	URL    string
 }
 
+// NewContext creates a new Context with Options
 func NewContext(opt Options) *Context {
 	var d time.Time
 	if opt.Config.Timeout > 0 {
@@ -54,7 +57,7 @@ func NewContext(opt Options) *Context {
 		c.cancelFunc = func() { c.cancel(context.Canceled) }
 		return c
 	}
-	c.redirectURL = opt.Url
+	c.redirectURL = opt.URL
 	if u, err := url.Parse(c.redirectURL); err == nil {
 		c.baseURL = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 	}
@@ -100,11 +103,9 @@ func (c *Context) cancel(err error) {
 }
 
 func (c *Context) Cancel() {
-	c.mu.Lock()
 	if c.cancelFunc != nil {
 		c.cancelFunc()
 	}
-	c.mu.Unlock()
 }
 
 func (c *Context) Deadline() (time.Time, bool) {

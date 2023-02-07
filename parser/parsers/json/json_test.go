@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	json    Parser //nolint:gochecknoglobals
+	json    Parser
 	ctx     *c.Context
 	content = `
 {

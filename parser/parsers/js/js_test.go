@@ -17,7 +17,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	ctx = p.NewContext(p.Options{
-		Url: "http://localhost/home",
+		URL: "http://localhost/home",
 	})
 	code := m.Run()
 	os.Exit(code)

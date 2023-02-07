@@ -88,4 +88,5 @@ linters:
   - sqlclosecheck
   - structcheck
   - wastedassign
+  - gochecknoglobals
   fast: false
