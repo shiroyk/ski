@@ -21,8 +21,8 @@ const (
 )
 
 var (
-	defaultScheduler atomic.Value
-	ErrVMPoolClosed  = errors.New("runtime pool is closed")
+	defaultScheduler   atomic.Value
+	ErrSchedulerClosed = errors.New("scheduler is closed")
 )
 
 func init() {
@@ -79,12 +79,15 @@ type schedulerImpl struct {
 	vms                                         chan VM
 	initVMs, activeVMs, maxVMs, maxRetriesGetVM int
 	maxTimeToWaitGetVM                          time.Duration
-	useStrict                                   bool
+	closed, useStrict                           bool
 }
 
 // Close the scheduler
 func (s *schedulerImpl) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	close(s.vms)
+	s.closed = true
 	return nil
 }
 
@@ -113,7 +116,10 @@ func (s *schedulerImpl) Get() (VM, error) {
 	timer := time.NewTimer(s.maxTimeToWaitGetVM)
 	for i := 1; i <= s.maxRetriesGetVM; i++ {
 		select {
-		case vm := <-s.vms:
+		case vm, ok := <-s.vms:
+			if !ok {
+				return nil, ErrSchedulerClosed
+			}
 			return vm, nil
 		case <-timer.C:
 			s.mu.Lock()
@@ -137,6 +143,9 @@ func (s *schedulerImpl) Get() (VM, error) {
 // Release the VM
 func (s *schedulerImpl) Release(vm VM) {
 	s.mu.Lock()
+	if s.closed {
+		return
+	}
 	s.vms <- vm
 	if s.activeVMs > s.initVMs {
 		s.activeVMs--
