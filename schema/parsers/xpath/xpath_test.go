@@ -6,12 +6,12 @@ import (
 	"reflect"
 	"testing"
 
-	c "github.com/shiroyk/cloudcat/parser"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 )
 
 var (
 	xpath   Parser
-	ctx     *c.Context
+	ctx     *parsers.Context
 	content = `
 <!DOCTYPE html>
 <html lang="en">
@@ -56,15 +56,15 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = c.NewContext(c.Options{Config: c.Config{Separator: ", "}})
+	ctx = parsers.NewContext(parsers.Options{})
 	code := m.Run()
 	os.Exit(code)
 }
 
 func TestParser(t *testing.T) {
-	_, ok := c.GetParser(key)
+	_, ok := parsers.GetParser(key)
 	if !ok {
-		t.Fatal("parser not registered")
+		t.Fatal("schema not registered")
 	}
 
 	_, err := xpath.GetString(ctx, 1, ``)

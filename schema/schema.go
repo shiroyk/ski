@@ -1,29 +1,29 @@
-package parser
+package schema
 
 import (
 	"fmt"
 )
 
-// SchemaType The property type.
-type SchemaType string
+// Type The property type.
+type Type string
 
 const (
-	// StringType The SchemaType of string.
-	StringType SchemaType = "string"
-	// NumberType The SchemaType of number.
-	NumberType SchemaType = "number"
-	// IntegerType The SchemaType of integer.
-	IntegerType SchemaType = "integer"
-	// BooleanType The SchemaType of boolean.
-	BooleanType SchemaType = "boolean"
-	// ObjectType The SchemaType of object.
-	ObjectType SchemaType = "object"
-	// ArrayType The SchemaType of array.
-	ArrayType SchemaType = "array"
+	// StringType The Type of string.
+	StringType Type = "string"
+	// NumberType The Type of number.
+	NumberType Type = "number"
+	// IntegerType The Type of integer.
+	IntegerType Type = "integer"
+	// BooleanType The Type of boolean.
+	BooleanType Type = "boolean"
+	// ObjectType The Type of object.
+	ObjectType Type = "object"
+	// ArrayType The Type of array.
+	ArrayType Type = "array"
 )
 
-// ToSchemaType parses the schema type.
-func ToSchemaType(s any) (SchemaType, error) {
+// ToType parses the schema type.
+func ToType(s any) (Type, error) {
 	switch s {
 	case "string":
 		return StringType, nil
@@ -55,13 +55,13 @@ const (
 	OperatorOr Operator = "or"
 )
 
-// Schema The parser schema.
+// Schema The schema.
 type Schema struct {
-	Type       SchemaType `yaml:"type"`
-	Format     SchemaType `yaml:"format,omitempty"`
-	Init       Actions    `yaml:"init,omitempty"`
-	Rule       Actions    `yaml:"rule,omitempty"`
-	Properties Property   `yaml:"properties,omitempty"`
+	Type       Type     `yaml:"type"`
+	Format     Type     `yaml:"format,omitempty"`
+	Init       Actions  `yaml:"init,omitempty"`
+	Rule       Actions  `yaml:"rule,omitempty"`
+	Properties Property `yaml:"properties,omitempty"`
 }
 
 // Property The Schema property.
@@ -69,7 +69,7 @@ type Property map[string]Schema
 
 // NewSchema returns a new Schema with the given SchemaType.
 // The first argument is the type, second is the format.
-func NewSchema(types ...SchemaType) *Schema {
+func NewSchema(types ...Type) *Schema {
 	if len(types) == 0 {
 		panic("schema must have type")
 	} else if len(types) == 1 {
@@ -140,7 +140,7 @@ func (schema *Schema) AddRuleOp(op Operator) *Schema {
 
 // CloneWithType returns a copy of Schema.
 // Schema.Format and Schema.Rule will be copied.
-func (schema *Schema) CloneWithType(typ SchemaType) *Schema {
+func (schema *Schema) CloneWithType(typ Type) *Schema {
 	return &Schema{
 		Type:   typ,
 		Format: schema.Format,

@@ -1,21 +1,40 @@
-package parser
+package schema
 
 import (
 	"testing"
 	"time"
 
+	"github.com/shiroyk/cloudcat/schema/parsers"
 	"gopkg.in/yaml.v3"
 )
+
+type testParser struct{}
+
+func (t *testParser) GetString(*parsers.Context, any, string) (string, error) {
+	return "", nil
+}
+
+func (t *testParser) GetStrings(*parsers.Context, any, string) ([]string, error) {
+	return nil, nil
+}
+
+func (t *testParser) GetElement(*parsers.Context, any, string) (string, error) {
+	return "", nil
+}
+
+func (t *testParser) GetElements(*parsers.Context, any, string) ([]string, error) {
+	return nil, nil
+}
 
 func TestActions(t *testing.T) {
 	t.Parallel()
 	var actions Actions
 	var err error
-	if _, ok := GetParser("act"); !ok {
-		Register("act", new(testParser))
+	if _, ok := parsers.GetParser("act"); !ok {
+		parsers.Register("act", new(testParser))
 	}
 	actions = []Action{NewAction(NewStep("act", "1"), NewStep("act", "2")), NewActionOp(OperatorAnd), NewAction(NewStep("act", "3"))}
-	ctx := NewContext(Options{Config: Config{Timeout: time.Second}})
+	ctx := parsers.NewContext(parsers.Options{Timeout: time.Second})
 
 	_, err = actions.GetString(ctx, "action")
 	if err != nil {

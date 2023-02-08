@@ -4,12 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/shiroyk/cloudcat/parser"
-	_ "github.com/shiroyk/cloudcat/parser/parsers/gq"
-	_ "github.com/shiroyk/cloudcat/parser/parsers/js"
-	_ "github.com/shiroyk/cloudcat/parser/parsers/json"
-	_ "github.com/shiroyk/cloudcat/parser/parsers/regex"
-	_ "github.com/shiroyk/cloudcat/parser/parsers/xpath"
+	"github.com/shiroyk/cloudcat/schema"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 	"github.com/spf13/cast"
 )
 
@@ -25,53 +21,53 @@ func NewAnalyzer() *Analyzer {
 	}
 }
 
-// ExecuteSchema execute a parser.Schema, returns the result
-func (analyzer *Analyzer) ExecuteSchema(ctx *parser.Context, schema *parser.Schema, content string) any {
+// ExecuteSchema execute a schema.Schema, returns the result
+func (analyzer *Analyzer) ExecuteSchema(ctx *parsers.Context, s *schema.Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
 			ctx.Logger().Error("analyzer error ", r.(error))
 		}
 	}()
 
-	return analyzer.process(ctx, schema, content)
+	return analyzer.process(ctx, s, content)
 }
 
-func (analyzer *Analyzer) process(ctx *parser.Context, schema *parser.Schema, content any) any {
-	switch schema.Type {
+func (analyzer *Analyzer) process(ctx *parsers.Context, s *schema.Schema, content any) any {
+	switch s.Type {
 	default:
 		return nil
-	case parser.StringType, parser.IntegerType, parser.NumberType, parser.BooleanType:
-		return analyzer.processString(ctx, schema, content)
-	case parser.ObjectType:
-		return analyzer.processObject(ctx, schema, content)
-	case parser.ArrayType:
-		return analyzer.processArray(ctx, schema, content)
+	case schema.StringType, schema.IntegerType, schema.NumberType, schema.BooleanType:
+		return analyzer.processString(ctx, s, content)
+	case schema.ObjectType:
+		return analyzer.processObject(ctx, s, content)
+	case schema.ArrayType:
+		return analyzer.processArray(ctx, s, content)
 	}
 }
 
-func (analyzer *Analyzer) processString(ctx *parser.Context, schema *parser.Schema, content any) any {
+func (analyzer *Analyzer) processString(ctx *parsers.Context, s *schema.Schema, content any) any {
 	var result any
 	var err error
-	if schema.Type == parser.ArrayType {
-		result, err = schema.Rule.GetStrings(ctx, content)
+	if s.Type == schema.ArrayType {
+		result, err = s.Rule.GetStrings(ctx, content)
 		if err != nil {
 			ctx.Logger().Error("process failed", err)
 		}
 	} else {
-		result, err = schema.Rule.GetString(ctx, content)
+		result, err = s.Rule.GetString(ctx, content)
 		if err != nil {
 			ctx.Logger().Error("process failed", err)
 		}
 
-		if schema.Type != parser.StringType {
-			if result, err = analyzer.FormatHandler.Format(result, schema.Type); err != nil {
+		if s.Type != schema.StringType {
+			if result, err = analyzer.FormatHandler.Format(result, s.Type); err != nil {
 				ctx.Logger().Error("format failed", err)
 			}
 		}
 	}
 
-	if schema.Format != "" {
-		if result, err = analyzer.FormatHandler.Format(result, schema.Format); err != nil {
+	if s.Format != "" {
+		if result, err = analyzer.FormatHandler.Format(result, s.Format); err != nil {
 			ctx.Logger().Error("format failed", err)
 		}
 	}
@@ -79,43 +75,43 @@ func (analyzer *Analyzer) processString(ctx *parser.Context, schema *parser.Sche
 	return result
 }
 
-func (analyzer *Analyzer) processObject(ctx *parser.Context, schema *parser.Schema, content any) any {
-	if schema.Properties != nil {
-		element := analyzer.processInit(ctx, schema, content)[0]
-		object := make(map[string]any, len(schema.Properties))
+func (analyzer *Analyzer) processObject(ctx *parsers.Context, s *schema.Schema, content any) any {
+	if s.Properties != nil {
+		element := analyzer.processInit(ctx, s, content)[0]
+		object := make(map[string]any, len(s.Properties))
 
-		for field, schema := range schema.Properties {
-			object[field] = analyzer.process(ctx, &schema, element)
+		for field, s := range s.Properties {
+			object[field] = analyzer.process(ctx, &s, element)
 		}
 
 		return object
-	} else if schema.Rule != nil {
-		return analyzer.processString(ctx, schema.CloneWithType(parser.ObjectType), content)
+	} else if s.Rule != nil {
+		return analyzer.processString(ctx, s.CloneWithType(schema.ObjectType), content)
 	}
 
 	return nil
 }
 
-func (analyzer *Analyzer) processArray(ctx *parser.Context, schema *parser.Schema, content any) any {
-	if schema.Properties != nil {
-		elements := analyzer.processInit(ctx, schema, content)
+func (analyzer *Analyzer) processArray(ctx *parsers.Context, s *schema.Schema, content any) any {
+	if s.Properties != nil {
+		elements := analyzer.processInit(ctx, s, content)
 		array := make([]any, len(elements))
 
 		for i, item := range elements {
-			s := parser.NewSchema(parser.ObjectType).SetProperty(schema.Properties)
+			s := schema.NewSchema(schema.ObjectType).SetProperty(s.Properties)
 			array[i] = analyzer.processObject(ctx, s, item)
 		}
 
 		return array
-	} else if schema.Rule != nil {
-		return analyzer.processString(ctx, schema.CloneWithType(parser.ArrayType), content)
+	} else if s.Rule != nil {
+		return analyzer.processString(ctx, s.CloneWithType(schema.ArrayType), content)
 	}
 
 	return nil
 }
 
-func (analyzer *Analyzer) processInit(ctx *parser.Context, schema *parser.Schema, content any) []string {
-	if schema.Init == nil || len(schema.Init) == 0 {
+func (analyzer *Analyzer) processInit(ctx *parsers.Context, s *schema.Schema, content any) []string {
+	if s.Init == nil || len(s.Init) == 0 {
 		switch data := content.(type) {
 		case []string, nil:
 			return data.([]string)
@@ -127,15 +123,15 @@ func (analyzer *Analyzer) processInit(ctx *parser.Context, schema *parser.Schema
 		}
 	}
 
-	if schema.Type == parser.ArrayType {
-		elements, err := schema.Init.GetElements(ctx, content)
+	if s.Type == schema.ArrayType {
+		elements, err := s.Init.GetElements(ctx, content)
 		if err != nil {
 			ctx.Logger().Error("process init failed", err)
 		}
 		return elements
 	}
 
-	element, err := schema.Init.GetElement(ctx, content)
+	element, err := s.Init.GetElement(ctx, content)
 	if err != nil {
 		ctx.Logger().Error("process init failed", err)
 	}
@@ -144,32 +140,32 @@ func (analyzer *Analyzer) processInit(ctx *parser.Context, schema *parser.Schema
 
 // FormatHandler schema property formatter
 type FormatHandler interface {
-	// Format the data to the given parser.SchemaType
-	Format(data any, format parser.SchemaType) (any, error)
+	// Format the data to the given schema.SchemaType
+	Format(data any, format schema.Type) (any, error)
 }
 
 type defaultFormatHandler struct{}
 
-// Format the data to the given parser.SchemaType
-func (f defaultFormatHandler) Format(data any, format parser.SchemaType) (any, error) {
+// Format the data to the given schema.SchemaType
+func (f defaultFormatHandler) Format(data any, format schema.Type) (any, error) {
 	switch data := data.(type) {
 	case string:
 		switch format {
-		case parser.StringType:
+		case schema.StringType:
 			return data, nil
-		case parser.IntegerType:
+		case schema.IntegerType:
 			return cast.ToIntE(data)
-		case parser.NumberType:
+		case schema.NumberType:
 			return cast.ToFloat64E(data)
-		case parser.BooleanType:
+		case schema.BooleanType:
 			return cast.ToBoolE(data)
-		case parser.ArrayType:
+		case schema.ArrayType:
 			slice := make([]any, 0)
 			if err := json.Unmarshal([]byte(data), &slice); err != nil {
 				return nil, err
 			}
 			return slice, nil
-		case parser.ObjectType:
+		case schema.ObjectType:
 			object := make(map[string]any, 0)
 			if err := json.Unmarshal([]byte(data), &object); err != nil {
 				return nil, err

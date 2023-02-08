@@ -4,21 +4,22 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/parser"
-	_ "github.com/shiroyk/cloudcat/parser/parsers/json"
+	"github.com/shiroyk/cloudcat/schema"
+	"github.com/shiroyk/cloudcat/schema/parsers"
+	_ "github.com/shiroyk/cloudcat/schema/parsers/json"
 	"golang.org/x/exp/slog"
 )
 
 type testParser struct{}
 
-func (t *testParser) GetString(_ *parser.Context, content any, arg string) (string, error) {
+func (t *testParser) GetString(_ *parsers.Context, content any, arg string) (string, error) {
 	if str, ok := content.(string); ok {
 		return str + arg, nil
 	}
 	return "", fmt.Errorf("type not supported")
 }
 
-func (t *testParser) GetStrings(ctx *parser.Context, content any, arg string) ([]string, error) {
+func (t *testParser) GetStrings(ctx *parsers.Context, content any, arg string) ([]string, error) {
 	str, err := t.GetString(ctx, content, arg)
 	if err != nil {
 		return nil, err
@@ -26,18 +27,18 @@ func (t *testParser) GetStrings(ctx *parser.Context, content any, arg string) ([
 	return []string{str}, nil
 }
 
-func (t *testParser) GetElement(ctx *parser.Context, content any, arg string) (string, error) {
+func (t *testParser) GetElement(ctx *parsers.Context, content any, arg string) (string, error) {
 	return t.GetString(ctx, content, arg)
 }
 
-func (t *testParser) GetElements(ctx *parser.Context, content any, arg string) ([]string, error) {
+func (t *testParser) GetElements(ctx *parsers.Context, content any, arg string) ([]string, error) {
 	return t.GetStrings(ctx, content, arg)
 }
 
 func TestCat(t *testing.T) {
 	t.Parallel()
-	parser.Register("test", new(testParser))
-	ctx := parser.NewContext(parser.Options{
+	schema.Register("test", new(testParser))
+	ctx := parsers.NewContext(parsers.Options{
 		URL:    "http://localhost/home",
 		Logger: slog.Default().WithGroup("js"),
 	})

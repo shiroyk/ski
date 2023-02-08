@@ -7,7 +7,8 @@ import (
 
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
-	"github.com/shiroyk/cloudcat/parser"
+	"github.com/shiroyk/cloudcat/schema"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 )
 
 var content = `<!DOCTYPE html>
@@ -34,78 +35,78 @@ var content = `<!DOCTYPE html>
 
 func TestAnalyzer(t *testing.T) {
 	di.Provide(fetch.NewFetcher(fetch.Options{}))
-	ctx := parser.NewContext(parser.Options{
+	ctx := parsers.NewContext(parsers.Options{
 		URL: "https://localhost",
 	})
 	testCases := []struct {
-		Schema *parser.Schema
+		Schema *schema.Schema
 		Result string
 	}{
-		{parser.NewSchema(parser.ObjectType).
-			AddProperty("title", *parser.NewSchema(parser.StringType).
-				AddRule(parser.NewStep("gq", "foo")).
-				AddRuleOp(parser.OperatorOr).
-				AddRule(parser.NewStep("gq", "title"))),
-			`{"title":"Tests for Analyzer"}`,
-		},
-		{parser.NewSchema(parser.ArrayType).
-			AddInit(parser.NewStep("gq", "#main div")).
-			AddProperty("item", *parser.NewSchema(parser.StringType).
-				AddRule(parser.NewStep("gq", "foo")).
-				AddRuleOp(parser.OperatorOr).
-				AddRule(parser.NewStep("gq", "div"))),
-			`[{"item":"1"},{"item":"2.1"},{"item":"[\"3\"]"},{"item":"{\"n4\":\"4.2\"}"}]`,
-		},
-		{parser.NewSchema(parser.ArrayType).
-			AddInit(parser.NewStep("gq", "#main div")).
-			AddInitOp(parser.OperatorAnd).
-			AddInit(parser.NewStep("gq", ".body li")).
-			AddProperty("item", *parser.NewSchema(parser.StringType).
-				AddRule(parser.NewStep("gq", "* -> attr(id)"))),
+		{schema.NewSchema(schema.ArrayType).
+			AddInit(schema.NewStep("gq", "#main div")).
+			AddInitOp(schema.OperatorAnd).
+			AddInit(schema.NewStep("gq", ".body li")).
+			AddProperty("item", *schema.NewSchema(schema.StringType).
+				AddRule(schema.NewStep("gq", "div, li -> attr(id)"))),
 			`[{"item":"n1"},{"item":"n2"},{"item":"n3"},{"item":"n4"},{"item":"a1"},{"item":"a2"}]`,
 		},
-		{parser.NewSchema(parser.ObjectType).
-			AddProperty("home", *parser.NewSchema(parser.StringType).
-				AddRule(parser.NewStep("gq", `.body ul #a2 a -> href`))),
+		{schema.NewSchema(schema.ObjectType).
+			AddProperty("title", *schema.NewSchema(schema.StringType).
+				AddRule(schema.NewStep("gq", "foo")).
+				AddRuleOp(schema.OperatorOr).
+				AddRule(schema.NewStep("gq", "title"))),
+			`{"title":"Tests for Analyzer"}`,
+		},
+		{schema.NewSchema(schema.ArrayType).
+			AddInit(schema.NewStep("gq", "#main div")).
+			AddProperty("item", *schema.NewSchema(schema.StringType).
+				AddRule(schema.NewStep("gq", "foo")).
+				AddRuleOp(schema.OperatorOr).
+				AddRule(schema.NewStep("gq", "div"))),
+			`[{"item":"1"},{"item":"2.1"},{"item":"[\"3\"]"},{"item":"{\"n4\":\"4.2\"}"}]`,
+		},
+		{schema.NewSchema(schema.ObjectType).
+			AddProperty("home", *schema.NewSchema(schema.StringType).
+				AddRule(schema.NewStep("gq", `.body ul #a2 a -> href`))),
 			`{"home":"https://localhost/home"}`,
 		},
-		{parser.NewSchema(parser.ObjectType).
-			AddProperty("object", *parser.NewSchema(parser.ObjectType).
-				AddInit(parser.NewStep("gq", "#main")).
-				AddProperty("string", *parser.NewSchema(parser.StringType).
-					AddRule(parser.NewStep("gq", "#n1"))).
-				AddProperty("integer", *parser.NewSchema(parser.IntegerType).
-					AddRule(parser.NewStep("gq", "#n1"))).
-				AddProperty("number", *parser.NewSchema(parser.NumberType).
-					AddRule(parser.NewStep("gq", "#n2"))).
-				AddProperty("boolean", *parser.NewSchema(parser.BooleanType).
-					AddRule(parser.NewStep("gq", "#n1"))).
-				AddProperty("array", *parser.NewSchema(parser.StringType, parser.ArrayType).
-					AddRule(parser.NewStep("gq", "#n3"))).
-				AddProperty("object", *parser.NewSchema(parser.StringType, parser.ObjectType).
-					AddRule(parser.NewStep("gq", "#n4")))),
+		{schema.NewSchema(schema.ObjectType).
+			AddProperty("object", *schema.NewSchema(schema.ObjectType).
+				AddInit(schema.NewStep("gq", "#main")).
+				AddProperty("string", *schema.NewSchema(schema.StringType).
+					AddRule(schema.NewStep("gq", "#n1"))).
+				AddProperty("integer", *schema.NewSchema(schema.IntegerType).
+					AddRule(schema.NewStep("gq", "#n1"))).
+				AddProperty("number", *schema.NewSchema(schema.NumberType).
+					AddRule(schema.NewStep("gq", "#n2"))).
+				AddProperty("boolean", *schema.NewSchema(schema.BooleanType).
+					AddRule(schema.NewStep("gq", "#n1"))).
+				AddProperty("array", *schema.NewSchema(schema.StringType, schema.ArrayType).
+					AddRule(schema.NewStep("gq", "#n3"))).
+				AddProperty("object", *schema.NewSchema(schema.StringType, schema.ObjectType).
+					AddRule(schema.NewStep("gq", "#n4")))),
 			`{"object":{"array":["3"],"boolean":true,"integer":1,"number":2.1,"object":{"n4":"4.2"},"string":"1"}}`,
 		},
-		{parser.NewSchema(parser.ObjectType).
-			AddProperty("object1", *parser.NewSchema(parser.ObjectType, parser.NumberType).
-				AddRule(parser.NewStep("gq", `#main #n4`))),
+		{schema.NewSchema(schema.ObjectType).
+			AddProperty("object1", *schema.NewSchema(schema.ObjectType, schema.NumberType).
+				AddRule(schema.NewStep("gq", `#main #n4`))),
 			`{"object1":{"n4":4.2}}`,
 		},
-		{parser.NewSchema(parser.ObjectType).
-			AddProperty("array", *parser.NewSchema(parser.ArrayType).
-				AddInit(parser.NewStep("gq", `#main div -> slice(0, 2)`)).
-				AddProperty("n", *parser.NewSchema(parser.NumberType).
-					AddRule(parser.NewStep("gq", `div -> text`)))),
+		{schema.NewSchema(schema.ObjectType).
+			AddProperty("array", *schema.NewSchema(schema.ArrayType).
+				AddInit(schema.NewStep("gq", `#main div -> slice(0, 2)`)).
+				AddProperty("n", *schema.NewSchema(schema.NumberType).
+					AddRule(schema.NewStep("gq", `div -> text`)))),
 			`{"array":[{"n":1},{"n":2.1}]}`,
 		},
-		{parser.NewSchema(parser.ObjectType).
-			AddProperty("array1", *parser.NewSchema(parser.ArrayType, parser.NumberType).
-				AddRule(parser.NewStep("gq", `#main div -> slice(0, 2)`))),
+		{schema.NewSchema(schema.ObjectType).
+			AddProperty("array1", *schema.NewSchema(schema.ArrayType, schema.NumberType).
+				AddRule(schema.NewStep("gq", `#main div -> slice(0, 2)`))),
 			`{"array1":[1,2.1]}`,
 		},
-		{parser.NewSchema(parser.ObjectType).
-			AddProperty("array2", *parser.NewSchema(parser.ArrayType, parser.NumberType).
-				AddRule(parser.NewStep("gq", `#main #n3`), parser.NewStep("json", `$.*`))),
+		{schema.NewSchema(schema.ObjectType).
+			AddProperty("array2", *schema.NewSchema(schema.ArrayType, schema.NumberType).
+				AddRule(schema.NewStep("gq", `#main #n3`), schema.NewStep("json", `$.*`))),
 			`{"array2":[3]}`,
 		},
 	}

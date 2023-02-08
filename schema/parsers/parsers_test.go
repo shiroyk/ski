@@ -1,6 +1,8 @@
-package parser
+package parsers
 
-import "testing"
+import (
+	"testing"
+)
 
 type testParser struct{}
 
@@ -26,6 +28,6 @@ func TestRegister(t *testing.T) {
 		Register("test", new(testParser))
 	}
 	if _, ok := GetParser("test"); !ok {
-		t.Fatal("unable get parser")
+		t.Fatal("unable get schema")
 	}
 }

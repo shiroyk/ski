@@ -6,12 +6,12 @@ import (
 	"reflect"
 	"testing"
 
-	c "github.com/shiroyk/cloudcat/parser"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 )
 
 var (
 	json    Parser
-	ctx     *c.Context
+	ctx     *parsers.Context
 	content = `
 {
     "store": {
@@ -54,7 +54,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = c.NewContext(c.Options{Config: c.Config{Separator: ", "}})
+	ctx = parsers.NewContext(parsers.Options{})
 	code := m.Run()
 	os.Exit(code)
 }
@@ -104,8 +104,8 @@ func assertGetElements(t *testing.T, arg string, assert func([]string) bool) {
 }
 
 func TestParser(t *testing.T) {
-	if _, ok := c.GetParser(key); !ok {
-		t.Fatal("parser not registered")
+	if _, ok := parsers.GetParser(key); !ok {
+		t.Fatal("schema not registered")
 	}
 
 	contents := []any{114514, `}{`}

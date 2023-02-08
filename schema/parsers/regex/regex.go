@@ -6,19 +6,19 @@ import (
 	"strings"
 
 	"github.com/dlclark/regexp2"
-	"github.com/shiroyk/cloudcat/parser"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 )
 
-// Parser the regexp2 parser
+// Parser the regexp2 schema
 type Parser struct{}
 
 const key string = "regex"
 
 func init() {
-	parser.Register(key, new(Parser))
+	parsers.Register(key, new(Parser))
 }
 
-func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, error) {
+func (p Parser) GetString(_ *parsers.Context, content any, arg string) (string, error) {
 	re, replace, start, count, err := parseRegexp(arg)
 	if err != nil {
 		return "", err
@@ -31,7 +31,7 @@ func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, e
 	return "", fmt.Errorf("unexpected content type %T", content)
 }
 
-func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
+func (p Parser) GetStrings(_ *parsers.Context, content any, arg string) ([]string, error) {
 	re, replace, start, count, err := parseRegexp(arg)
 	if err != nil {
 		return nil, err
@@ -50,11 +50,11 @@ func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string
 	return nil, fmt.Errorf("unexpected content type %T", content)
 }
 
-func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (string, error) {
+func (p Parser) GetElement(ctx *parsers.Context, content any, arg string) (string, error) {
 	return p.GetString(ctx, content, arg)
 }
 
-func (p Parser) GetElements(ctx *parser.Context, content any, arg string) ([]string, error) {
+func (p Parser) GetElements(ctx *parsers.Context, content any, arg string) ([]string, error) {
 	return p.GetStrings(ctx, content, arg)
 }
 

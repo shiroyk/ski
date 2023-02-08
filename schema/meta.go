@@ -1,4 +1,4 @@
-package parser
+package schema
 
 import (
 	"fmt"
@@ -6,12 +6,6 @@ import (
 
 	"github.com/spf13/cast"
 )
-
-// Config the Meta configuration
-type Config struct {
-	Separator string
-	Timeout   time.Duration
-}
 
 // Source the Meta source
 type Source struct {
@@ -24,7 +18,6 @@ type Source struct {
 // Meta the meta
 type Meta struct {
 	Source *Source `yaml:"source"`
-	Config *Config `yaml:"config"`
 	Schema *Schema `yaml:"scheme"`
 }
 
@@ -42,10 +35,6 @@ func (meta *Meta) UnmarshalYAML(unmarshal func(any) error) error {
 func (meta *Meta) buildMeta(maps map[string]any) (err error) {
 	if source, ok := maps["source"]; ok {
 		meta.Source = source.(*Source)
-	}
-
-	if config, ok := maps["config"]; ok {
-		meta.Config = config.(*Config)
 	}
 
 	if properties, ok := maps["schema"].(map[string]any); ok {
@@ -148,15 +137,15 @@ func buildStringSchema(obj any) (schema Schema, err error) {
 }
 
 func buildTypedSchema(typed any, obj map[string]any) (schema Schema, err error) {
-	var schemaType SchemaType
-	schemaType, err = ToSchemaType(typed)
+	var schemaType Type
+	schemaType, err = ToType(typed)
 	if err != nil {
 		return
 	}
 	schema = *NewSchema(schemaType)
 
 	if format, ok := obj["format"]; ok {
-		schema.Format, err = ToSchemaType(format)
+		schema.Format, err = ToType(format)
 		if err != nil {
 			return
 		}

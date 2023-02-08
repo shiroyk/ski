@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/shiroyk/cloudcat/parser"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 	"github.com/shiroyk/cloudcat/utils"
 	"github.com/spf13/cast"
 )
@@ -15,10 +15,10 @@ type Parser struct{}
 const key string = "gq"
 
 func init() {
-	parser.Register(key, new(Parser))
+	parsers.Register(key, new(Parser))
 }
 
-func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret string, err error) {
+func (p Parser) GetString(ctx *parsers.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
@@ -30,8 +30,7 @@ func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret str
 	}
 
 	selection := nodes.Find(rule)
-	var node any
-	node = selection
+	var node any = selection
 
 	for _, fun := range funcs {
 		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
@@ -39,7 +38,7 @@ func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret str
 		}
 	}
 
-	join, err := buildInFunc.Join(ctx, node)
+	join, err := buildInFunc.Join(ctx, node, "\n")
 	if err != nil {
 		return
 	}
@@ -47,7 +46,7 @@ func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret str
 	return cast.ToStringE(join)
 }
 
-func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []string, err error) {
+func (p Parser) GetStrings(ctx *parsers.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
@@ -84,7 +83,7 @@ func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []
 	return cast.ToStringSliceE(node)
 }
 
-func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret string, err error) {
+func (p Parser) GetElement(ctx *parsers.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
@@ -111,7 +110,7 @@ func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret st
 	return cast.ToStringE(node)
 }
 
-func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret []string, err error) {
+func (p Parser) GetElements(ctx *parsers.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return

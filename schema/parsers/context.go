@@ -1,4 +1,4 @@
-package parser
+package parsers
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/shiroyk/cloudcat/utils"
 	"golang.org/x/exp/slog"
 )
 
@@ -31,19 +32,14 @@ type Context struct {
 
 // Options The Context options
 type Options struct {
-	Config Config
-	Logger *slog.Logger
-	URL    string
+	Timeout time.Duration
+	Logger  *slog.Logger
+	URL     string
 }
 
 // NewContext creates a new Context with Options
 func NewContext(opt Options) *Context {
-	var d time.Time
-	if opt.Config.Timeout > 0 {
-		d = time.Now().Add(opt.Config.Timeout)
-	} else {
-		d = time.Now().Add(DefaultTimeout)
-	}
+	d := time.Now().Add(utils.ZeroOr(opt.Timeout, DefaultTimeout))
 	if opt.Logger == nil {
 		opt.Logger = slog.Default()
 	}
@@ -176,11 +172,6 @@ func (c *Context) GetValue(key any) (any, bool) {
 // SetValue value associated with key is val.
 func (c *Context) SetValue(key any, value any) {
 	c.value.Store(key, value)
-}
-
-// Config returns the Config
-func (c *Context) Config() Config {
-	return c.opt.Config
 }
 
 // Logger returns the logger, if Options.Logger is nil return slog.Default

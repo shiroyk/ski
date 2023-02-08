@@ -9,12 +9,7 @@ import (
 	"github.com/dop251/goja/ast"
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
-	_ "github.com/shiroyk/cloudcat/js/modules/cache"
-	_ "github.com/shiroyk/cloudcat/js/modules/console"
-	_ "github.com/shiroyk/cloudcat/js/modules/cookie"
-	_ "github.com/shiroyk/cloudcat/js/modules/http"
-	_ "github.com/shiroyk/cloudcat/js/modules/shortener"
-	"github.com/shiroyk/cloudcat/parser"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 	"golang.org/x/exp/maps"
 )
 
@@ -57,7 +52,7 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 		argValues = append(argValues, vm.runtime.ToValue(v))
 	}
 
-	if ctx, ok := ctx.(*parser.Context); ok {
+	if ctx, ok := ctx.(*parsers.Context); ok {
 		argKeys = append(argKeys, "cat")
 		argValues = append(argValues, vm.runtime.ToValue(NewCat(ctx)))
 	}

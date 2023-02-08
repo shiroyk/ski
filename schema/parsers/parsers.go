@@ -1,10 +1,10 @@
-package parser
+package parsers
 
 import (
 	"github.com/shiroyk/cloudcat/ext"
 )
 
-// Parser the content parser
+// Parser the content schema
 type Parser interface {
 	// GetString gets the string of the content with the given arguments
 	GetString(*Context, any, string) (string, error)
@@ -16,7 +16,7 @@ type Parser interface {
 	GetElements(*Context, any, string) ([]string, error)
 }
 
-// Register registers the parser with the given key parser
+// Register registers the Parser with the given key Parser
 func Register(key string, parser Parser) {
 	ext.Register(key, ext.ParserExtension, parser)
 }
@@ -24,8 +24,8 @@ func Register(key string, parser Parser) {
 // GetParser returns a Parser with the given key
 func GetParser(key string) (Parser, bool) {
 	parsers := ext.Get(ext.ParserExtension)
-	if parser, ok := parsers[key]; ok {
-		return parser.Module.(Parser), true
+	if p, ok := parsers[key]; ok {
+		return p.Module.(Parser), true
 	}
 	return nil, false
 }

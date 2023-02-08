@@ -22,19 +22,19 @@ type ExtensionType uint
 const (
 	// JSExtension The modules.Module or modules.NativeModule
 	JSExtension ExtensionType = iota + 1
-	// ParserExtension The parser.Parser.
+	// ParserExtension The parsers.Parser.
 	ParserExtension
 )
 
 func (e ExtensionType) String() string {
-	var s string
 	switch e {
 	case JSExtension:
-		s = "js"
+		return "js"
 	case ParserExtension:
-		s = "parser"
+		return "parser"
+	default:
+		return ""
 	}
-	return s
 }
 
 // Extension a generic container.

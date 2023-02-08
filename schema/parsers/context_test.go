@@ -1,4 +1,4 @@
-package parser
+package parsers
 
 import (
 	"testing"
@@ -10,9 +10,9 @@ import (
 func TestContext(t *testing.T) {
 	t.Parallel()
 	ctx := NewContext(Options{
-		URL:    "http://localhost",
-		Logger: slog.Default(),
-		Config: Config{Timeout: time.Second},
+		URL:     "http://localhost",
+		Logger:  slog.Default(),
+		Timeout: time.Second,
 	})
 	if _, ok := ctx.Deadline(); !ok {
 		t.Error("deadline not set")
@@ -35,9 +35,6 @@ func TestContext(t *testing.T) {
 	if ctx.Logger() == nil {
 		t.Error("context logger not set")
 	}
-	if ctx.Config().Timeout != time.Second {
-		t.Error("context config not set")
-	}
 	if ctx.BaseURL() == "" {
 		t.Error("context baseURL not set")
 	}
@@ -50,9 +47,9 @@ func TestContext(t *testing.T) {
 	}
 	<-ctx.Done()
 
-	ctx1 := NewContext(Options{Config: Config{Timeout: time.Nanosecond}})
+	ctx1 := NewContext(Options{Timeout: time.Nanosecond})
 	<-ctx1.Done()
 
-	ctx2 := NewContext(Options{Config: Config{Timeout: time.Millisecond}})
+	ctx2 := NewContext(Options{Timeout: time.Millisecond})
 	<-ctx2.Done()
 }

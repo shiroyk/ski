@@ -6,17 +6,17 @@ import (
 	"reflect"
 	"testing"
 
-	p "github.com/shiroyk/cloudcat/parser"
+	"github.com/shiroyk/cloudcat/schema/parsers"
 )
 
 var (
 	jsParser Parser
-	ctx      *p.Context
+	ctx      *parsers.Context
 )
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = p.NewContext(p.Options{
+	ctx = parsers.NewContext(parsers.Options{
 		URL: "http://localhost/home",
 	})
 	code := m.Run()
@@ -24,9 +24,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestParser(t *testing.T) {
-	_, ok := p.GetParser(key)
+	_, ok := parsers.GetParser(key)
 	if !ok {
-		t.Fatal("parser not registered")
+		t.Fatal("schema not registered")
 	}
 }
 
