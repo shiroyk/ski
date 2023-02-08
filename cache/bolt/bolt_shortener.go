@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/shiroyk/cloudcat/cache"
-	"golang.org/x/exp/slog"
+	"github.com/shiroyk/cloudcat/logger"
 )
 
 // Shortener is an implementation of cache.Shortener that stores HTTP request in bolt.DB.
@@ -20,7 +20,7 @@ func (s *Shortener) Set(http string, timeout time.Duration) string {
 	id := hex.EncodeToString(hash[:])
 
 	if err := s.db.PutWithTimeout([]byte(id), []byte(http), timeout); err != nil {
-		slog.Error("failed to set shortener", err)
+		logger.Errorf("failed to set shortener %s", err)
 	}
 	return id
 }

@@ -53,8 +53,7 @@ func NewRequest(method, u string, body any, headers map[string]string) (*Request
 		// Convert body to io.Reader
 		switch data := body.(type) {
 		default:
-			switch reflect.ValueOf(body).Kind() {
-			case reflect.Struct, reflect.Map:
+			if kind := reflect.ValueOf(body).Kind(); kind == reflect.Struct || kind == reflect.Map {
 				j, err := json.Marshal(body)
 				if err != nil {
 					return nil, err
@@ -62,7 +61,9 @@ func NewRequest(method, u string, body any, headers map[string]string) (*Request
 				if headers == nil {
 					headers = make(map[string]string)
 				}
-				headers["Content-Type"] = "application/json"
+				if _, ok := headers["Content-Type"]; !ok {
+					headers["Content-Type"] = "application/json"
+				}
 				reqBody = bytes.NewReader(j)
 			}
 		case *bytes.Buffer:
@@ -121,9 +122,9 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 	}()
 
 	req := new(http.Request)
-	var rawUrl string
+	var rawURI string
 
-	req.Method, rawUrl, req.Proto = parseRequestLine(s)
+	req.Method, rawURI, req.Proto = parseRequestLine(s)
 	if !validMethod(req.Method) {
 		return nil, fmt.Errorf("invalid method %s", req.Method)
 	}
@@ -132,7 +133,7 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 		return nil, fmt.Errorf("malformed HTTP version %s", req.Proto)
 	}
 
-	if req.URL, err = url.ParseRequestURI(rawUrl); err != nil {
+	if req.URL, err = url.ParseRequestURI(rawURI); err != nil {
 		return nil, err
 	}
 

@@ -10,16 +10,24 @@ import (
 	"github.com/shiroyk/cloudcat/js/modules"
 )
 
+// Module js module
 type Module struct{}
 
+// Exports returns the module instance
 func (*Module) Exports() any {
 	return &Cache{di.MustResolve[cache.Cache]()}
+}
+
+// Native returns is it is a native module
+func (*Module) Native() bool {
+	return false
 }
 
 func init() {
 	modules.Register("cache", &Module{})
 }
 
+// Cache interface is used to store string or bytes.
 type Cache struct {
 	cache cache.Cache
 }

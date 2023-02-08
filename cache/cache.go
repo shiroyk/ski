@@ -21,6 +21,7 @@ type Cache interface {
 
 // (This implementation code copyright geziyor authors: https://github.com/geziyor/geziyor)
 
+// Policy has no awareness of any HTTP Cache-Control directives.
 type Policy int
 
 const (
@@ -583,6 +584,7 @@ func (r *cachingReadCloser) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Close the io.ReadCloser
 func (r *cachingReadCloser) Close() error {
 	return r.R.Close()
 }

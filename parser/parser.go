@@ -6,9 +6,13 @@ import (
 
 // Parser the content parser
 type Parser interface {
+	// GetString gets the string of the content with the given arguments
 	GetString(*Context, any, string) (string, error)
+	// GetStrings gets the string of the content with the given arguments
 	GetStrings(*Context, any, string) ([]string, error)
+	// GetElement gets the string of the content with the given arguments
 	GetElement(*Context, any, string) (string, error)
+	// GetElements gets the string of the content with the given arguments
 	GetElements(*Context, any, string) ([]string, error)
 }
 

@@ -30,7 +30,7 @@ func TestFormData(t *testing.T) {
 		`mp.append('name', 'bar');
 		 assert.equal(mp.keys().length, 2);
 		 assert.equal(mp.get('name'), 'foo');`,
-		`assert.equal(mp.entries().length, 4)`,
+		`assert.equal(mp.entries().length, 2)`,
 		`mp.delete('name');
 		 assert.equal(mp.getAll('name').length, 0)`,
 		`assert(!mp.has('name'))`,
@@ -40,7 +40,6 @@ func TestFormData(t *testing.T) {
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			t.Parallel()
 			_, err := vm.RunString(ctx, s)
 			if err != nil {
 				t.Errorf("Script: %s , %s", s, err)

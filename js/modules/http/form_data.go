@@ -20,9 +20,11 @@ type FormData struct {
 	data map[string][]any
 }
 
+// NativeFormData js native module
 type NativeFormData struct{}
 
-func (*NativeFormData) New() any {
+// Exports returns module instance
+func (*NativeFormData) Exports() any {
 	return func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
 		param := call.Argument(0)
 
@@ -56,6 +58,11 @@ func (*NativeFormData) New() any {
 
 		return vm.ToValue(FormData{data}).ToObject(vm)
 	}
+}
+
+// Native returns is it is a native module
+func (*NativeFormData) Native() bool {
+	return true
 }
 
 // Append method of the FormData interface appends a new value onto an existing key inside a FormData object,

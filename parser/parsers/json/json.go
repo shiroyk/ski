@@ -10,6 +10,7 @@ import (
 	"github.com/shiroyk/cloudcat/utils"
 )
 
+// Parser the json parser
 type Parser struct{}
 
 const key string = "json"

@@ -13,16 +13,19 @@ import (
 	"github.com/spf13/cast"
 )
 
+// Analyzer context analyzer
 type Analyzer struct {
 	FormatHandler FormatHandler
 }
 
+// NewAnalyzer returns a new analyzer
 func NewAnalyzer() *Analyzer {
 	return &Analyzer{
 		FormatHandler: new(defaultFormatHandler),
 	}
 }
 
+// ExecuteSchema execute a parser.Schema, returns the result
 func (analyzer *Analyzer) ExecuteSchema(ctx *parser.Context, schema *parser.Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
@@ -147,6 +150,7 @@ type FormatHandler interface {
 
 type defaultFormatHandler struct{}
 
+// Format the data to the given parser.SchemaType
 func (f defaultFormatHandler) Format(data any, format parser.SchemaType) (any, error) {
 	switch data := data.(type) {
 	case string:

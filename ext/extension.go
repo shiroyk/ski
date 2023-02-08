@@ -16,10 +16,13 @@ var (
 	extensions = make(map[ExtensionType]map[string]*Extension)
 )
 
+// ExtensionType The type of extension
 type ExtensionType uint
 
 const (
+	// JSExtension The modules.Module or modules.NativeModule
 	JSExtension ExtensionType = iota + 1
+	// ParserExtension The parser.Parser.
 	ParserExtension
 )
 
@@ -34,6 +37,7 @@ func (e ExtensionType) String() string {
 	return s
 }
 
+// Extension a generic container.
 type Extension struct {
 	Name, Path, Desc, Version string
 	Type                      ExtensionType
@@ -44,6 +48,7 @@ func (e Extension) String() string {
 	return fmt.Sprintf("%s [%s] %s %s ", e.Name, e.Type, e.Version, e.Path)
 }
 
+// MarshalJSON encodes to JSON
 func (e Extension) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
 		"name":    e.Name,
@@ -104,6 +109,7 @@ func Get(typ ExtensionType) map[string]*Extension {
 	return result
 }
 
+// GetAll returns all extensions.
 func GetAll() []*Extension {
 	mx.RLock()
 	defer mx.RUnlock()

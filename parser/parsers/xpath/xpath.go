@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Parser the xpath parser
 type Parser struct{}
 
 const key string = "xpath"

@@ -16,6 +16,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
+// Fetch http client interface
 type Fetch interface {
 	Get(url string, headers map[string]string) (*Response, error)
 	Post(url string, body any, headers map[string]string) (*Response, error)
@@ -30,23 +31,31 @@ type fetcher struct {
 }
 
 const (
-	DefaultUserAgent         = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.0.0 Safari/537.36"
+	// DefaultUserAgent fetch.Request default user-agent
+	DefaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.0.0 Safari/537.36"
+	// DefaultMaxBodySize fetch.Response default max body size
 	DefaultMaxBodySize int64 = 1024 * 1024 * 1024
-	DefaultRetryTimes        = 3
-	DefaultTimeout           = time.Second * 180
+	// DefaultRetryTimes fetch.Request retry times
+	DefaultRetryTimes = 3
+	// DefaultTimeout fetch.Request timeout
+	DefaultTimeout = time.Second * 180
 )
 
 var (
+	// DefaultRetryHTTPCodes retry fetch.Request error status code
 	DefaultRetryHTTPCodes = []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable,
 		http.StatusGatewayTimeout, http.StatusRequestTimeout}
+	// DefaultHeaders defaults fetch.Request headers
 	DefaultHeaders = map[string]string{
 		"Accept":          "*/*",
 		"Accept-Encoding": "gzip",
 		"User-Agent":      DefaultUserAgent,
 	}
+	// ErrRequestCancel fetch.Request cancel error
 	ErrRequestCancel = errors.New("request canceled")
 )
 
+// Options The Fetch instance options
 type Options struct {
 	CharsetDetectDisabled bool
 	MaxBodySize           int64
@@ -55,6 +64,7 @@ type Options struct {
 	Timeout               time.Duration
 }
 
+// NewFetcher returns a new Fetch instance
 func NewFetcher(opt Options) Fetch {
 	fetch := new(fetcher)
 
@@ -92,18 +102,22 @@ func NewFetcher(opt Options) Fetch {
 	return fetch
 }
 
+// Get issues a GET to the specified URL string and headers.
 func (f *fetcher) Get(url string, headers map[string]string) (*Response, error) {
 	return f.Request(http.MethodGet, url, nil, headers)
 }
 
+// Post issues a POST to the specified URL string and headers.
 func (f *fetcher) Post(url string, body any, headers map[string]string) (*Response, error) {
 	return f.Request(http.MethodPost, url, body, headers)
 }
 
+// Head issues a POST to the specified URL string and headers.
 func (f *fetcher) Head(url string, headers map[string]string) (*Response, error) {
 	return f.Request(http.MethodHead, url, nil, headers)
 }
 
+// Request sends request with specified method, url, body, headers; returns an HTTP response.
 func (f *fetcher) Request(method, url string, body any, headers map[string]string) (*Response, error) {
 	request, err := NewRequest(method, url, body, headers)
 	if err != nil {
@@ -112,6 +126,7 @@ func (f *fetcher) Request(method, url string, body any, headers map[string]strin
 	return f.DoRequest(request)
 }
 
+// DoRequest sends a fetch.Request and returns an HTTP response
 func (f *fetcher) DoRequest(req *Request) (*Response, error) {
 	f.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy(req.URL.String(), req.Proxy...)
 	return f.doRequestRetry(req)

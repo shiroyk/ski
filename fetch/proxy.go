@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"sync/atomic"
 
+	"github.com/shiroyk/cloudcat/logger"
 	"github.com/shiroyk/cloudcat/utils"
-	"golang.org/x/exp/slog"
 )
 
-type ProxyURLKey int
+type proxyURLKey int
 
 var (
 	cacheProxy = utils.NewLRUCache[string, roundRobinProxy](64)
@@ -21,11 +21,12 @@ type roundRobinProxy struct {
 	index     uint32
 }
 
-func (r *roundRobinProxy) GetProxy(pr *http.Request) (*url.URL, error) {
+// getProxy returns a proxy URL for the given http.Request
+func (r *roundRobinProxy) getProxy(pr *http.Request) (*url.URL, error) {
 	index := atomic.AddUint32(&r.index, 1) - 1
 	u := r.proxyURLs[index%uint32(len(r.proxyURLs))]
 	// Set proxy url to context
-	ctx := context.WithValue(pr.Context(), ProxyURLKey(0), u.String())
+	ctx := context.WithValue(pr.Context(), proxyURLKey(0), u.String())
 	*pr = *pr.WithContext(ctx)
 	return u, nil
 }
@@ -44,14 +45,14 @@ func RoundRobinCacheProxy(u string, proxyURLs ...string) func(*http.Request) (*u
 	var ok bool
 	p, ok = cacheProxy.Get(u)
 	if ok {
-		return p.GetProxy
+		return p.getProxy
 	}
 
 	parsedProxyURLs := make([]*url.URL, len(proxyURLs))
 	for i, pu := range proxyURLs {
 		parsedURL, err := url.Parse(pu)
 		if err != nil {
-			slog.Error("proxy url error ", err)
+			logger.Errorf("proxy url error %s", err)
 			return nil
 		}
 		parsedProxyURLs[i] = parsedURL
@@ -59,5 +60,5 @@ func RoundRobinCacheProxy(u string, proxyURLs ...string) func(*http.Request) (*u
 
 	p = roundRobinProxy{parsedProxyURLs, 0}
 	cacheProxy.Add(u, p)
-	return p.GetProxy
+	return p.getProxy
 }

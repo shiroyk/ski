@@ -13,12 +13,12 @@ type Cookie struct {
 	entries *sync.Map
 }
 
-// SetCookieString handles the receipt of the cookies strung in a reply for the given URL.
+// SetCookieString handles the receipt of the cookies string in a reply for the given URL.
 func (c *Cookie) SetCookieString(u *url.URL, cookies string) {
 	c.entries.Store(u.Host, cookies)
 }
 
-// CookieString returns the cookies string to send in a request for the given URL.
+// CookieString returns the cookies string for the given URL.
 func (c *Cookie) CookieString(u *url.URL) string {
 	if cookies, ok := c.entries.Load(u.Host); ok {
 		return cookies.(string)
@@ -26,7 +26,7 @@ func (c *Cookie) CookieString(u *url.URL) string {
 	return ""
 }
 
-// DeleteCookie handles the receipt of the cookies in a reply for the given URL.
+// DeleteCookie delete the cookies for the given URL.
 func (c *Cookie) DeleteCookie(u *url.URL) {
 	c.entries.Delete(u.Host)
 }

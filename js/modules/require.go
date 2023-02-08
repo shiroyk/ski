@@ -28,6 +28,7 @@ type require struct {
 	globalFolders []string
 }
 
+// Require load a js module from path or URL
 func (r *require) Require(name string) goja.Value {
 	if e, ok := ext.Get(ext.JSExtension)[name]; ok {
 		if module, ok := e.Module.(Module); ok {

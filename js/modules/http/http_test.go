@@ -93,7 +93,6 @@ func TestHttp(t *testing.T) {
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			t.Parallel()
 			_, err := vm.RunString(ctx, s)
 			if err != nil {
 				t.Errorf("Script: %s , %s", s, err)

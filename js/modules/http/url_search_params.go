@@ -21,8 +21,8 @@ type URLSearchParams struct {
 // NativeURLSearchParams Native module
 type NativeURLSearchParams struct{}
 
-// New instance URLSearchParams module
-func (*NativeURLSearchParams) New() any {
+// Exports instance URLSearchParams module
+func (*NativeURLSearchParams) Exports() any {
 	return func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
 		param := call.Argument(0)
 
@@ -48,6 +48,11 @@ func (*NativeURLSearchParams) New() any {
 
 		return vm.ToValue(URLSearchParams{data: data}).ToObject(vm)
 	}
+}
+
+// Native returns is it is a native module
+func (*NativeURLSearchParams) Native() bool {
+	return true
 }
 
 // encode encodes the values into “URL encoded” form

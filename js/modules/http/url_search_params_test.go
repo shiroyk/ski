@@ -28,16 +28,16 @@ func TestURLSearchParams(t *testing.T) {
 		`assert.equal(form.toString(), 'name=foo&name=bar')`,
 		`form.append('value', 'zoo');
 		 assert(compareArray(form.keys(), ['name', 'value']))`,
-		`assert.equal(form.entries().length, 5)`,
+		`assert.equal(form.entries().length, 3)`,
 		`form.delete('name');
 		 assert.equal(form.getAll('name').length, 0)`,
 		`assert(!form.has('name'))`,
 		`form.set('name', 'foobar');
-		 assert.equal(form.values().length, 2)`} //nolint:gofumpt
+		 assert.equal(form.values().length, 2)`,
+	} //nolint:gofumpt
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			t.Parallel()
 			_, err := vm.RunString(ctx, s)
 			if err != nil {
 				t.Errorf("Script: %s , %s", s, err)

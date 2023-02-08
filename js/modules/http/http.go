@@ -14,16 +14,23 @@ import (
 	"github.com/spf13/cast"
 )
 
+// Module js module
 type Module struct{}
 
+// Exports returns module instance
 func (*Module) Exports() any {
 	return &Http{di.MustResolve[fetch.Fetch]()}
 }
 
+// Native returns is it is a native module
+func (*Module) Native() bool {
+	return false
+}
+
 func init() {
 	modules.Register("http", &Module{})
-	modules.RegisterNative("FormData", &NativeFormData{})
-	modules.RegisterNative("URLSearchParams", &NativeURLSearchParams{})
+	modules.Register("FormData", &NativeFormData{})
+	modules.Register("URLSearchParams", &NativeURLSearchParams{})
 }
 
 // Http module for fetching resources (including across the network).
@@ -73,19 +80,15 @@ func handleBody(body any, header map[string]string) (any, error) {
 }
 
 // Get Make a GET request with URL and optional headers.
-func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) *goja.Promise {
+func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	header := cast.ToStringMapString(call.Argument(1).Export())
 
-	p, resolve, reject := vm.NewPromise()
-	go func() {
-		res, err := h.fetch.Get(call.Argument(0).String(), header)
-		if err != nil {
-			reject(err)
-		}
-		resolve(NewResponse(res))
-	}()
+	res, err := h.fetch.Get(call.Argument(0).String(), header)
+	if err != nil {
+		common.Throw(vm, err)
+	}
 
-	return p
+	return vm.ToValue(NewResponse(res))
 }
 
 // Post Make a POST request with URL, optional body, optional headers.

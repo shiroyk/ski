@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shiroyk/cloudcat/logger"
 	"go.etcd.io/bbolt"
-	"golang.org/x/exp/slog"
 )
 
 const (
@@ -24,7 +24,8 @@ const (
 
 var (
 	expireBucketName = []byte("expire")
-	ErrKeyNotFound   = errors.New("key not found")
+	// ErrKeyNotFound not found the key
+	ErrKeyNotFound = errors.New("key not found")
 )
 
 // DB a bbolt.DB instance
@@ -189,7 +190,7 @@ func (db *DB) expire() {
 			now := time.Now().Unix()
 			tx, err := db.db.Begin(false)
 			if err != nil {
-				slog.Error("error start cleaning transactions", err)
+				logger.Errorf("error start cleaning transactions %s", err)
 				continue
 			}
 
@@ -211,7 +212,7 @@ func (db *DB) expire() {
 			_ = tx.Rollback()
 
 			if err = db.DeleteBatch(deletedKeys); err != nil {
-				slog.Error("error cleaning expired keys", err)
+				logger.Errorf("error cleaning expired keys %s", err)
 			}
 
 		case <-exitSign:

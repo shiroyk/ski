@@ -17,6 +17,7 @@ type Response struct {
 	Ok         bool        // true if response Status in the range 200-299.
 }
 
+// NewResponse returns a new Response
 func NewResponse(res *fetch.Response) *Response {
 	return &Response{
 		body:       res.Body,

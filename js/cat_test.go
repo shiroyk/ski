@@ -45,8 +45,8 @@ func TestCat(t *testing.T) {
 
 	testCase := []string{
 		`cat.log('start test')`,
-		`if (cat.baseUrl !== "http://localhost") throw ("not equal, got" + cat.baseUrl);`,
-		`if (cat.redirectUrl !== "http://localhost/home") throw ("not equal, got" + cat.redirectUrl);`,
+		`if (cat.baseURL !== "http://localhost") throw ("not equal, got" + cat.baseURL);`,
+		`if (cat.redirectURL !== "http://localhost/home") throw ("not equal, got" + cat.redirectURL);`,
 		`cat.setVar('v1', 114514)`,
 		`if (cat.getVar('v1') !== 114514) throw ("not equal, got" + cat.getVar('v1'));`,
 		`cat.clearVar()

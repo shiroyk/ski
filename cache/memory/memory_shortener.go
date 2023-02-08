@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/exp/slog"
+	"github.com/shiroyk/cloudcat/logger"
 )
 
 // Shortener is an implementation of cache.Shortener that stores HTTP request in in-memory.
@@ -21,7 +21,7 @@ func (s *Shortener) Set(http string, timeout time.Duration) string {
 	id := hex.EncodeToString(hash[:])
 	s.entries.Store(id, http)
 	s.timeout.Store(id, time.Now().Add(timeout).Unix())
-	slog.Debug("shortener url added %s => %s", id, http)
+	logger.Debugf("shortener url added %s => %s", id, http)
 	return id
 }
 

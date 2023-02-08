@@ -28,7 +28,6 @@ func TestVM(t *testing.T) {
 
 	for _, c := range testCases {
 		t.Run(c.script, func(t *testing.T) {
-			t.Parallel()
 			v, err := vm.RunString(context.Background(), c.script)
 			if err != nil {
 				if c.isErr {
@@ -51,5 +50,16 @@ func TestTimeout(t *testing.T) {
 	_, err := newVM(false).RunString(ctx, `while(true){}`)
 	if !strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
 		t.Fatal(err)
+	}
+}
+
+func TestUseStrict(t *testing.T) {
+	t.Parallel()
+	vm := newVM(true)
+	_, err := vm.RunString(context.Background(), `eval('a = 1');a`)
+	if err != nil {
+		if !strings.Contains(err.Error(), "ReferenceError: a is not defined") {
+			t.Fatal(err)
+		}
 	}
 }

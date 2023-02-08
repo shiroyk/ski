@@ -2,13 +2,15 @@ package js
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/ast"
-	"github.com/shiroyk/cloudcat/ext"
+	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
 	_ "github.com/shiroyk/cloudcat/js/modules/cache"
+	_ "github.com/shiroyk/cloudcat/js/modules/console"
 	_ "github.com/shiroyk/cloudcat/js/modules/cookie"
 	_ "github.com/shiroyk/cloudcat/js/modules/http"
 	_ "github.com/shiroyk/cloudcat/js/modules/shortener"
@@ -16,38 +18,37 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type Program struct {
-	Code string
-	Args map[string]any
-}
-
+// VM the js runtime.
+// An instance of VM can only be used by a single goroutine at a time.
 type VM interface {
-	Run(context.Context, Program) (goja.Value, error)
+	// Run the js program
+	Run(context.Context, common.Program) (goja.Value, error)
+	// RunString the js string
 	RunString(context.Context, string) (goja.Value, error)
 }
 
 type vmImpl struct {
 	runtime   *goja.Runtime
+	busy      chan struct{}
 	useStrict bool
 }
 
 func newVM(useStrict bool) VM {
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
-	EnableConsole(vm)
 	modules.EnableRequire(vm)
+	modules.InitNativeModule(vm)
 
-	// Enable native modules
-	for _, extension := range ext.Get(ext.JSExtension) {
-		if native, ok := extension.Module.(modules.NativeModule); ok {
-			_ = vm.Set(extension.Name, native.New())
-		}
-	}
-
-	return &vmImpl{vm, useStrict}
+	return &vmImpl{vm, make(chan struct{}), useStrict}
 }
 
-func (vm *vmImpl) Run(ctx context.Context, p Program) (goja.Value, error) {
+// Run the js program
+func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error) {
+	// resets the interrupt flag.
+	vm.runtime.ClearInterrupt()
+	defer func() {
+		<-vm.busy // unlock deactivation again
+	}()
 	code := p.Code
 	argKeys := maps.Keys(p.Args)
 	argValues := make([]goja.Value, 0, len(p.Args))
@@ -72,29 +73,33 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (goja.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn, err := vm.runtime.RunProgram(program)
-	if err != nil {
-		return nil, err
-	}
 
 	go func() {
 		// Wait for the context to be done
 		<-ctx.Done()
 		// Interrupt running JavaScript.
 		vm.runtime.Interrupt(ctx.Err())
+		// Wait for the vm stop running
+		vm.busy <- struct{}{}
 		// Release vm
 		GetScheduler().Release(vm)
 	}()
+
+	fn, err := vm.runtime.RunProgram(program)
+	if err != nil {
+		return nil, err
+	}
 
 	if call, ok := goja.AssertFunction(fn); ok {
 		return call(goja.Undefined(), argValues...)
 	}
 
-	return nil, ErrVMPoolClosed
+	return nil, fmt.Errorf("unexpected function code:\n %s", code)
 }
 
+// RunString the js string
 func (vm *vmImpl) RunString(ctx context.Context, s string) (goja.Value, error) {
-	return vm.Run(ctx, Program{Code: s})
+	return vm.Run(ctx, common.Program{Code: s})
 }
 
 // transformCode transforms code into return statement

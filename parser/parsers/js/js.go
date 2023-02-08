@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cast"
 )
 
+// Parser the js parser
 type Parser struct{}
 
 const key string = "js"
@@ -40,7 +41,7 @@ func (p *Parser) GetElements(ctx *parser.Context, content any, arg string) ([]st
 }
 
 func runScript(ctx *parser.Context, content any, script string) (any, error) {
-	result, err := js.Run(ctx, js.Program{Code: script, Args: map[string]any{
+	result, err := js.Run(ctx, common.Program{Code: script, Args: map[string]any{
 		"content": content,
 	}})
 	if err != nil {

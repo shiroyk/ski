@@ -53,9 +53,6 @@ func TestContext(t *testing.T) {
 	ctx1 := NewContext(Options{Config: Config{Timeout: time.Nanosecond}})
 	<-ctx1.Done()
 
-	ctx2 := NewContext(Options{Config: Config{Timeout: time.Microsecond}})
+	ctx2 := NewContext(Options{Config: Config{Timeout: time.Millisecond}})
 	<-ctx2.Done()
-
-	ctx3 := NewContext(Options{Config: Config{Timeout: time.Millisecond}})
-	<-ctx3.Done()
 }

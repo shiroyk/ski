@@ -2,7 +2,7 @@ package bolt
 
 import (
 	"github.com/shiroyk/cloudcat/cache"
-	"golang.org/x/exp/slog"
+	"github.com/shiroyk/cloudcat/logger"
 )
 
 // Cache is an implementation of Cache that stores bytes in bolt.DB.
@@ -23,7 +23,7 @@ func (c *Cache) Get(key string) (value []byte, ok bool) {
 func (c *Cache) Set(key string, value []byte) {
 	err := c.db.Put([]byte(key), value)
 	if err != nil {
-		slog.Error("failed to set cache with key %s", err, key)
+		logger.Errorf("failed to set cache with key %s %s", key, err)
 	}
 }
 
@@ -31,7 +31,7 @@ func (c *Cache) Set(key string, value []byte) {
 func (c *Cache) Del(key string) {
 	err := c.db.Delete([]byte(key))
 	if err != nil {
-		slog.Error("failed to delete cache with key %s", err, key)
+		logger.Errorf("failed to delete cache with key %s %s", key, err)
 	}
 }
 

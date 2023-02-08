@@ -11,10 +11,10 @@ import (
 type Cookie interface {
 	http.CookieJar
 
-	// SetCookieString handles the receipt of the cookies strung in a reply for the given URL.
+	// SetCookieString handles the receipt of the cookies string in a reply for the given URL.
 	SetCookieString(u *url.URL, cookies string)
-	// CookieString returns the cookies string to send in a request for the given URL.
+	// CookieString returns the cookies string for the given URL.
 	CookieString(u *url.URL) string
-	// DeleteCookie handles the receipt of the cookies in a reply for the given URL.
+	// DeleteCookie delete the cookies for the given URL.
 	DeleteCookie(u *url.URL)
 }

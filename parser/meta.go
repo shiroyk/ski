@@ -7,11 +7,13 @@ import (
 	"github.com/spf13/cast"
 )
 
+// Config the Meta configuration
 type Config struct {
 	Separator string
 	Timeout   time.Duration
 }
 
+// Source the Meta source
 type Source struct {
 	Name    string
 	BaseURL string
@@ -19,12 +21,14 @@ type Source struct {
 	Header  map[string]string
 }
 
+// Meta the meta
 type Meta struct {
 	Source *Source `yaml:"source"`
 	Config *Config `yaml:"config"`
 	Schema *Schema `yaml:"scheme"`
 }
 
+// UnmarshalYAML decodes the Meta from yaml
 func (meta *Meta) UnmarshalYAML(unmarshal func(any) error) error {
 	var maps map[string]any
 

@@ -11,13 +11,13 @@ import (
 )
 
 type (
-	BuildInFunc struct{}
-	Func        func(ctx *parser.Context, content any, args ...string) (any, error)
+	gqBuildInFunc struct{}
+	gqFunc        func(ctx *parser.Context, content any, args ...string) (any, error)
 )
 
 var (
-	buildInFunc  BuildInFunc
-	buildInFuncs = map[string]Func{
+	buildInFunc gqBuildInFunc
+	funcMap     = map[string]gqFunc{
 		"get":     buildInFunc.Get,
 		"set":     buildInFunc.Set,
 		"attr":    buildInFunc.Attr,
@@ -34,11 +34,11 @@ var (
 	}
 )
 
-func mapToString(content any, f func(*goquery.Selection) (string, error)) (any, error) {
+func mapToString(content any, fn func(*goquery.Selection) (string, error)) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		list := make([]string, node.Length())
 		node.EachWithBreak(func(i int, sel *goquery.Selection) bool {
-			result, err := f(sel)
+			result, err := fn(sel)
 			if err != nil {
 				return false
 			}
@@ -53,7 +53,9 @@ func mapToString(content any, f func(*goquery.Selection) (string, error)) (any, 
 	return nil, fmt.Errorf("unexpected type %T", content)
 }
 
-func (BuildInFunc) Get(ctx *parser.Context, _ any, args ...string) (any, error) {
+// Get returns the value associated with this context for key, or nil
+// if no value is associated with key.
+func (gqBuildInFunc) Get(ctx *parser.Context, _ any, args ...string) (any, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("get function must has one argment")
 	}
@@ -66,7 +68,10 @@ func (BuildInFunc) Get(ctx *parser.Context, _ any, args ...string) (any, error) 
 	return ctx.Value(key), nil
 }
 
-func (BuildInFunc) Set(ctx *parser.Context, content any, args ...string) (any, error) {
+// Set value associated with key is val.
+// The first argument is the key, and the second argument is value.
+// if the value is present will store the content.
+func (gqBuildInFunc) Set(ctx *parser.Context, content any, args ...string) (any, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("set function must has least one argment")
 	}
@@ -85,13 +90,16 @@ func (BuildInFunc) Set(ctx *parser.Context, content any, args ...string) (any, e
 	return content, nil
 }
 
-func (BuildInFunc) Text(_ *parser.Context, content any, _ ...string) (any, error) {
+// Text gets the combined text contents of each element in the set of matched
+// elements, including their descendants.
+func (gqBuildInFunc) Text(_ *parser.Context, content any, _ ...string) (any, error) {
 	return mapToString(content, func(node *goquery.Selection) (string, error) {
 		return strings.TrimSpace(node.Text()), nil
 	})
 }
 
-func (f BuildInFunc) Join(ctx *parser.Context, content any, args ...string) (any, error) {
+// Join the text with the separator, if not present separator uses the config separator.
+func (f gqBuildInFunc) Join(ctx *parser.Context, content any, args ...string) (any, error) {
 	if str, ok := content.(string); ok {
 		return str, nil
 	}
@@ -120,7 +128,10 @@ func (f BuildInFunc) Join(ctx *parser.Context, content any, args ...string) (any
 	return strings.Join(list, sep), nil
 }
 
-func (BuildInFunc) Attr(_ *parser.Context, content any, args ...string) (any, error) {
+// Attr gets the specified attribute's value for the first element in the
+// Selection.
+// The first argument is the name of the attribute, the second is the default value
+func (gqBuildInFunc) Attr(_ *parser.Context, content any, args ...string) (any, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("attr(name) must has name")
 	}
@@ -136,7 +147,8 @@ func (BuildInFunc) Attr(_ *parser.Context, content any, args ...string) (any, er
 	})
 }
 
-func (BuildInFunc) Href(ctx *parser.Context, content any, _ ...string) (any, error) {
+// Href gets the href attribute's value, if URL is not absolute returns the absolute URL.
+func (gqBuildInFunc) Href(ctx *parser.Context, content any, _ ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		hrefURL, err := url.Parse(node.AttrOr("href", ""))
 		if err != nil {
@@ -153,9 +165,14 @@ func (BuildInFunc) Href(ctx *parser.Context, content any, _ ...string) (any, err
 	return nil, fmt.Errorf("unexpected content type %T", content)
 }
 
-func (BuildInFunc) Html(_ *parser.Context, content any, args ...string) (any, error) {
+// Html the first argument is outer.
+// If true returns the outer HTML rendering of the first item in
+// the selection - that is, the HTML including the first element's
+// tag and attributes, or gets the HTML contents of the first element
+// in the set of matched elements. It includes text and comment nodes;
+func (gqBuildInFunc) Html(_ *parser.Context, content any, args ...string) (any, error) {
 	var err error
-	outer := false
+	var outer bool
 
 	if len(args) > 0 {
 		outer, err = cast.ToBoolE(args[0])
@@ -183,7 +200,11 @@ func (BuildInFunc) Html(_ *parser.Context, content any, args ...string) (any, er
 	})
 }
 
-func (BuildInFunc) Prev(_ *parser.Context, content any, args ...string) (any, error) {
+// Prev gets the immediately preceding sibling of each element in the
+// Selection.
+// If present selector gets all preceding siblings of each element up to but not
+// including the element matched by the selector.
+func (gqBuildInFunc) Prev(_ *parser.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.PrevUntil(args[0]), nil
@@ -194,7 +215,11 @@ func (BuildInFunc) Prev(_ *parser.Context, content any, args ...string) (any, er
 	return nil, fmt.Errorf("unexpected content type %T", content)
 }
 
-func (BuildInFunc) Next(_ *parser.Context, content any, args ...string) (any, error) {
+// Next gets the immediately following sibling of each element in the
+// Selection.
+// If present selector gets all following siblings of each element up to but not
+// including the element matched by the selector.
+func (gqBuildInFunc) Next(_ *parser.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.NextUntil(args[0]), nil
@@ -205,7 +230,17 @@ func (BuildInFunc) Next(_ *parser.Context, content any, args ...string) (any, er
 	return nil, fmt.Errorf("unexpected type %T", content)
 }
 
-func (BuildInFunc) Slice(_ *parser.Context, content any, args ...string) (any, error) {
+// Slice reduces the set of matched elements to a subset specified by a range
+// of indices. The start index is 0-based and indicates the index of the first
+// element to select. The end index is 0-based and indicates the index at which
+// the elements stop being selected (the end index is not selected).
+//
+// If not present the end reduces the set of matched elements to the one at the
+// specified start index.
+//
+// The indices may be negative, in which case they represent an offset from the
+// end of the selection.
+func (gqBuildInFunc) Slice(_ *parser.Context, content any, args ...string) (any, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("slice(start, end) must have at least one int argument")
 	}
@@ -229,7 +264,9 @@ func (BuildInFunc) Slice(_ *parser.Context, content any, args ...string) (any, e
 	return nil, fmt.Errorf("unexpected type %T", content)
 }
 
-func (BuildInFunc) Child(_ *parser.Context, content any, args ...string) (any, error) {
+// Child gets the child elements of each element in the Selection.
+// If present the selector will return filtered by the specified selector.
+func (gqBuildInFunc) Child(_ *parser.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.ChildrenFiltered(args[0]), nil
@@ -240,7 +277,9 @@ func (BuildInFunc) Child(_ *parser.Context, content any, args ...string) (any, e
 	return nil, fmt.Errorf("unexpected type %T", content)
 }
 
-func (BuildInFunc) Parent(_ *parser.Context, content any, args ...string) (any, error) {
+// Parent gets the parent of each element in the Selection.
+// if present the selector will return filtered by a selector.
+func (gqBuildInFunc) Parent(_ *parser.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.ParentFiltered(args[0]), nil
@@ -251,7 +290,9 @@ func (BuildInFunc) Parent(_ *parser.Context, content any, args ...string) (any, 
 	return nil, fmt.Errorf("unexpected type %T", content)
 }
 
-func (BuildInFunc) Parents(_ *parser.Context, content any, args ...string) (any, error) {
+// Parents gets the ancestors of each element in the current Selection.
+// if present the selector will return filtered by a selector.
+func (gqBuildInFunc) Parents(_ *parser.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			if len(args) > 1 {

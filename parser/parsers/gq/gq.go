@@ -34,7 +34,7 @@ func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret str
 	node = selection
 
 	for _, fun := range funcs {
-		if node, err = buildInFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
 			return ret, err
 		}
 	}
@@ -63,7 +63,7 @@ func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []
 	node = selection
 
 	for _, fun := range funcs {
-		if node, err = buildInFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
 			return nil, err
 		}
 	}
@@ -99,7 +99,7 @@ func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret st
 	node = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = buildInFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
 			return ret, err
 		}
 	}
@@ -127,7 +127,7 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret [
 	node = selection
 
 	for _, fun := range funcs {
-		if node, err = buildInFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
 			return nil, err
 		}
 	}

@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/ext"
-	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
 )
 
+// TestLib js assertion utilities
 const TestLib = `
 function $ERROR(message) {
 	throw new Error(message);
@@ -97,28 +97,27 @@ function compareArray(a, b) {
 }
 `
 
+// VM test vm
 type VM struct {
 	vm *goja.Runtime
 }
 
+// RunString the js string
 func (vm *VM) RunString(_ context.Context, script string) (goja.Value, error) {
 	return vm.vm.RunString(script)
 }
 
-func (vm *VM) Run(_ context.Context, program js.Program) (goja.Value, error) {
+// Run the js program
+func (vm *VM) Run(_ context.Context, program common.Program) (goja.Value, error) {
 	return vm.vm.RunString(program.Code)
 }
 
+// New returns a test VM instance
 func New() *VM {
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
-	js.EnableConsole(vm)
 	modules.EnableRequire(vm)
-	for _, extension := range ext.Get(ext.JSExtension) {
-		if _, ok := extension.Module.(modules.Module); !ok {
-			_ = vm.Set(extension.Name, extension.Module)
-		}
-	}
+	modules.InitNativeModule(vm)
 	_, _ = vm.RunProgram(goja.MustCompile("testlib.js", TestLib, false))
 	return &VM{vm}
 }

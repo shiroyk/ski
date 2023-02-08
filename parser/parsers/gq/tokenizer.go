@@ -18,43 +18,41 @@ type ruleFunc struct {
 	args []string
 }
 
-func parseRuleFunctions(rules string) (string, []ruleFunc, error) {
-	funcs := make([]ruleFunc, 0)
-	args := strings.Split(rules, "->")
-	rule := strings.TrimSpace(args[0])
-
-	if len(args) == 1 {
-		return rule, funcs, nil
+func parseRuleFunctions(ruleStr string) (rule string, funcs []ruleFunc, err error) {
+	ruleFuncs := strings.Split(ruleStr, "->")
+	if len(ruleFuncs) == 1 {
+		return ruleFuncs[0], funcs, nil
 	}
+	rule = strings.TrimSpace(ruleFuncs[0])
 
-	for _, fun := range args[1:] {
-		fun = strings.TrimSpace(fun)
-		if fun == "" {
+	for _, function := range ruleFuncs[1:] {
+		function = strings.TrimSpace(function)
+		if function == "" {
 			continue
 		}
-		f, err := parseFuncArguments(fun)
+		fn, err := parseFuncArguments(function)
 		if err != nil {
 			return "", nil, err
 		}
-		if buildInFuncs[f.name] == nil {
-			return "", nil, fmt.Errorf("unexpected not exists function %s", f.name)
+		if funcMap[fn.name] == nil {
+			return "", nil, fmt.Errorf("function %s not exists", fn.name)
 		}
-		funcs = append(funcs, *f)
+		funcs = append(funcs, fn)
 	}
 
-	return rule, funcs, nil
+	return
 }
 
-func parseFuncArguments(s string) (*ruleFunc, error) {
+func parseFuncArguments(s string) (ret ruleFunc, err error) {
 	openBracket := strings.IndexByte(s, '(')
 	closeBracket := strings.LastIndexByte(s, ')')
 
 	if openBracket == -1 {
-		return &ruleFunc{name: s}, nil
+		return ruleFunc{name: s}, nil
 	}
 
 	if closeBracket == -1 {
-		return nil, fmt.Errorf("unexpected function %s not close bracket", s)
+		return ret, fmt.Errorf("unexpected function %s not close bracket", s)
 	}
 
 	funcName := s[0:openBracket]
@@ -62,6 +60,21 @@ func parseFuncArguments(s string) (*ruleFunc, error) {
 	arg := strings.Builder{}
 	state := commonState
 	offset := openBracket + 1
+
+	reverseState := func(s2 tokenState) bool {
+		switch state {
+		case commonState:
+			state = s2
+		case s2:
+			if arg.Len() == 0 {
+				arg.Grow(1)
+			}
+			state = commonState
+		default:
+			return false
+		}
+		return true
+	}
 
 	for offset < closeBracket {
 		ch := s[offset]
@@ -72,25 +85,11 @@ func parseFuncArguments(s string) (*ruleFunc, error) {
 			arg.WriteByte(s[offset])
 			continue
 		case '\'':
-			if state == commonState {
-				state = singleQuoteState
-				continue
-			} else if state == singleQuoteState {
-				if offset > 1 && s[offset-2] == '\'' {
-					args = append(args, "")
-				}
-				state = commonState
+			if reverseState(singleQuoteState) {
 				continue
 			}
 		case '"':
-			if state == commonState {
-				state = doubleQuoteState
-				continue
-			} else if state == doubleQuoteState {
-				if offset > 1 && s[offset-2] == '"' {
-					args = append(args, "")
-				}
-				state = commonState
+			if reverseState(doubleQuoteState) {
 				continue
 			}
 		case ',':
@@ -108,15 +107,15 @@ func parseFuncArguments(s string) (*ruleFunc, error) {
 	}
 
 	if state == singleQuoteState || state == doubleQuoteState {
-		return nil, fmt.Errorf("unexpected function %s argument quote not closed", s)
+		return ret, fmt.Errorf("unexpected function %s argument quote not closed", s)
 	}
 
-	if arg.Len() > 0 {
+	if arg.Cap() > 0 {
 		args = append(args, arg.String())
 		arg.Reset()
 	}
 
-	return &ruleFunc{
+	return ruleFunc{
 		name: funcName,
 		args: args,
 	}, nil

@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	// DefaultTimeout The Context default timeout
 	DefaultTimeout = time.Minute
 )
 
@@ -79,6 +80,7 @@ func init() {
 	close(closedC)
 }
 
+// cancel closes c.done
 func (c *Context) cancel(err error) {
 	if err == nil {
 		panic("context: internal error: missing cancel error")
@@ -102,16 +104,26 @@ func (c *Context) cancel(err error) {
 	c.mu.Unlock()
 }
 
+// Cancel this context releases resources associated with it, so code should
+// call cancel as soon as the operations running in this Context complete.
 func (c *Context) Cancel() {
 	if c.cancelFunc != nil {
 		c.cancelFunc()
 	}
 }
 
+// Deadline returns the time when work done on behalf of this context
+// should be canceled. Deadline returns ok==false when no deadline is
+// set. Successive calls to Deadline return the same results.
 func (c *Context) Deadline() (time.Time, bool) {
 	return c.deadline, true
 }
 
+// Err If Done is not yet closed, Err returns nil.
+// If Done is closed, Err returns a non-nil error explaining why:
+// Canceled if the context was canceled
+// or DeadlineExceeded if the context's deadline passed.
+// After Err returns a non-nil error, successive calls to Err return the same error.
 func (c *Context) Err() error {
 	c.mu.Lock()
 	err := c.err
@@ -119,6 +131,11 @@ func (c *Context) Err() error {
 	return err
 }
 
+// Done returns a channel that's closed when work done on behalf of this
+// context should be canceled. Done may return nil if this context can
+// never be canceled. Successive calls to Done return the same value.
+// The close of the Done channel may happen asynchronously,
+// after the cancel function returns.
 func (c *Context) Done() <-chan struct{} {
 	d := c.done.Load()
 	if d != nil {
@@ -134,10 +151,14 @@ func (c *Context) Done() <-chan struct{} {
 	return d.(chan struct{})
 }
 
+// ClearValue clean all values
 func (c *Context) ClearValue() {
 	c.value = new(sync.Map)
 }
 
+// Value returns the value associated with this context for key, or nil
+// if no value is associated with key. Successive calls to Value with
+// the same key returns the same result.
 func (c *Context) Value(key any) any {
 	if v, ok := c.value.Load(key); ok {
 		return v
@@ -145,26 +166,34 @@ func (c *Context) Value(key any) any {
 	return nil
 }
 
+// GetValue returns the value associated with this context for key, or nil
+// if no value is associated with key. Successive calls to Value with
+// the same key returns the same result.
 func (c *Context) GetValue(key any) (any, bool) {
 	return c.value.Load(key)
 }
 
+// SetValue value associated with key is val.
 func (c *Context) SetValue(key any, value any) {
 	c.value.Store(key, value)
 }
 
+// Config returns the Config
 func (c *Context) Config() Config {
 	return c.opt.Config
 }
 
+// Logger returns the logger, if Options.Logger is nil return slog.Default
 func (c *Context) Logger() *slog.Logger {
 	return c.opt.Logger
 }
 
+// BaseURL returns the base URL string
 func (c *Context) BaseURL() string {
 	return c.baseURL
 }
 
+// RedirectURL returns the redirect URL string
 func (c *Context) RedirectURL() string {
 	return c.redirectURL
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/shiroyk/cloudcat/parser"
 )
 
+// Parser the regexp2 parser
 type Parser struct{}
 
 const key string = "regex"

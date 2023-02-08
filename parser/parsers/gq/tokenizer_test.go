@@ -1,8 +1,11 @@
 package gq
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
-func TestBuildInFunc(t *testing.T) {
+func TestParseRuleFunction(t *testing.T) {
 	rules := []string{
 		`-> -> unknown`, `-> text(`, `-> text(")`,
 		`-> text("')`, `-> text('")`, `-> text(' ", ")`,
@@ -10,8 +13,16 @@ func TestBuildInFunc(t *testing.T) {
 	}
 
 	for _, rule := range rules {
-		if _, err := gq.GetString(ctx, content, rule); err == nil {
+		if _, _, err := parseRuleFunctions(rule); err == nil {
 			t.Fatalf("Unexpected function and argument parse %s", rule)
 		}
 	}
+}
+
+func TestBuildInFunc(t *testing.T) {
+	_, fn, err := parseRuleFunctions("rule -> set('', href(1))")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(fn)
 }
