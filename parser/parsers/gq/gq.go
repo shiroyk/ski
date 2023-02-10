@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/utils"
 	"github.com/spf13/cast"
 )
@@ -15,10 +15,10 @@ type Parser struct{}
 const key string = "gq"
 
 func init() {
-	parsers.Register(key, new(Parser))
+	parser.Register(key, new(Parser))
 }
 
-func (p Parser) GetString(ctx *parsers.Context, content any, arg string) (ret string, err error) {
+func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
@@ -46,7 +46,7 @@ func (p Parser) GetString(ctx *parsers.Context, content any, arg string) (ret st
 	return cast.ToStringE(join)
 }
 
-func (p Parser) GetStrings(ctx *parsers.Context, content any, arg string) (ret []string, err error) {
+func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
@@ -83,7 +83,7 @@ func (p Parser) GetStrings(ctx *parsers.Context, content any, arg string) (ret [
 	return cast.ToStringSliceE(node)
 }
 
-func (p Parser) GetElement(ctx *parsers.Context, content any, arg string) (ret string, err error) {
+func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
@@ -110,7 +110,7 @@ func (p Parser) GetElement(ctx *parsers.Context, content any, arg string) (ret s
 	return cast.ToStringE(node)
 }
 
-func (p Parser) GetElements(ctx *parsers.Context, content any, arg string) (ret []string, err error) {
+func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return

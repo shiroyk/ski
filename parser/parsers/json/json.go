@@ -6,7 +6,7 @@ import (
 
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/utils"
 )
 
@@ -16,10 +16,10 @@ type Parser struct{}
 const key string = "json"
 
 func init() {
-	parsers.Register(key, new(Parser))
+	parser.Register(key, new(Parser))
 }
 
-func (p Parser) GetString(_ *parsers.Context, content any, arg string) (string, error) {
+func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, error) {
 	obj, err := getDoc(content, arg)
 	if err != nil {
 		return "", err
@@ -37,7 +37,7 @@ func (p Parser) GetString(_ *parsers.Context, content any, arg string) (string, 
 	return strings.Join(str, ""), nil
 }
 
-func (p Parser) GetStrings(_ *parsers.Context, content any, arg string) ([]string, error) {
+func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
 	obj, err := getDoc(content, arg)
 	if err != nil {
 		return nil, err
@@ -55,11 +55,11 @@ func (p Parser) GetStrings(_ *parsers.Context, content any, arg string) ([]strin
 	return str, nil
 }
 
-func (p Parser) GetElement(ctx *parsers.Context, content any, arg string) (string, error) {
+func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (string, error) {
 	return p.GetString(ctx, content, arg)
 }
 
-func (p Parser) GetElements(ctx *parsers.Context, content any, arg string) ([]string, error) {
+func (p Parser) GetElements(ctx *parser.Context, content any, arg string) ([]string, error) {
 	return p.GetStrings(ctx, content, arg)
 }
 

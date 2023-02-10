@@ -1,4 +1,4 @@
-package parsers
+package parser
 
 import (
 	"testing"
@@ -28,6 +28,6 @@ func TestRegister(t *testing.T) {
 		Register("test", new(testParser))
 	}
 	if _, ok := GetParser("test"); !ok {
-		t.Fatal("unable get schema")
+		t.Fatal("unable get parser")
 	}
 }

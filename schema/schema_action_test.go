@@ -4,25 +4,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 	"gopkg.in/yaml.v3"
 )
 
 type testParser struct{}
 
-func (t *testParser) GetString(*parsers.Context, any, string) (string, error) {
+func (t *testParser) GetString(*parser.Context, any, string) (string, error) {
 	return "", nil
 }
 
-func (t *testParser) GetStrings(*parsers.Context, any, string) ([]string, error) {
+func (t *testParser) GetStrings(*parser.Context, any, string) ([]string, error) {
 	return nil, nil
 }
 
-func (t *testParser) GetElement(*parsers.Context, any, string) (string, error) {
+func (t *testParser) GetElement(*parser.Context, any, string) (string, error) {
 	return "", nil
 }
 
-func (t *testParser) GetElements(*parsers.Context, any, string) ([]string, error) {
+func (t *testParser) GetElements(*parser.Context, any, string) ([]string, error) {
 	return nil, nil
 }
 
@@ -30,11 +30,11 @@ func TestActions(t *testing.T) {
 	t.Parallel()
 	var actions Actions
 	var err error
-	if _, ok := parsers.GetParser("act"); !ok {
-		parsers.Register("act", new(testParser))
+	if _, ok := parser.GetParser("act"); !ok {
+		parser.Register("act", new(testParser))
 	}
 	actions = []Action{NewAction(NewStep("act", "1"), NewStep("act", "2")), NewActionOp(OperatorAnd), NewAction(NewStep("act", "3"))}
-	ctx := parsers.NewContext(parsers.Options{Timeout: time.Second})
+	ctx := parser.NewContext(parser.Options{Timeout: time.Second})
 
 	_, err = actions.GetString(ctx, "action")
 	if err != nil {

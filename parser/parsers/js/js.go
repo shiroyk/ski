@@ -3,7 +3,7 @@ package js
 import (
 	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/js/common"
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 	"github.com/spf13/cast"
 )
 
@@ -13,10 +13,10 @@ type Parser struct{}
 const key string = "js"
 
 func init() {
-	parsers.Register(key, new(Parser))
+	parser.Register(key, new(Parser))
 }
 
-func (p *Parser) GetString(ctx *parsers.Context, content any, arg string) (ret string, err error) {
+func (p *Parser) GetString(ctx *parser.Context, content any, arg string) (ret string, err error) {
 	str, err := runScript(ctx, content, arg)
 	if err != nil {
 		return
@@ -24,7 +24,7 @@ func (p *Parser) GetString(ctx *parsers.Context, content any, arg string) (ret s
 	return cast.ToStringE(str)
 }
 
-func (p *Parser) GetStrings(ctx *parsers.Context, content any, arg string) (ret []string, err error) {
+func (p *Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []string, err error) {
 	str, err := runScript(ctx, content, arg)
 	if err != nil {
 		return
@@ -32,15 +32,15 @@ func (p *Parser) GetStrings(ctx *parsers.Context, content any, arg string) (ret 
 	return cast.ToStringSliceE(str)
 }
 
-func (p *Parser) GetElement(ctx *parsers.Context, content any, arg string) (string, error) {
+func (p *Parser) GetElement(ctx *parser.Context, content any, arg string) (string, error) {
 	return p.GetString(ctx, content, arg)
 }
 
-func (p *Parser) GetElements(ctx *parsers.Context, content any, arg string) ([]string, error) {
+func (p *Parser) GetElements(ctx *parser.Context, content any, arg string) ([]string, error) {
 	return p.GetStrings(ctx, content, arg)
 }
 
-func runScript(ctx *parsers.Context, content any, script string) (any, error) {
+func runScript(ctx *parser.Context, content any, script string) (any, error) {
 	result, err := js.Run(ctx, common.Program{Code: script, Args: map[string]any{
 		"content": content,
 	}})

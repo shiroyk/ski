@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/antchfx/htmlquery"
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/utils"
 	"golang.org/x/net/html"
 )
@@ -16,10 +16,10 @@ type Parser struct{}
 const key string = "xpath"
 
 func init() {
-	parsers.Register(key, new(Parser))
+	parser.Register(key, new(Parser))
 }
 
-func (p Parser) GetString(_ *parsers.Context, content any, arg string) (string, error) {
+func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return "", err
@@ -39,7 +39,7 @@ func (p Parser) GetString(_ *parsers.Context, content any, arg string) (string, 
 	return str.String(), nil
 }
 
-func (p Parser) GetStrings(_ *parsers.Context, content any, arg string) ([]string, error) {
+func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (p Parser) GetStrings(_ *parsers.Context, content any, arg string) ([]strin
 	return result, err
 }
 
-func (p Parser) GetElement(_ *parsers.Context, content any, arg string) (string, error) {
+func (p Parser) GetElement(_ *parser.Context, content any, arg string) (string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return "", err
@@ -77,7 +77,7 @@ func (p Parser) GetElement(_ *parsers.Context, content any, arg string) (string,
 	return str.String(), nil
 }
 
-func (p Parser) GetElements(_ *parsers.Context, content any, arg string) ([]string, error) {
+func (p Parser) GetElements(_ *parser.Context, content any, arg string) ([]string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
 		return nil, err

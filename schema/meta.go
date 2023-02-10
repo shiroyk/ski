@@ -58,7 +58,7 @@ func (meta *Meta) buildMeta(maps map[string]any) (err error) {
 func toSteps(object any) ([]Step, error) {
 	switch obj := object.(type) {
 	case map[string]any:
-		steps := make([]Step, 0)
+		steps := make([]Step, 0, len(obj))
 		for parser, step := range obj {
 			stepStr, err := cast.ToStringE(step)
 			if err != nil {
@@ -75,7 +75,7 @@ func toSteps(object any) ([]Step, error) {
 func buildStep(object any) ([]Step, error) {
 	switch obj := object.(type) {
 	case []any:
-		steps := make([]Step, 0)
+		steps := make([]Step, 0, len(obj))
 
 		for _, step := range obj {
 			s, err := toSteps(step)

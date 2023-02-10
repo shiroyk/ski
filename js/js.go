@@ -75,19 +75,19 @@ type Options struct {
 }
 
 type schedulerImpl struct {
-	mu                                          *sync.Mutex
-	vms                                         chan VM
-	initVMs, activeVMs, maxVMs, maxRetriesGetVM int
-	maxTimeToWaitGetVM                          time.Duration
-	closed, useStrict                           bool
+	mu                               *sync.Mutex
+	vms                              chan VM
+	initVMs, maxVMs, maxRetriesGetVM int
+	unInitVMs, waiting               *atomic.Int64
+	closed                           *atomic.Bool
+	maxTimeToWaitGetVM               time.Duration
+	useStrict                        bool
 }
 
 // Close the scheduler
 func (s *schedulerImpl) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.closed.Store(true)
 	close(s.vms)
-	s.closed = true
 	return nil
 }
 
@@ -95,25 +95,45 @@ func (s *schedulerImpl) Close() error {
 func NewScheduler(opt Options) Scheduler {
 	scheduler := &schedulerImpl{
 		mu:                 new(sync.Mutex),
-		vms:                make(chan VM, opt.InitialVMs),
 		useStrict:          opt.UseStrict,
-		initVMs:            utils.ZeroOr(opt.InitialVMs, 1),
+		closed:             new(atomic.Bool),
+		waiting:            new(atomic.Int64),
+		unInitVMs:          new(atomic.Int64),
 		maxVMs:             utils.ZeroOr(opt.MaxVMs, 1),
+		initVMs:            utils.ZeroOr(opt.InitialVMs, 1),
 		maxRetriesGetVM:    utils.ZeroOr(opt.MaxRetriesGetVM, DefaultMaxRetriesGetVM),
 		maxTimeToWaitGetVM: utils.ZeroOr(opt.MaxTimeToWaitGetVM, DefaultMaxTimeToWaitGetVM),
 	}
-	scheduler.mu.Lock()
-	defer scheduler.mu.Unlock()
-	for i := 0; i < opt.InitialVMs; i++ {
-		scheduler.vms <- newVM(opt.UseStrict)
-		scheduler.activeVMs++
+	scheduler.vms = make(chan VM, scheduler.maxVMs)
+	for i := 0; i < scheduler.initVMs; i++ {
+		scheduler.vms <- newVM(scheduler.useStrict)
 	}
+	scheduler.unInitVMs.Store(int64(scheduler.maxVMs - scheduler.initVMs))
 	return scheduler
+}
+
+func (s *schedulerImpl) cleanIdleVMs() {
+	for i := 1; i <= s.maxRetriesGetVM; i++ {
+		if s.unInitVMs.Load() < int64(s.initVMs) {
+			if s.waiting.Load() < int64(s.initVMs) {
+				s.unInitVMs.Add(1)
+				_ = <-s.vms
+			}
+			time.Sleep(DefaultMaxTimeToWaitGetVM)
+		}
+	}
 }
 
 // Get the VM
 func (s *schedulerImpl) Get() (VM, error) {
 	timer := time.NewTimer(s.maxTimeToWaitGetVM)
+	s.waiting.Add(1)
+
+	defer func() {
+		s.waiting.Add(-1)
+		go s.cleanIdleVMs()
+	}()
+
 	for i := 1; i <= s.maxRetriesGetVM; i++ {
 		select {
 		case vm, ok := <-s.vms:
@@ -122,18 +142,12 @@ func (s *schedulerImpl) Get() (VM, error) {
 			}
 			return vm, nil
 		case <-timer.C:
-			s.mu.Lock()
-			if s.activeVMs < s.maxVMs {
-				vm := newVM(s.useStrict)
-				s.activeVMs++
-				s.mu.Unlock()
-				return vm, nil
-			} else {
-				logger.Warnf("could not get VM in %v",
-					time.Duration(i)*s.maxTimeToWaitGetVM)
+			if s.unInitVMs.Load() > 0 {
+				s.unInitVMs.Add(-1)
+				return newVM(s.useStrict), nil
 			}
-			timer.Reset(DefaultMaxTimeToWaitGetVM)
-			s.mu.Unlock()
+			logger.Warnf("could not get VM in %v", time.Duration(i)*s.maxTimeToWaitGetVM)
+			timer.Reset(s.maxTimeToWaitGetVM)
 		}
 	}
 	return nil, fmt.Errorf("could not get VM in %v",
@@ -142,13 +156,9 @@ func (s *schedulerImpl) Get() (VM, error) {
 
 // Release the VM
 func (s *schedulerImpl) Release(vm VM) {
-	s.mu.Lock()
-	if s.closed {
+	if s.closed.Load() {
 		return
 	}
+
 	s.vms <- vm
-	if s.activeVMs > s.initVMs {
-		s.activeVMs--
-	}
-	s.mu.Unlock()
 }

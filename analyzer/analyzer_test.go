@@ -7,8 +7,8 @@ import (
 
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
+	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
-	"github.com/shiroyk/cloudcat/schema/parsers"
 )
 
 var content = `<!DOCTYPE html>
@@ -35,7 +35,7 @@ var content = `<!DOCTYPE html>
 
 func TestAnalyzer(t *testing.T) {
 	di.Provide(fetch.NewFetcher(fetch.Options{}))
-	ctx := parsers.NewContext(parsers.Options{
+	ctx := parser.NewContext(parser.Options{
 		URL: "https://localhost",
 	})
 	testCases := []struct {

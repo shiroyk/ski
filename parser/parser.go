@@ -1,4 +1,4 @@
-package parsers
+package parser
 
 import (
 	"github.com/shiroyk/cloudcat/ext"

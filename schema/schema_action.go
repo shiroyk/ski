@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 )
 
 // Action The Schema Action
@@ -38,7 +38,7 @@ func NewActionOp(op Operator) Action {
 	return Action{operator: op}
 }
 
-// toActionOp parsers the Operator string returns an operator Action
+// toActionOp parser the Operator string returns an operator Action
 func toActionOp(op string) (ret Action, err error) {
 	if op == string(OperatorAnd) || op == strings.ToUpper(string(OperatorAnd)) {
 		return NewActionOp(OperatorAnd), nil
@@ -73,9 +73,9 @@ func NewStep(parser string, rule string) Step {
 type Actions []Action
 
 // GetString run the action returns a string
-func (a Actions) GetString(ctx *parsers.Context, content any) (string, error) {
+func (a Actions) GetString(ctx *parser.Context, content any) (string, error) {
 	return runActions(a, ctx, content,
-		func(p parsers.Parser) func(*parsers.Context, any, string) (string, error) {
+		func(p parser.Parser) func(*parser.Context, any, string) (string, error) {
 			return p.GetString
 		},
 		func(s string) bool {
@@ -87,9 +87,9 @@ func (a Actions) GetString(ctx *parsers.Context, content any) (string, error) {
 }
 
 // GetStrings run the action returns a slice of string
-func (a Actions) GetStrings(ctx *parsers.Context, content any) ([]string, error) {
+func (a Actions) GetStrings(ctx *parser.Context, content any) ([]string, error) {
 	return runActions(a, ctx, content,
-		func(p parsers.Parser) func(*parsers.Context, any, string) ([]string, error) {
+		func(p parser.Parser) func(*parser.Context, any, string) ([]string, error) {
 			return p.GetStrings
 		},
 		func(s []string) bool {
@@ -101,9 +101,9 @@ func (a Actions) GetStrings(ctx *parsers.Context, content any) ([]string, error)
 }
 
 // GetElement run the action returns an element string
-func (a Actions) GetElement(ctx *parsers.Context, content any) (string, error) {
+func (a Actions) GetElement(ctx *parser.Context, content any) (string, error) {
 	return runActions(a, ctx, content,
-		func(p parsers.Parser) func(*parsers.Context, any, string) (string, error) {
+		func(p parser.Parser) func(*parser.Context, any, string) (string, error) {
 			return p.GetElement
 		},
 		func(s string) bool {
@@ -115,9 +115,9 @@ func (a Actions) GetElement(ctx *parsers.Context, content any) (string, error) {
 }
 
 // GetElements run the action returns a slice of element string
-func (a Actions) GetElements(ctx *parsers.Context, content any) ([]string, error) {
+func (a Actions) GetElements(ctx *parser.Context, content any) ([]string, error) {
 	return runActions(a, ctx, content,
-		func(p parsers.Parser) func(*parsers.Context, any, string) ([]string, error) {
+		func(p parser.Parser) func(*parser.Context, any, string) ([]string, error) {
 			return p.GetElements
 		},
 		func(s []string) bool {
@@ -131,9 +131,9 @@ func (a Actions) GetElements(ctx *parsers.Context, content any) ([]string, error
 // runActions runs the Actions
 func runActions[T any](
 	action Actions,
-	ctx *parsers.Context,
+	ctx *parser.Context,
 	content any,
-	runFn func(parsers.Parser) func(*parsers.Context, any, string) (T, error),
+	runFn func(parser.Parser) func(*parser.Context, any, string) (T, error),
 	orFn func(T) bool,
 	andFn func(T, T) T,
 ) (ret T, err error) {
@@ -146,7 +146,7 @@ func runActions[T any](
 		}
 		stepResult := content
 		for _, step := range act.step {
-			p, ok := parsers.GetParser(step.parser)
+			p, ok := parser.GetParser(step.parser)
 			if !ok {
 				return ret, fmt.Errorf("schema %s not found", step.parser)
 			}

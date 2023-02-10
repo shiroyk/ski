@@ -45,14 +45,3 @@ func InitNativeModule(vm *goja.Runtime) {
 		}
 	}
 }
-
-// EnableRequire set runtime require module
-func EnableRequire(vm *goja.Runtime, path ...string) {
-	rrt := &require{
-		vm:            vm,
-		nodeModules:   make(map[string]*goja.Object),
-		globalFolders: path,
-	}
-
-	_ = vm.Set("require", rrt.Require)
-}

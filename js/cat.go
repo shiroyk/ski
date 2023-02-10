@@ -3,17 +3,17 @@ package js
 import (
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/js/common"
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 )
 
 // Cat an analyzer context
 type Cat struct {
-	ctx                  *parsers.Context
+	ctx                  *parser.Context
 	BaseURL, RedirectURL string
 }
 
 // NewCat returns a new Cat instance
-func NewCat(ctx *parsers.Context) *Cat {
+func NewCat(ctx *parser.Context) *Cat {
 	return &Cat{ctx, ctx.BaseURL(), ctx.RedirectURL()}
 }
 
@@ -47,7 +47,7 @@ func (c *Cat) GetString(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Valu
 	content := call.Argument(1).String()
 	arg := call.Argument(2).String()
 
-	if p, ok := parsers.GetParser(key); ok {
+	if p, ok := parser.GetParser(key); ok {
 		str, err := p.GetString(c.ctx, content, arg)
 		if err != nil {
 			common.Throw(vm, err)
@@ -64,7 +64,7 @@ func (c *Cat) GetStrings(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Val
 	content := call.Argument(1).String()
 	arg := call.Argument(2).String()
 
-	if p, ok := parsers.GetParser(key); ok {
+	if p, ok := parser.GetParser(key); ok {
 		str, err := p.GetStrings(c.ctx, content, arg)
 		if err != nil {
 			common.Throw(vm, err)
@@ -81,7 +81,7 @@ func (c *Cat) GetElement(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Val
 	content := call.Argument(1).String()
 	arg := call.Argument(2).String()
 
-	if p, ok := parsers.GetParser(key); ok {
+	if p, ok := parser.GetParser(key); ok {
 		str, err := p.GetElement(c.ctx, content, arg)
 		if err != nil {
 			common.Throw(vm, err)
@@ -98,7 +98,7 @@ func (c *Cat) GetElements(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Va
 	content := call.Argument(1).String()
 	arg := call.Argument(2).String()
 
-	if p, ok := parsers.GetParser(key); ok {
+	if p, ok := parser.GetParser(key); ok {
 		str, err := p.GetElements(c.ctx, content, arg)
 		if err != nil {
 			common.Throw(vm, err)

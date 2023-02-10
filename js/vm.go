@@ -3,13 +3,15 @@ package js
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/ast"
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/logger"
+	"github.com/shiroyk/cloudcat/parser"
 	"golang.org/x/exp/maps"
 )
 
@@ -24,7 +26,7 @@ type VM interface {
 
 type vmImpl struct {
 	runtime   *goja.Runtime
-	busy      chan struct{}
+	done      chan struct{}
 	useStrict bool
 }
 
@@ -34,7 +36,7 @@ func newVM(useStrict bool) VM {
 	modules.EnableRequire(vm)
 	modules.InitNativeModule(vm)
 
-	return &vmImpl{vm, make(chan struct{}), useStrict}
+	return &vmImpl{vm, make(chan struct{}, 1), useStrict}
 }
 
 // Run the js program
@@ -42,8 +44,30 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 	// resets the interrupt flag.
 	vm.runtime.ClearInterrupt()
 	defer func() {
-		<-vm.busy // unlock deactivation again
+		if r := recover(); r != nil {
+			logger.Errorf("vm run error %s", r, debug.Stack())
+		}
+
+		vm.done <- struct{}{} // End of run
 	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				// Interrupt running JavaScript.
+				vm.runtime.Interrupt(ctx.Err())
+				// Release vm
+				GetScheduler().Release(vm)
+				return
+			case <-vm.done:
+				// Release vm
+				GetScheduler().Release(vm)
+				return
+			}
+		}
+	}()
+
 	code := p.Code
 	argKeys := maps.Keys(p.Args)
 	argValues := make([]goja.Value, 0, len(p.Args))
@@ -52,7 +76,7 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 		argValues = append(argValues, vm.runtime.ToValue(v))
 	}
 
-	if ctx, ok := ctx.(*parsers.Context); ok {
+	if ctx, ok := ctx.(*parser.Context); ok {
 		argKeys = append(argKeys, "cat")
 		argValues = append(argValues, vm.runtime.ToValue(NewCat(ctx)))
 	}
@@ -68,17 +92,6 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 	if err != nil {
 		return nil, err
 	}
-
-	go func() {
-		// Wait for the context to be done
-		<-ctx.Done()
-		// Interrupt running JavaScript.
-		vm.runtime.Interrupt(ctx.Err())
-		// Wait for the vm stop running
-		vm.busy <- struct{}{}
-		// Release vm
-		GetScheduler().Release(vm)
-	}()
 
 	fn, err := vm.runtime.RunProgram(program)
 	if err != nil {

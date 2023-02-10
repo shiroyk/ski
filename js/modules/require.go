@@ -21,6 +21,17 @@ import (
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
 
+// EnableRequire set runtime require module
+func EnableRequire(vm *goja.Runtime, path ...string) {
+	req := &require{
+		vm:            vm,
+		nodeModules:   make(map[string]*goja.Object),
+		globalFolders: path,
+	}
+
+	_ = vm.Set("require", req.Require)
+}
+
 type require struct {
 	vm          *goja.Runtime
 	nodeModules map[string]*goja.Object

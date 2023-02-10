@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
-	"github.com/shiroyk/cloudcat/schema/parsers"
 	"github.com/spf13/cast"
 )
 
@@ -22,7 +22,7 @@ func NewAnalyzer() *Analyzer {
 }
 
 // ExecuteSchema execute a schema.Schema, returns the result
-func (analyzer *Analyzer) ExecuteSchema(ctx *parsers.Context, s *schema.Schema, content string) any {
+func (analyzer *Analyzer) ExecuteSchema(ctx *parser.Context, s *schema.Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
 			ctx.Logger().Error("analyzer error ", r.(error))
@@ -32,7 +32,7 @@ func (analyzer *Analyzer) ExecuteSchema(ctx *parsers.Context, s *schema.Schema, 
 	return analyzer.process(ctx, s, content)
 }
 
-func (analyzer *Analyzer) process(ctx *parsers.Context, s *schema.Schema, content any) any {
+func (analyzer *Analyzer) process(ctx *parser.Context, s *schema.Schema, content any) any {
 	switch s.Type {
 	default:
 		return nil
@@ -45,7 +45,7 @@ func (analyzer *Analyzer) process(ctx *parsers.Context, s *schema.Schema, conten
 	}
 }
 
-func (analyzer *Analyzer) processString(ctx *parsers.Context, s *schema.Schema, content any) any {
+func (analyzer *Analyzer) processString(ctx *parser.Context, s *schema.Schema, content any) any {
 	var result any
 	var err error
 	if s.Type == schema.ArrayType {
@@ -75,7 +75,7 @@ func (analyzer *Analyzer) processString(ctx *parsers.Context, s *schema.Schema, 
 	return result
 }
 
-func (analyzer *Analyzer) processObject(ctx *parsers.Context, s *schema.Schema, content any) any {
+func (analyzer *Analyzer) processObject(ctx *parser.Context, s *schema.Schema, content any) any {
 	if s.Properties != nil {
 		element := analyzer.processInit(ctx, s, content)[0]
 		object := make(map[string]any, len(s.Properties))
@@ -92,7 +92,7 @@ func (analyzer *Analyzer) processObject(ctx *parsers.Context, s *schema.Schema, 
 	return nil
 }
 
-func (analyzer *Analyzer) processArray(ctx *parsers.Context, s *schema.Schema, content any) any {
+func (analyzer *Analyzer) processArray(ctx *parser.Context, s *schema.Schema, content any) any {
 	if s.Properties != nil {
 		elements := analyzer.processInit(ctx, s, content)
 		array := make([]any, len(elements))
@@ -110,7 +110,7 @@ func (analyzer *Analyzer) processArray(ctx *parsers.Context, s *schema.Schema, c
 	return nil
 }
 
-func (analyzer *Analyzer) processInit(ctx *parsers.Context, s *schema.Schema, content any) []string {
+func (analyzer *Analyzer) processInit(ctx *parser.Context, s *schema.Schema, content any) []string {
 	if s.Init == nil || len(s.Init) == 0 {
 		switch data := content.(type) {
 		case []string, nil:
