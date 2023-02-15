@@ -42,6 +42,10 @@ func NewDB(path, name string, interval time.Duration) (*DB, error) {
 	if path == "" {
 		path = defaultPath
 	}
+	err := os.MkdirAll(path, 0700)
+	if err != nil {
+		return nil, err
+	}
 	db, err := bbolt.Open(filepath.Join(path, name), 0600, &bbolt.Options{
 		Timeout:         1 * time.Second,
 		InitialMmapSize: 1024,

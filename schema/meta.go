@@ -9,39 +9,28 @@ import (
 
 // Source the Meta source
 type Source struct {
-	Name    string
-	BaseURL string
-	Timeout time.Duration
-	Header  map[string]string
+	Name    string            `yaml:"name"`
+	URL     string            `yaml:"url"`
+	Timeout time.Duration     `yaml:"timeout"`
+	Header  map[string]string `yaml:"header"`
 }
 
 // Meta the meta
 type Meta struct {
 	Source *Source `yaml:"source"`
-	Schema *Schema `yaml:"scheme"`
+	Schema *Schema
 }
 
-// UnmarshalYAML decodes the Meta from yaml
-func (meta *Meta) UnmarshalYAML(unmarshal func(any) error) error {
+// UnmarshalYAML decodes the Schema from yaml
+func (schema *Schema) UnmarshalYAML(unmarshal func(any) error) error {
 	var maps map[string]any
 
 	if err := unmarshal(&maps); err != nil {
 		return err
 	}
 
-	return meta.buildMeta(maps)
-}
+	*schema = *NewSchema(ObjectType)
 
-func (meta *Meta) buildMeta(maps map[string]any) (err error) {
-	if source, ok := maps["source"]; ok {
-		meta.Source = source.(*Source)
-	}
-
-	if properties, ok := maps["schema"].(map[string]any); ok {
-		maps = properties
-	}
-
-	schema := NewSchema(ObjectType)
 	for k, v := range maps {
 		property, err := buildSchema(v)
 		if err != nil {
@@ -50,9 +39,7 @@ func (meta *Meta) buildMeta(maps map[string]any) (err error) {
 		schema.AddProperty(k, property)
 	}
 
-	meta.Schema = schema
-
-	return
+	return nil
 }
 
 func toSteps(object any) ([]Step, error) {

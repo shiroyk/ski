@@ -4,13 +4,13 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
-func TestYaml(t *testing.T) {
+func TestSchemaYaml(t *testing.T) {
 	t.Parallel()
-	r := new(Meta)
 
 	testCases := []struct {
 		Yaml   string
@@ -126,14 +126,39 @@ body:
 
 	for i, test := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			err := yaml.Unmarshal([]byte(test.Yaml), r)
+			s := new(Schema)
+			err := yaml.Unmarshal([]byte(test.Yaml), s)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(r.Schema, test.Schema) {
+			if !reflect.DeepEqual(s, test.Schema) {
 				t.Error("not equal")
 			}
 		})
 	}
+}
 
+func TestSourceYaml(t *testing.T) {
+	s := `source:
+  name: test
+  url: http://localhost
+  timeout: 60s
+  header:
+    user-agent: cloudcat
+`
+	meta := new(Meta)
+	err := yaml.Unmarshal([]byte(s), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*meta.Source, Source{
+		Name:    "test",
+		URL:     "http://localhost",
+		Timeout: time.Minute,
+		Header: map[string]string{
+			"user-agent": "cloudcat",
+		},
+	}) {
+		t.Error("not equal")
+	}
 }
