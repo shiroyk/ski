@@ -1,12 +1,17 @@
 package fetch
 
 import (
+	"compress/gzip"
+	"compress/zlib"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/andybalholm/brotli"
 )
 
 func TestCharsetFromHeaders(t *testing.T) {
@@ -104,6 +109,58 @@ func TestCancel(t *testing.T) {
 	_, err = fetch.DoRequest(req)
 	if err != ErrRequestCancel {
 		t.Fatal(err)
+	}
+}
+
+func TestDecompress(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		encoding := r.Header.Get("Content-Encoding")
+		w.Header().Set("Content-Encoding", encoding)
+		w.Header().Set("Content-Type", "text/plain")
+
+		var bodyWriter io.WriteCloser
+		switch encoding {
+		case "deflate":
+			bodyWriter = zlib.NewWriter(w)
+		case "gzip":
+			bodyWriter = gzip.NewWriter(w)
+		case "br":
+			bodyWriter = brotli.NewWriter(w)
+		}
+		defer bodyWriter.Close()
+
+		bytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+
+		_, _ = bodyWriter.Write(bytes)
+	}))
+	defer ts.Close()
+
+	testCases := []struct {
+		compress, want string
+	}{
+		{"deflate", "test1"},
+		{"gzip", "test2"},
+		{"br", "test3"},
+	}
+
+	fetch := newFetcherDefault()
+
+	for _, testCase := range testCases {
+		t.Run(testCase.compress, func(t *testing.T) {
+			res, err := fetch.Post(ts.URL, testCase.want, map[string]string{
+				"Content-Encoding": testCase.compress,
+			})
+			if err != nil {
+				t.Error(err)
+			}
+
+			if res.String() != testCase.want {
+				t.Errorf("want %v, got %v", testCase.want, res.String())
+			}
+		})
 	}
 }
 

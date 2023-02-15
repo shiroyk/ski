@@ -1,13 +1,17 @@
 package fetch
 
 import (
+	"compress/gzip"
+	"compress/zlib"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/utils"
@@ -27,7 +31,11 @@ type Fetch interface {
 
 type fetcher struct {
 	*http.Client
-	opt Options
+	charsetDetectDisabled bool
+	maxBodySize           int64
+	retryTimes            int
+	retryHTTPCodes        []int
+	timeout               time.Duration
 }
 
 const (
@@ -48,7 +56,8 @@ var (
 	// DefaultHeaders defaults fetch.Request headers
 	DefaultHeaders = map[string]string{
 		"Accept":          "*/*",
-		"Accept-Encoding": "gzip",
+		"Accept-Encoding": "gzip, deflate, br",
+		"Accept-Language": "en-US,en;",
 		"User-Agent":      DefaultUserAgent,
 	}
 	// ErrRequestCancel fetch.Request cancel error
@@ -67,6 +76,11 @@ type Options struct {
 // NewFetcher returns a new Fetch instance
 func NewFetcher(opt Options) Fetch {
 	fetch := new(fetcher)
+
+	fetch.charsetDetectDisabled = opt.CharsetDetectDisabled
+	fetch.maxBodySize = utils.ZeroOr(opt.MaxBodySize, DefaultMaxBodySize)
+	fetch.timeout = utils.ZeroOr(opt.Timeout, DefaultTimeout)
+	fetch.retryHTTPCodes = utils.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
 	var transport http.RoundTripper = &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -95,10 +109,9 @@ func NewFetcher(opt Options) Fetch {
 	cookie, _ := di.Resolve[cache.Cookie]()
 	fetch.Client = &http.Client{
 		Transport: transport,
-		Timeout:   opt.Timeout,
+		Timeout:   fetch.timeout,
 		Jar:       cookie,
 	}
-	fetch.opt = opt
 	return fetch
 }
 
@@ -140,7 +153,7 @@ func (f *fetcher) doRequestRetry(req *Request) (*Response, error) {
 
 	// Retry on Error
 	if err != nil {
-		if req.retryCounter < utils.ZeroOr(req.RetryTimes, f.opt.RetryTimes) {
+		if req.retryCounter < f.retryTimes {
 			req.retryCounter++
 			return f.doRequestRetry(req)
 		}
@@ -148,8 +161,8 @@ func (f *fetcher) doRequestRetry(req *Request) (*Response, error) {
 	}
 
 	// Retry on http status codes
-	if slices.Contains(utils.EmptyOr(req.RetryHTTPCodes, f.opt.RetryHTTPCodes), res.StatusCode) {
-		if req.retryCounter < utils.ZeroOr(req.RetryTimes, f.opt.RetryTimes) {
+	if slices.Contains(f.retryHTTPCodes, res.StatusCode) {
+		if req.retryCounter < f.retryTimes {
 			req.retryCounter++
 			return f.doRequestRetry(req)
 		}
@@ -170,7 +183,25 @@ func (f *fetcher) doRequest(req *Request) (*Response, error) {
 	}
 
 	// Limit response body reading
-	bodyReader := io.LimitReader(res.Body, utils.ZeroOr(f.opt.MaxBodySize, DefaultMaxBodySize))
+	bodyReader := io.LimitReader(res.Body, f.maxBodySize)
+
+	contentEncodings := strings.Split(res.Header.Get("Content-Encoding"), ",")
+	// In the order decompressed
+	for _, encoding := range contentEncodings {
+		switch strings.TrimSpace(encoding) {
+		case "deflate":
+			bodyReader, err = zlib.NewReader(bodyReader)
+		case "gzip":
+			bodyReader, err = gzip.NewReader(bodyReader)
+		case "br":
+			bodyReader = brotli.NewReader(bodyReader)
+		default:
+			err = fmt.Errorf("unsupported compression type %s", encoding)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if res.Request.Method != http.MethodHead && res.ContentLength > 0 {
 		if req.Encoding != "" {
@@ -178,7 +209,7 @@ func (f *fetcher) doRequest(req *Request) (*Response, error) {
 				bodyReader = transform.NewReader(bodyReader, enc.NewDecoder())
 			}
 		} else {
-			if !f.opt.CharsetDetectDisabled {
+			if !f.charsetDetectDisabled {
 				contentType := req.Header.Get("Content-Type")
 				bodyReader, err = charset.NewReader(bodyReader, contentType)
 				if err != nil {
