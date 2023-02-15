@@ -2,8 +2,15 @@ package analyzer
 
 import (
 	"fmt"
+	"runtime/debug"
 
+	_ "github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/parser"
+	_ "github.com/shiroyk/cloudcat/parser/parsers/gq"
+	_ "github.com/shiroyk/cloudcat/parser/parsers/js"
+	_ "github.com/shiroyk/cloudcat/parser/parsers/json"
+	_ "github.com/shiroyk/cloudcat/parser/parsers/regex"
+	_ "github.com/shiroyk/cloudcat/parser/parsers/xpath"
 	"github.com/shiroyk/cloudcat/schema"
 )
 
@@ -23,7 +30,7 @@ func NewAnalyzer() *Analyzer {
 func (analyzer *Analyzer) ExecuteSchema(ctx *parser.Context, s *schema.Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger().Error("analyzer error ", r.(error))
+			ctx.Logger().Error("analyzer error %v", r.(error), debug.Stack())
 		}
 	}()
 

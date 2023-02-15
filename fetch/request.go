@@ -14,6 +14,8 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/shiroyk/cloudcat/cache"
+	"github.com/shiroyk/cloudcat/di"
 	"golang.org/x/net/http/httpguts"
 )
 
@@ -177,6 +179,21 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 	setDefaultHeader(req.Header)
 
 	return &Request{Request: req}, nil
+}
+
+func DefaultTemplateFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"get": func(key string) (ret string) {
+			if v, ok := di.MustResolve[cache.Cache]().Get(key); ok {
+				return string(v)
+			}
+			return
+		},
+		"set": func(key string, value string) (ret string) {
+			di.MustResolve[cache.Cache]().Set(key, []byte(value))
+			return
+		},
+	}
 }
 
 func setDefaultHeader(reqHeader http.Header) {

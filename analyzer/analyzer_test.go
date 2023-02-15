@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/di"
-	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
 )
@@ -34,7 +32,6 @@ var content = `<!DOCTYPE html>
 `
 
 func TestAnalyzer(t *testing.T) {
-	di.Provide(fetch.NewFetcher(fetch.Options{}))
 	ctx := parser.NewContext(parser.Options{
 		URL: "https://localhost",
 	})
@@ -110,9 +107,10 @@ func TestAnalyzer(t *testing.T) {
 			`{"array2":[3]}`,
 		},
 	}
+	a := NewAnalyzer()
 	for i, testCase := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			bytes, err := json.Marshal(NewAnalyzer().ExecuteSchema(ctx, testCase.Schema, content))
+			bytes, err := json.Marshal(a.ExecuteSchema(ctx, testCase.Schema, content))
 			if err != nil {
 				t.Fatal(err)
 			}
