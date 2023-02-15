@@ -6,13 +6,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/utils"
 )
 
 var (
 	gq      Parser
-	ctx     *parsers.Context
+	ctx     *parser.Context
 	content = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -57,7 +57,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = parsers.NewContext(parsers.Options{
+	ctx = parser.NewContext(parser.Options{
 		URL: "https://localhost",
 	})
 	code := m.Run()
@@ -109,7 +109,7 @@ func assertGetElements(t *testing.T, arg string, assert func([]string) bool) {
 }
 
 func TestParser(t *testing.T) {
-	_, ok := parsers.GetParser(key)
+	_, ok := parser.GetParser(key)
 	if !ok {
 		t.Fatal("schema not registered")
 	}

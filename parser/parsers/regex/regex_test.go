@@ -3,7 +3,7 @@ package regex
 import (
 	"testing"
 
-	"github.com/shiroyk/cloudcat/schema/parsers"
+	"github.com/shiroyk/cloudcat/parser"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 )
 
 func TestParser(t *testing.T) {
-	_, ok := parsers.GetParser(key)
+	_, ok := parser.GetParser(key)
 	if !ok {
 		t.Fatal("schema not registered")
 	}
