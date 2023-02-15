@@ -36,16 +36,18 @@ func TestScheduler(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
 
-	s := GetScheduler().(*schedulerImpl)
-	initVMs := len(s.vms)
-	if initVMs != s.initVMs {
-		t.Fatalf("clean idle VM failed, want %v, got %v", s.initVMs, initVMs)
+func BenchmarkScheduler(b *testing.B) {
+	b.ResetTimer()
+	b.ReportAllocs()
+	wg := sync.WaitGroup{}
+	for n := 0; n < b.N; n++ {
+		wg.Add(1)
+		go func() {
+			_, _ = RunString(context.Background(), `1`)
+			wg.Done()
+		}()
 	}
-
-	finalUnInitVMs := s.unInitVMs.Load()
-	unInitVMs := int64(s.maxVMs - s.initVMs)
-	if finalUnInitVMs != unInitVMs {
-		t.Fatalf("clean idle VM failed, want %v, got %v", unInitVMs, finalUnInitVMs)
-	}
+	b.StopTimer()
 }

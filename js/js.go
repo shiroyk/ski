@@ -78,7 +78,7 @@ type schedulerImpl struct {
 	mu                               *sync.Mutex
 	vms                              chan VM
 	initVMs, maxVMs, maxRetriesGetVM int
-	unInitVMs, waiting               *atomic.Int64
+	unInitVMs                        *atomic.Int64
 	closed                           *atomic.Bool
 	maxTimeToWaitGetVM               time.Duration
 	useStrict                        bool
@@ -97,7 +97,6 @@ func NewScheduler(opt Options) Scheduler {
 		mu:                 new(sync.Mutex),
 		useStrict:          opt.UseStrict,
 		closed:             new(atomic.Bool),
-		waiting:            new(atomic.Int64),
 		unInitVMs:          new(atomic.Int64),
 		maxVMs:             utils.ZeroOr(opt.MaxVMs, 1),
 		initVMs:            utils.ZeroOr(opt.InitialVMs, 1),
@@ -112,26 +111,12 @@ func NewScheduler(opt Options) Scheduler {
 	return scheduler
 }
 
-func (s *schedulerImpl) cleanIdleVMs() {
-	for i := 1; i <= s.maxRetriesGetVM; i++ {
-		if s.unInitVMs.Load() < int64(s.initVMs) {
-			if s.waiting.Load() < int64(s.initVMs) {
-				s.unInitVMs.Add(1)
-				_ = <-s.vms
-			}
-			time.Sleep(DefaultMaxTimeToWaitGetVM)
-		}
-	}
-}
-
 // Get the VM
 func (s *schedulerImpl) Get() (VM, error) {
 	timer := time.NewTimer(s.maxTimeToWaitGetVM)
-	s.waiting.Add(1)
 
 	defer func() {
-		s.waiting.Add(-1)
-		go s.cleanIdleVMs()
+		timer.Stop()
 	}()
 
 	for i := 1; i <= s.maxRetriesGetVM; i++ {
@@ -142,10 +127,10 @@ func (s *schedulerImpl) Get() (VM, error) {
 			}
 			return vm, nil
 		case <-timer.C:
-			if s.unInitVMs.Load() > 0 {
-				s.unInitVMs.Add(-1)
+			if s.unInitVMs.Add(-1) >= 0 {
 				return newVM(s.useStrict), nil
 			}
+			s.unInitVMs.Add(1)
 			logger.Warnf("could not get VM in %v", time.Duration(i)*s.maxTimeToWaitGetVM)
 			timer.Reset(s.maxTimeToWaitGetVM)
 		}
