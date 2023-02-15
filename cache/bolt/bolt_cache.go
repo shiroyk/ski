@@ -2,7 +2,7 @@ package bolt
 
 import (
 	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/logger"
+	"github.com/shiroyk/cloudcat/utils/logger"
 )
 
 // Cache is an implementation of Cache that stores bytes in bolt.DB.

@@ -5,8 +5,8 @@ import (
 	"net/url"
 
 	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/logger"
 	"github.com/shiroyk/cloudcat/utils"
+	"github.com/shiroyk/cloudcat/utils/logger"
 )
 
 // Cookie is an implementation of cache.Cookie that stores http.Cookie in bolt.DB.

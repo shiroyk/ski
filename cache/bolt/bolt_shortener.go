@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/logger"
+	"github.com/shiroyk/cloudcat/utils/logger"
 )
 
 // Shortener is an implementation of cache.Shortener that stores HTTP request in bolt.DB.

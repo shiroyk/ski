@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shiroyk/cloudcat/logger"
+	"github.com/shiroyk/cloudcat/utils/logger"
 )
 
 // Shortener is an implementation of cache.Shortener that stores HTTP request in in-memory.

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shiroyk/cloudcat/logger"
+	"github.com/shiroyk/cloudcat/utils/logger"
 	"go.etcd.io/bbolt"
 )
 
