@@ -1,4 +1,4 @@
-package cmd
+package lib
 
 import (
 	"errors"
@@ -12,11 +12,11 @@ import (
 	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/js"
-	"github.com/shiroyk/cloudcat/utils"
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"gopkg.in/yaml.v3"
 )
 
-// Config The configuration
+// Config The cloudcat configuration
 type Config struct {
 	// Cache
 	Cache cache.Options `yaml:"cache"`
@@ -28,7 +28,8 @@ type Config struct {
 	JS js.Options `yaml:"js"`
 }
 
-func defaultConfig() *Config {
+// DefaultConfig The default configuration
+func DefaultConfig() *Config {
 	return &Config{
 		Cache: cache.Options{
 			Path: bolt.DefaultPath,
@@ -48,7 +49,9 @@ func defaultConfig() *Config {
 	}
 }
 
-func readConfig(path string) (config *Config, err error) {
+// ReadConfig read configuration from the file.
+// if the configuration file is not existing then create it with default configuration
+func ReadConfig(path string) (config *Config, err error) {
 	file := path
 	if strings.HasPrefix(strings.TrimSpace(path), "~") {
 		usr, err := user.Current()
@@ -63,7 +66,7 @@ func readConfig(path string) (config *Config, err error) {
 		if err != nil {
 			return nil, err
 		}
-		config = defaultConfig()
+		config = DefaultConfig()
 		bytes, err := yaml.Marshal(config)
 		if err != nil {
 			return nil, err

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/utils"
+	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 func TestCookie(t *testing.T) {

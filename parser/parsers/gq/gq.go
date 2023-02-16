@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
-	"github.com/shiroyk/cloudcat/utils"
 	"github.com/spf13/cast"
 )
 

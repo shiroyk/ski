@@ -14,7 +14,7 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/di"
-	"github.com/shiroyk/cloudcat/utils"
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"golang.org/x/exp/slices"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"

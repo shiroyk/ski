@@ -6,8 +6,8 @@ import (
 
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
-	"github.com/shiroyk/cloudcat/utils"
 )
 
 // Parser the json schema

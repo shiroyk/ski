@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
-	"github.com/shiroyk/cloudcat/utils"
 )
 
 var (

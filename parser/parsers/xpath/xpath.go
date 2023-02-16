@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/antchfx/htmlquery"
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
-	"github.com/shiroyk/cloudcat/utils"
 	"golang.org/x/net/html"
 )
 

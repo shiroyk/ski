@@ -4,13 +4,13 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/cache/cachetest"
-	"github.com/shiroyk/cloudcat/utils"
+	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 func TestCookie(t *testing.T) {
 	t.Parallel()
-	c := cachetest.NewCookie()
+	c := memory.NewCookie()
 
 	u, _ := url.Parse("http://localhost")
 

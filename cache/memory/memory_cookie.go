@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/shiroyk/cloudcat/utils"
+	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 // Cookie is an implementation of cache.Cookie that stores http.Cookie in in-memory.

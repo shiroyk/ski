@@ -6,21 +6,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/shiroyk/cloudcat/analyzer"
 	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/cloudcat/lib"
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
-	"github.com/shiroyk/cloudcat/utils"
 )
 
 var ErrInvalidMeta = errors.New("meta is invalid")
 
-func run(config Config, path, output string) (err error) {
+func run(config lib.Config, path, output string) (err error) {
 	if err = initDependencies(config); err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func run(config Config, path, output string) (err error) {
 	return
 }
 
-func initDependencies(config Config) error {
+func initDependencies(config lib.Config) error {
 	di.Provide(fetch.NewFetcher(fetch.Options{
 		CharsetDetectDisabled: config.Fetch.CharsetDetectDisabled,
 		MaxBodySize:           config.Fetch.MaxBodySize,
@@ -100,10 +100,10 @@ func initDependencies(config Config) error {
 	di.Provide(shortener)
 
 	js.SetScheduler(js.NewScheduler(js.Options{
-		InitialVMs:         utils.ZeroOr(config.JS.InitialVMs, 2),
-		MaxVMs:             utils.ZeroOr(config.JS.MaxVMs, runtime.GOMAXPROCS(0)),
-		MaxRetriesGetVM:    utils.ZeroOr(config.JS.MaxRetriesGetVM, js.DefaultMaxRetriesGetVM),
-		MaxTimeToWaitGetVM: utils.ZeroOr(config.JS.MaxTimeToWaitGetVM, js.DefaultMaxTimeToWaitGetVM),
+		InitialVMs:         config.JS.InitialVMs,
+		MaxVMs:             config.JS.MaxVMs,
+		MaxRetriesGetVM:    config.JS.MaxRetriesGetVM,
+		MaxTimeToWaitGetVM: config.JS.MaxTimeToWaitGetVM,
 		UseStrict:          config.JS.UseStrict,
 	}))
 

@@ -11,8 +11,8 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/js/common"
-	"github.com/shiroyk/cloudcat/utils"
-	"github.com/shiroyk/cloudcat/utils/logger"
+	"github.com/shiroyk/cloudcat/lib/logger"
+	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 const (

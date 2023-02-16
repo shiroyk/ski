@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/shiroyk/cloudcat/utils"
+	"github.com/shiroyk/cloudcat/lib/utils"
 	"golang.org/x/exp/slog"
 )
 

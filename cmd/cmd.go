@@ -4,23 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 	"runtime/debug"
 	"strings"
 
 	_ "github.com/shiroyk/cloudcat/analyzer"
 	"github.com/shiroyk/cloudcat/ext"
+	"github.com/shiroyk/cloudcat/lib"
 	"golang.org/x/exp/slog"
 )
-
-const banner = `
-        .__                   .___             __   
-   ____ |  |   ____  __ __  __| _/____ _____ _/  |_ 
- _/ ___\|  |  /  _ \|  |  \/ __ |/ ___\\__  \\   __\
- \  \___|  |_(  <_> )  |  / /_/ \  \___ / __ \|  |  
-  \___  >____/\____/|____/\____ |\___  >____  /__|  
-      \/                       \/    \/     \/    
-`
 
 var (
 	metaFlag       = flag.String("m", "", "Meta yml/yaml file path")
@@ -31,7 +22,7 @@ var (
 )
 
 func version() string {
-	return fmt.Sprintf("%v\n\t\tcloudcat %v %v", banner, "v1", runtime.Version())
+	return fmt.Sprintf("%v\n cloudcat %v/%v\n", lib.Banner, lib.Version, lib.CommitSHA)
 }
 
 // Execute main command
@@ -41,7 +32,7 @@ func Execute() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout)))
 
 	if file := *metaFlag; file != "" {
-		config, err := readConfig(*configFlag)
+		config, err := lib.ReadConfig(*configFlag)
 		if err != nil {
 			fmt.Printf("Error reading config file: \n %v", err)
 		}

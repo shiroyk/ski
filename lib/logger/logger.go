@@ -23,12 +23,12 @@ func Infof(format string, args ...any) {
 
 // Errorf calls LevelError on the default logger.
 func Errorf(format string, args ...any) {
-	Logf(slog.LevelError, format, args)
+	Logf(slog.LevelError, format, args...)
 }
 
 // Warnf calls LevelWarn on the default logger.
 func Warnf(format string, args ...any) {
-	Logf(slog.LevelWarn, format, args)
+	Logf(slog.LevelWarn, format, args...)
 }
 
 // Debug calls Logger.Debug on the default logger.

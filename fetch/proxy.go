@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	"github.com/shiroyk/cloudcat/utils"
-	"github.com/shiroyk/cloudcat/utils/logger"
+	"github.com/shiroyk/cloudcat/lib/logger"
+	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 type proxyURLKey int

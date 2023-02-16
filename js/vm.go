@@ -10,8 +10,8 @@ import (
 	"github.com/dop251/goja/ast"
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
+	"github.com/shiroyk/cloudcat/lib/logger"
 	"github.com/shiroyk/cloudcat/parser"
-	"github.com/shiroyk/cloudcat/utils/logger"
 	"golang.org/x/exp/maps"
 )
 
