@@ -9,7 +9,6 @@ import (
 )
 
 func TestURLSearchParams(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	vm := modulestest.New()
 

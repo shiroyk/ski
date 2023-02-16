@@ -1,11 +1,12 @@
 package bolt
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDB(t *testing.T) {
@@ -31,14 +32,10 @@ func TestDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(value, getValue) {
-		t.Fatalf("want %v, got %v", string(getValue), string(value))
-	}
+	assert.Equal(t, getValue, value)
 
 	time.Sleep(2 * time.Second)
 
 	_, err = db.Get(key)
-	if err != ErrKeyNotFound {
-		t.Fatalf("key not expired, got error %v", err)
-	}
+	assert.ErrorIs(t, err, ErrKeyNotFound)
 }

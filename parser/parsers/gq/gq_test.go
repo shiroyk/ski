@@ -3,11 +3,10 @@ package gq
 import (
 	"flag"
 	"os"
-	"reflect"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -64,48 +63,40 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func assertGetString(t *testing.T, arg string, assert func(string) bool) {
+func assertGetString(t *testing.T, arg string, expected string) {
 	str, err := gq.GetString(ctx, content, arg)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
-	if !assert(str) {
-		t.Fatalf("Unexpected string %s", str)
-	}
+	assert.Equal(t, expected, str)
 }
 
-func assertGetStrings(t *testing.T, arg string, assert func([]string) bool) {
+func assertGetStrings(t *testing.T, arg string, expected []string) {
 	str, err := gq.GetStrings(ctx, content, arg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !assert(str) {
-		t.Fatalf("Unexpected strings %s", str)
-	}
+	assert.Equal(t, expected, str)
 }
 
-func assertGetElement(t *testing.T, arg string, assert func(string2 string) bool) {
+func assertGetElement(t *testing.T, arg string, expected string) {
 	ele, err := gq.GetElement(ctx, content, arg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !assert(ele) {
-		t.Fatalf("Unexpected object %s", ele)
-	}
+	assert.Equal(t, expected, ele)
 }
 
-func assertGetElements(t *testing.T, arg string, assert func([]string) bool) {
+func assertGetElements(t *testing.T, arg string, expected []string) {
 	objs, err := gq.GetElements(ctx, content, arg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !assert(objs) {
-		t.Fatalf("Unexpected objects %s", objs)
-	}
+	assert.Equal(t, expected, objs)
 }
 
 func TestParser(t *testing.T) {
@@ -126,7 +117,7 @@ func TestParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := gq.GetString(ctx, utils.ToPtr(`<a href="https://go.dev" title="Golang page">Golang</a>`), ``); err != nil {
+	if _, err := gq.GetString(ctx, `<a href="https://go.dev" title="Golang page">Golang</a>`, ``); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,49 +128,31 @@ func TestParser(t *testing.T) {
 }
 
 func TestGetString(t *testing.T) {
-	assertGetString(t, `#main .row -> text`, func(s string) bool {
-		return s == "1, 2, 3, 4, 5, 6"
-	})
+	assertGetString(t, `#main .row -> text`, "1\n2\n3\n4\n5\n6")
 
-	assertGetString(t, `.body ul a -> parent(li) -> attr(id) -> join(-)`, func(s string) bool {
-		return s == "a1-a2-a3-a4"
-	})
+	assertGetString(t, `.body ul a -> parent(li) -> attr(id) -> join(-)`, "a1-a2-a3-a4")
 
-	assertGetString(t, `script -> slice(0)`, func(s string) bool {
-		return len(s) > 0
-	})
+	assertGetString(t, `script -> slice(0) -> attr(type)`, "text/javascript")
 }
 
 func TestGetStrings(t *testing.T) {
-	assertGetStrings(t, `.body ul li -> child(a) -> attr(title)`, func(str []string) bool {
-		return reflect.DeepEqual(str, []string{"Google page", "Github page", "Golang page", "Home page"})
-	})
+	assertGetStrings(t, `.body ul li -> child(a) -> attr(title)`, []string{"Google page", "Github page", "Golang page", "Home page"})
 
-	assertGetStrings(t, `.body ul a`, func(str []string) bool {
-		return reflect.DeepEqual(str, []string{"Google", "Github", "Golang", "Home"})
-	})
+	assertGetStrings(t, `.body ul a`, []string{"Google", "Github", "Golang", "Home"})
 }
 
 func TestGetElement(t *testing.T) {
-	assertGetElement(t, `.body ul a -> parents(li)`, func(ele string) bool {
-		return ele == `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>`
-	})
+	assertGetElement(t, `.body ul a -> parents(li)`, `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>`)
 
-	assertGetElement(t, `.body ul a -> slice(1) -> text`, func(ele string) bool {
-		return ele == `Github`
-	})
+	assertGetElement(t, `.body ul a -> slice(1) -> text`, `Github`)
 }
 
 func TestGetElements(t *testing.T) {
-	assertGetElements(t, `#foot div -> slice(0, 3)`, func(ele []string) bool {
-		return reflect.DeepEqual(ele, []string{
-			`<div id="nf1" class="one even row">f1</div>`,
-			`<div id="nf2" class="two odd row">f2</div>`,
-			`<div id="nf3" class="three even row">f3</div>`,
-		})
+	assertGetElements(t, `#foot div -> slice(0, 3)`, []string{
+		`<div id="nf1" class="one even row">f1</div>`,
+		`<div id="nf2" class="two odd row">f2</div>`,
+		`<div id="nf3" class="three even row">f3</div>`,
 	})
 
-	assertGetElements(t, `#foot div -> slice(0, 3) -> text`, func(ele []string) bool {
-		return reflect.DeepEqual(ele, []string{"f1", "f2", "f3"})
-	})
+	assertGetElements(t, `#foot div -> slice(0, 3) -> text`, []string{"f1", "f2", "f3"})
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/antchfx/htmlquery"
-	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
 	"golang.org/x/net/html"
 )
@@ -98,7 +97,7 @@ func (p Parser) GetElements(_ *parser.Context, content any, arg string) ([]strin
 func getHTMLNode(content any, arg string) ([]*html.Node, error) {
 	var err error
 	var node *html.Node
-	switch data := utils.FromPtr(content).(type) {
+	switch data := content.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected content type %T", data)
 	case []string:

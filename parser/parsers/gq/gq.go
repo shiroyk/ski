@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/spf13/cast"
 )
@@ -150,9 +149,9 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret [
 
 // getSelection converts content to goquery.Selection
 func getSelection(content any) (*goquery.Selection, error) {
-	switch data := utils.FromPtr(content).(type) {
+	switch data := content.(type) {
 	default:
-		return nil, fmt.Errorf("unexpected content type %T", data)
+		return nil, fmt.Errorf("unexpected content type %T", content)
 	case nil:
 		return &goquery.Selection{}, nil
 	case []string:

@@ -7,11 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/andybalholm/brotli"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCharsetFromHeaders(t *testing.T) {
@@ -21,11 +21,12 @@ func TestCharsetFromHeaders(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, _ := newFetcherDefault().Get(ts.URL, nil)
-
-	if res.String() != "Gültekin" {
-		t.Fatal(res.String())
+	res, err := newFetcherDefault().Get(ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	assert.Equal(t, "Gültekin", res.String())
 }
 
 func TestCharsetFromBody(t *testing.T) {
@@ -37,9 +38,7 @@ func TestCharsetFromBody(t *testing.T) {
 
 	res, _ := newFetcherDefault().Post(ts.URL, nil, nil)
 
-	if res.String() != "Gültekin" {
-		t.Fatal(res.String())
-	}
+	assert.Equal(t, "Gültekin", res.String())
 }
 
 func TestCharsetProvidedWithRequest(t *testing.T) {
@@ -53,9 +52,7 @@ func TestCharsetProvidedWithRequest(t *testing.T) {
 	req.Encoding = "windows-1254"
 	res, _ := newFetcherDefault().DoRequest(req)
 
-	if res.String() != "Gültekin" {
-		t.Fatal(res.String())
-	}
+	assert.Equal(t, "Gültekin", res.String())
 }
 
 func TestRetry(t *testing.T) {
@@ -75,6 +72,7 @@ func TestRetry(t *testing.T) {
 
 	for i, s := range []string{"Status code retry", "Other error retry"} {
 		t.Run(s, func(t *testing.T) {
+			times.Store(0)
 			var res *Response
 			var err error
 			if i > 0 {
@@ -84,13 +82,9 @@ func TestRetry(t *testing.T) {
 			}
 
 			if err != nil {
-				if !strings.Contains(err.Error(), "Location") {
-					t.Fatal(err)
-				}
+				assert.ErrorContains(t, err, "Location")
 			} else {
-				if res.StatusCode != http.StatusOK {
-					t.Fatalf("unexpected response status %v", res.StatusCode)
-				}
+				assert.Equal(t, http.StatusOK, res.StatusCode)
 			}
 		})
 	}
@@ -107,9 +101,7 @@ func TestCancel(t *testing.T) {
 	req.Cancel()
 
 	_, err = fetch.DoRequest(req)
-	if err != ErrRequestCancel {
-		t.Fatal(err)
-	}
+	assert.ErrorIs(t, err, ErrRequestCancel)
 }
 
 func TestDecompress(t *testing.T) {
@@ -157,9 +149,7 @@ func TestDecompress(t *testing.T) {
 				t.Error(err)
 			}
 
-			if res.String() != testCase.want {
-				t.Errorf("want %v, got %v", testCase.want, res.String())
-			}
+			assert.Equal(t, testCase.want, res.String())
 		})
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShortener(t *testing.T) {
@@ -23,7 +24,5 @@ Content-Type: application/json
 		t.Fatalf("not found: %v", id)
 	}
 
-	if req != h {
-		t.Fatalf("want: %s, got %s", req, h)
-	}
+	assert.Equal(t, h, req)
 }

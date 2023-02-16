@@ -80,6 +80,7 @@ func NewFetcher(opt Options) Fetch {
 	fetch.charsetDetectDisabled = opt.CharsetDetectDisabled
 	fetch.maxBodySize = utils.ZeroOr(opt.MaxBodySize, DefaultMaxBodySize)
 	fetch.timeout = utils.ZeroOr(opt.Timeout, DefaultTimeout)
+	fetch.retryTimes = utils.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
 	fetch.retryHTTPCodes = utils.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
 	var transport http.RoundTripper = &http.Transport{
@@ -185,19 +186,8 @@ func (f *fetcher) doRequest(req *Request) (*Response, error) {
 	// Limit response body reading
 	bodyReader := io.LimitReader(res.Body, f.maxBodySize)
 
-	contentEncodings := strings.Split(res.Header.Get("Content-Encoding"), ",")
-	// In the order decompressed
-	for _, encoding := range contentEncodings {
-		switch strings.TrimSpace(encoding) {
-		case "deflate":
-			bodyReader, err = zlib.NewReader(bodyReader)
-		case "gzip":
-			bodyReader, err = gzip.NewReader(bodyReader)
-		case "br":
-			bodyReader = brotli.NewReader(bodyReader)
-		default:
-			err = fmt.Errorf("unsupported compression type %s", encoding)
-		}
+	if encoding := res.Header.Get("Content-Encoding"); encoding != "" {
+		bodyReader, err = decompressedBody(encoding, bodyReader)
 		if err != nil {
 			return nil, err
 		}
@@ -225,4 +215,25 @@ func (f *fetcher) doRequest(req *Request) (*Response, error) {
 	}
 
 	return &Response{Response: res, Body: body}, nil
+}
+
+func decompressedBody(encoding string, reader io.Reader) (bodyReader io.Reader, err error) {
+	contentEncodings := strings.Split(encoding, ",")
+	// In the order decompressed
+	for _, encode := range contentEncodings {
+		switch strings.TrimSpace(encode) {
+		case "deflate":
+			bodyReader, err = zlib.NewReader(reader)
+		case "gzip":
+			bodyReader, err = gzip.NewReader(reader)
+		case "br":
+			bodyReader = brotli.NewReader(reader)
+		default:
+			err = fmt.Errorf("unsupported compression type %s", encode)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return
 }

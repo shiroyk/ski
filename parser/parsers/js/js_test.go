@@ -3,10 +3,10 @@ package js
 import (
 	"flag"
 	"os"
-	"reflect"
 	"testing"
 
 	"github.com/shiroyk/cloudcat/parser"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -35,9 +35,8 @@ func TestGetString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if str != "a1" {
-		t.Errorf("unexpected result %s", str)
-	}
+
+	assert.Equal(t, "a1", str)
 }
 
 func TestGetStrings(t *testing.T) {
@@ -50,9 +49,8 @@ func TestGetStrings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reflect.DeepEqual(str, [2]string{"a1", "a2"}) {
-		t.Errorf("unexpected result %s", str)
-	}
+
+	assert.Equal(t, []string{"a1", "a2"}, str)
 }
 
 func TestGetElement(t *testing.T) {
@@ -61,9 +59,8 @@ func TestGetElement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ele != "3" {
-		t.Fatalf("unexpected result %s", ele)
-	}
+
+	assert.Equal(t, "3", ele)
 }
 
 func TestGetElements(t *testing.T) {
@@ -73,7 +70,6 @@ func TestGetElements(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(ele, []string{"1", "2"}) {
-		t.Fatalf("unexpected result %s", ele)
-	}
+
+	assert.Equal(t, []string{"1", "2"}, ele)
 }

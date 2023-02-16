@@ -3,10 +3,10 @@ package xpath
 import (
 	"flag"
 	"os"
-	"reflect"
 	"testing"
 
 	"github.com/shiroyk/cloudcat/parser"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -69,19 +69,18 @@ func TestParser(t *testing.T) {
 
 	_, err := xpath.GetString(ctx, 1, ``)
 	if err == nil {
-		t.Fatal("error should be nil")
+		t.Fatal("error should not be nil")
 	}
 
-	node := `<a href="https://go.dev" title="Golang page">Golang</a>`
-	_, err = xpath.GetString(ctx, &node, `//a`)
+	_, err = xpath.GetString(ctx, `<a href="https://go.dev" title="Golang page">Golang</a>`, `//a`)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	sel, _ := xpath.GetElement(ctx, content, `//div[@class="body"]`)
 	_, err = xpath.GetString(ctx, sel, `//a/text()`)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
@@ -94,25 +93,19 @@ func TestGetString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if str1 != "1, 2, 3, 4, 5, 6" {
-		t.Fatalf("Unexpected string %s", str1)
-	}
+	assert.Equal(t, "1\n2\n3\n4\n5\n6", str1)
 
 	str2, err := xpath.GetString(ctx, content, `//div[@class="body"]/ul/li/@id`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if str2 != "a1, a2, a3" {
-		t.Fatalf("Unexpected string %s", str2)
-	}
+	assert.Equal(t, "a1\na2\na3", str2)
 
 	js, err := xpath.GetString(ctx, content, `//script[1]`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(js) == 0 {
-		t.Fatalf("Unexpected string %s", js)
-	}
+	assert.NotEmpty(t, js)
 }
 
 func TestGetStrings(t *testing.T) {
@@ -124,17 +117,13 @@ func TestGetStrings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(str1, []string{"Google page", "Github page", "Golang page"}) {
-		t.Fatalf("Unexpected strings %s", str1)
-	}
+	assert.Equal(t, []string{"Google page", "Github page", "Golang page"}, str1)
 
 	str2, err := xpath.GetStrings(ctx, content, `//div[@class="body"]/ul//a`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(str2, []string{"Google", "Github", "Golang"}) {
-		t.Fatalf("Unexpected strings %s", str2)
-	}
+	assert.Equal(t, []string{"Google", "Github", "Golang"}, str2)
 }
 
 func TestGetElement(t *testing.T) {
@@ -146,11 +135,9 @@ func TestGetElement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if object != `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>
+	assert.Equal(t, `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>
 <li id="a2"><a href="https://github.com" title="Github page">Github</a></li>
-<li id="a3" class="selected"><a href="https://go.dev" title="Golang page">Golang</a></li>` {
-		t.Fatalf("Unexpected object %s", object)
-	}
+<li id="a3" class="selected"><a href="https://go.dev" title="Golang page">Golang</a></li>`, object)
 }
 
 func TestGetElements(t *testing.T) {
@@ -162,8 +149,7 @@ func TestGetElements(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if len(objects) != 6 {
-		t.Fatalf("Unexpected node length %d", len(objects))
-	}
+	assert.Equal(t, []string{"<class>one even row</class>", "<class>two odd row</class>",
+		"<class>three even row</class>", "<class>four odd row</class>",
+		"<class>five even row odder</class>", "<class>six odd row</class>"}, objects)
 }

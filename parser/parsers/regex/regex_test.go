@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/shiroyk/cloudcat/parser"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -26,7 +27,7 @@ var (
 func TestParser(t *testing.T) {
 	_, ok := parser.GetParser(key)
 	if !ok {
-		t.Fatal("schema not registered")
+		t.Fatal("parser not registered")
 	}
 }
 
@@ -37,9 +38,7 @@ func TestGetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if str != s.want {
-				t.Errorf("wanted %s, go %s", s.want, str)
-			}
+			assert.Equal(t, s.want, str)
 		})
 	}
 }
@@ -51,9 +50,7 @@ func TestGetStrings(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if str[0] != s.want {
-				t.Errorf("wanted %s, go %s", s.want, str)
-			}
+			assert.Equal(t, s.want, str[0])
 		})
 	}
 }

@@ -3,10 +3,10 @@ package json
 import (
 	"flag"
 	"os"
-	"reflect"
 	"testing"
 
 	"github.com/shiroyk/cloudcat/parser"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -59,48 +59,22 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func assertString(t *testing.T, arg string, assert func(string) bool) {
+func assertString(t *testing.T, arg string, expected string) {
 	str, err := json.GetString(ctx, content, arg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !assert(str) {
-		t.Fatalf("unexpected result %s", str)
-	}
+	assert.Equal(t, expected, str)
 }
 
-func assertStrings(t *testing.T, arg string, assert func([]string) bool) {
+func assertStrings(t *testing.T, arg string, expected []string) {
 	str, err := json.GetStrings(ctx, content, arg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !assert(str) {
-		t.Fatalf("unexpected result %s", str)
-	}
-}
-
-func assertGetElement(t *testing.T, arg string, assert func(string) bool) {
-	obj, err := json.GetElement(ctx, content, arg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !assert(obj) {
-		t.Fatalf("Unexpected object %s", obj)
-	}
-}
-
-func assertGetElements(t *testing.T, arg string, assert func([]string) bool) {
-	objs, err := json.GetElements(ctx, content, arg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !assert(objs) {
-		t.Fatalf("Unexpected objects %s", objs)
-	}
+	assert.Equal(t, expected, str)
 }
 
 func TestParser(t *testing.T) {
@@ -122,20 +96,14 @@ func TestParser(t *testing.T) {
 
 func TestGetString(t *testing.T) {
 	t.Parallel()
-	assertString(t, `$.store.book[*].author`, func(str string) bool {
-		return str == `Nigel Rees, Evelyn Waugh, Herman Melville, J. R. R. Tolkien`
-	})
+	assertString(t, `$.store.book[*].author`, `Nigel ReesEvelyn WaughHerman MelvilleJ. R. R. Tolkien`)
 }
 
 func TestGetStrings(t *testing.T) {
 	t.Parallel()
-	assertStrings(t, `$...book[0].price`, func(str []string) bool {
-		return reflect.DeepEqual(str, []string{"8.95"})
-	})
+	assertStrings(t, `$...book[0].price`, []string{"8.95"})
 
-	assertStrings(t, `$...book[-1].price`, func(str []string) bool {
-		return reflect.DeepEqual(str, []string{"22.99"})
-	})
+	assertStrings(t, `$...book[-1].price`, []string{"22.99"})
 }
 
 func TestGetElement(t *testing.T) {
@@ -144,9 +112,7 @@ func TestGetElement(t *testing.T) {
 		t.Fatal("Unexpected path")
 	}
 
-	assertGetElement(t, `$.store.book[-1]`, func(obj string) bool {
-		return obj != ""
-	})
+	assertString(t, `$.store.book[-1].price`, "22.99")
 
 	str1, err := json.GetElement(ctx, content, `$.store.book[?(@.price > 20)]`)
 	if err != nil {
@@ -164,9 +130,7 @@ func TestGetElement(t *testing.T) {
 
 func TestGetElements(t *testing.T) {
 	t.Parallel()
-	assertGetElements(t, `$.store.book[?(@.price < 10)].isbn`, func(obj []string) bool {
-		return obj[0] == `0-553-21311-3`
-	})
+	assertStrings(t, `$.store.book[?(@.price < 10)].isbn`, []string{`0-553-21311-3`})
 
 	str1, err := json.GetElements(ctx, content, `$.store.book[3]`)
 	if err != nil {

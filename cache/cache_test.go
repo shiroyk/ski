@@ -184,7 +184,6 @@ func resetTest() {
 // TestCacheableMethod ensures that uncacheable method does not get stored
 // in cache and get incorrectly used for a following cacheable method request.
 func TestCacheableMethod(t *testing.T) {
-	t.Parallel()
 	resetTest()
 	{
 		req, err := http.NewRequest(http.MethodPost, s.server.URL+"/method", nil)
@@ -242,7 +241,6 @@ func TestCacheableMethod(t *testing.T) {
 }
 
 func TestDontServeHeadResponseToGetRequest(t *testing.T) {
-	t.Parallel()
 	resetTest()
 	url := s.server.URL + "/"
 	req, err := http.NewRequest(http.MethodHead, url, nil)

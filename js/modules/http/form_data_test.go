@@ -9,7 +9,6 @@ import (
 )
 
 func TestFormData(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	vm := modulestest.New()
 

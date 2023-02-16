@@ -2,9 +2,10 @@ package js
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestVM(t *testing.T) {
@@ -35,9 +36,8 @@ func TestVM(t *testing.T) {
 				}
 				t.Fatal(err)
 			}
-			if v.String() != c.want {
-				t.Errorf("want %v, got %v", c.want, v.String())
-			}
+
+			assert.Equal(t, c.want, v.String())
 		})
 	}
 }
@@ -48,9 +48,7 @@ func TestTimeout(t *testing.T) {
 	defer cancel()
 
 	_, err := newVM(false).RunString(ctx, `while(true){}`)
-	if !strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
-		t.Fatal(err)
-	}
+	assert.ErrorContains(t, err, context.DeadlineExceeded.Error())
 }
 
 func TestUseStrict(t *testing.T) {
@@ -58,8 +56,6 @@ func TestUseStrict(t *testing.T) {
 	vm := newVM(true)
 	_, err := vm.RunString(context.Background(), `eval('a = 1');a`)
 	if err != nil {
-		if !strings.Contains(err.Error(), "ReferenceError: a is not defined") {
-			t.Fatal(err)
-		}
+		assert.Contains(t, err.Error(), "ReferenceError: a is not defined")
 	}
 }

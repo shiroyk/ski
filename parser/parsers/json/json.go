@@ -6,7 +6,6 @@ import (
 
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
-	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
 )
 
@@ -66,7 +65,7 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) ([]str
 func getDoc(content any, arg string) ([]any, error) {
 	var err error
 	var doc any
-	switch data := utils.FromPtr(content).(type) {
+	switch data := content.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected content type %T", content)
 	case nil:

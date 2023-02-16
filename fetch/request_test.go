@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"text/template"
-	"time"
 
 	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewRequest(t *testing.T) {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=iso-8859-9")
 		switch r.Method {
 		case http.MethodPut:
 			if token := r.Header.Get("Authorization"); token != "1919810" {
@@ -31,7 +31,6 @@ func TestNewRequest(t *testing.T) {
 			}
 			return
 		}
-		w.Header().Set("Content-Type", "text/plain; charset=iso-8859-9")
 
 		if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
 			file, _, err := r.FormFile("file")
@@ -120,11 +119,10 @@ func TestNewRequest(t *testing.T) {
 
 				res, err := fetch.DoRequest(req)
 				if err != nil {
-					t.Fatal(err)
+					t.Error(err)
+					continue
 				}
-				if res.String() != r.want {
-					t.Errorf("response got %s, want %s", res.String(), r.want)
-				}
+				assert.Equal(t, r.want, res.String())
 			}
 		})
 	}
@@ -229,12 +227,8 @@ func TestNewTemplateRequest(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if res.String() != tpl.want {
-					t.Errorf("response got %s, want %s", res.String(), tpl.want)
-				}
-				if res.ContentType() != "text/plain" {
-					t.Errorf("content type got %s, want text/plain", res.String())
-				}
+				assert.Equal(t, tpl.want, res.String())
+				assert.Equal(t, "text/plain", res.ContentType())
 			}
 		})
 	}
@@ -328,23 +322,10 @@ func createMultiPart(t *testing.T, data map[string]any) ([]byte, map[string]stri
 }
 
 func newTestFetcher() *fetcher {
-	fetch := new(fetcher)
-	fetch.Client = &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          0,    // Default: 100
-			MaxIdleConnsPerHost:   1000, // Default: 2
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-		Timeout: DefaultTimeout,
-		Jar:     memory.NewCookie(),
-	}
-	return fetch
+	return NewFetcher(Options{
+		MaxBodySize:    DefaultMaxBodySize,
+		RetryTimes:     DefaultRetryTimes,
+		RetryHTTPCodes: DefaultRetryHTTPCodes,
+		Timeout:        DefaultTimeout,
+	}).(*fetcher)
 }

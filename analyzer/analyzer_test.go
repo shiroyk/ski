@@ -7,6 +7,7 @@ import (
 
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
+	"github.com/stretchr/testify/assert"
 )
 
 var content = `<!DOCTYPE html>
@@ -114,9 +115,7 @@ func TestAnalyzer(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if string(bytes) != testCase.Result {
-				t.Fatalf("want %s, got %s", testCase.Result, bytes)
-			}
+			assert.Equal(t, testCase.Result, string(bytes))
 		})
 	}
 }

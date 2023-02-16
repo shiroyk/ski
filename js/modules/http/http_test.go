@@ -15,7 +15,6 @@ import (
 )
 
 func TestHttp(t *testing.T) {
-	t.Parallel()
 	di.Override(fetch.NewFetcher(fetch.Options{}))
 	ctx := context.Background()
 	vm := modulestest.New()

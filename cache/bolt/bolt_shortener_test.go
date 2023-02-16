@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShortener(t *testing.T) {
@@ -30,9 +32,7 @@ Content-Type: application/json
 		t.Fatal(fmt.Sprintf("not found: %v", id))
 	}
 
-	if req != h {
-		t.Fatalf("want: %s, got %s", req, h)
-	}
+	assert.Equal(t, h, req)
 
 	time.Sleep(2 * time.Second)
 

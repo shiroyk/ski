@@ -2,9 +2,7 @@ package utils
 
 import (
 	"os"
-	"reflect"
 
-	"golang.org/x/exp/constraints"
 	"gopkg.in/yaml.v3"
 )
 
@@ -12,18 +10,6 @@ import (
 type Pair[K comparable, V any] struct {
 	Key   K
 	Value V
-}
-
-// FromPtr returns the value from pointer
-func FromPtr[T any](ptr T) (ret T) {
-	v := reflect.ValueOf(ptr)
-	if v.Kind() == reflect.Invalid {
-		return
-	}
-	for v.Kind() == reflect.Ptr && !v.IsNil() {
-		v = v.Elem()
-	}
-	return v.Interface().(T)
 }
 
 // ZeroOr if value is zero value returns the defaultValue
@@ -41,11 +27,6 @@ func EmptyOr[T any](value, defaultValue []T) []T {
 		return defaultValue
 	}
 	return value
-}
-
-// ToPtr returns the value pointer
-func ToPtr[T constraints.Ordered](value T) *T {
-	return &value
 }
 
 // ReadYaml read the YAML file and convert it to T

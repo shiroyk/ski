@@ -6,6 +6,7 @@ import (
 
 	"github.com/shiroyk/cloudcat/cache/memory"
 	"github.com/shiroyk/cloudcat/lib/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCookie(t *testing.T) {
@@ -21,16 +22,12 @@ func TestCookie(t *testing.T) {
 	{
 		maxAge := "MaxAge=3600;"
 		c.SetCookies(u, utils.ParseCookie(maxAge))
-		if c.CookieString(u) != "MaxAge=3600" {
-			t.Fatalf("unexpected cookie %s", c.CookieString(u))
-		}
+		assert.Equal(t, "MaxAge=3600", c.CookieString(u))
 	}
 
 	{
 		maxAge := "MaxAge=7200;"
 		c.SetCookieString(u, maxAge)
-		if c.CookieString(u) != "MaxAge=7200" {
-			t.Fatalf("unexpected cookie %s", c.CookieString(u))
-		}
+		assert.Equal(t, "MaxAge=7200;", c.CookieString(u))
 	}
 }

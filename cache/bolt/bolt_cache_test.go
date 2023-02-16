@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCache(t *testing.T) {
@@ -23,9 +25,7 @@ func TestCache(t *testing.T) {
 
 	c.Set(key, []byte(value))
 	v, _ := c.Get(key)
-	if string(v) != value {
-		t.Fatalf("unexpected value %s", v)
-	}
+	assert.Equal(t, value, string(v))
 
 	c.Del(key)
 	if _, ok := c.Get(key); ok {
