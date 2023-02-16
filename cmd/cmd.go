@@ -37,16 +37,15 @@ func version() string {
 // Execute main command
 func Execute() {
 	flag.Parse()
-	var err error
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout)))
 
-	config, err := readConfig(*configFlag)
-	if err != nil {
-		fmt.Printf("Error reading config file: \n %v", err)
-	}
-
 	if file := *metaFlag; file != "" {
+		config, err := readConfig(*configFlag)
+		if err != nil {
+			fmt.Printf("Error reading config file: \n %v", err)
+		}
+
 		output := *outputFlag
 		err = run(*config, file, output)
 		if err != nil {
