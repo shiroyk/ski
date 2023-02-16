@@ -69,9 +69,11 @@ type Scheduler interface {
 
 // Options Scheduler options
 type Options struct {
-	InitialVMs, MaxVMs, MaxRetriesGetVM int
-	MaxTimeToWaitGetVM                  time.Duration
-	UseStrict                           bool
+	InitialVMs         int           `yaml:"initial-vms"`
+	MaxVMs             int           `yaml:"max-vms"`
+	MaxRetriesGetVM    int           `yaml:"max-retries-get-vm"`
+	MaxTimeToWaitGetVM time.Duration `yaml:"max-time-to-wait-get-vm"`
+	UseStrict          bool          `yaml:"use-strict"`
 }
 
 type schedulerImpl struct {

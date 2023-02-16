@@ -23,7 +23,8 @@ const banner = `
 `
 
 var (
-	schemaFlag     = flag.String("f", "", "Schema yml/yaml filename")
+	metaFlag       = flag.String("m", "", "Meta yml/yaml file path")
+	configFlag     = flag.String("c", "~/.config/cloudcat/config.yml", "Config file path")
 	outputFlag     = flag.String("o", "", "Write to file instead of stdout")
 	versionFlag    = flag.Bool("v", false, "Version")
 	extensionsFlag = flag.Bool("e", false, "Extensions list")
@@ -36,14 +37,20 @@ func version() string {
 // Execute main command
 func Execute() {
 	flag.Parse()
+	var err error
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout)))
 
-	if file := *schemaFlag; file != "" {
+	config, err := readConfig(*configFlag)
+	if err != nil {
+		fmt.Printf("Error reading config file: \n %v", err)
+	}
+
+	if file := *metaFlag; file != "" {
 		output := *outputFlag
-		err := run(file, output)
+		err = run(*config, file, output)
 		if err != nil {
-			fmt.Println(err, string(debug.Stack()))
+			fmt.Printf("Error run parse meta: \n %v%v", err, string(debug.Stack()))
 		}
 		return
 	}

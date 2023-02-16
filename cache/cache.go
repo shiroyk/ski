@@ -588,3 +588,8 @@ func (r *cachingReadCloser) Read(p []byte) (n int, err error) {
 func (r *cachingReadCloser) Close() error {
 	return r.R.Close()
 }
+
+// Options the cache configuration
+type Options struct {
+	Path string `yaml:"path"`
+}

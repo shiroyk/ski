@@ -181,6 +181,7 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 	return &Request{Request: req}, nil
 }
 
+// DefaultTemplateFuncMap The default template function map
 func DefaultTemplateFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"get": func(key string) (ret string) {

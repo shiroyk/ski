@@ -16,7 +16,7 @@ import (
 
 const (
 	defaultBatchSize = 100000
-	defaultPath      = "cache"
+	DefaultPath      = "cache"
 	defaultInterval  = 10 * time.Minute
 	defaultKeysClean = 64
 	fillPercent      = 0.9
@@ -40,7 +40,7 @@ type DB struct {
 // if interval above 0, will not clear expired keys
 func NewDB(path, name string, interval time.Duration) (*DB, error) {
 	if path == "" {
-		path = defaultPath
+		path = DefaultPath
 	}
 	err := os.MkdirAll(path, 0700)
 	if err != nil {

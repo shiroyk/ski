@@ -66,11 +66,11 @@ var (
 
 // Options The Fetch instance options
 type Options struct {
-	CharsetDetectDisabled bool
-	MaxBodySize           int64
-	RetryTimes            int
-	RetryHTTPCodes        []int
-	Timeout               time.Duration
+	CharsetDetectDisabled bool          `yaml:"charset-detect-disabled"`
+	MaxBodySize           int64         `yaml:"max-body-size"`
+	RetryTimes            int           `yaml:"retry-times"`
+	RetryHTTPCodes        []int         `yaml:"retry-http-codes"`
+	Timeout               time.Duration `yaml:"timeout"`
 }
 
 // NewFetcher returns a new Fetch instance

@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"os"
 	"reflect"
 
 	"golang.org/x/exp/constraints"
+	"gopkg.in/yaml.v3"
 )
 
 // Pair a key and a value pair
@@ -44,4 +46,20 @@ func EmptyOr[T any](value, defaultValue []T) []T {
 // ToPtr returns the value pointer
 func ToPtr[T constraints.Ordered](value T) *T {
 	return &value
+}
+
+// ReadYaml read the YAML file and convert it to T
+func ReadYaml[T any](path string) (t *T, err error) {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	t = new(T)
+	err = yaml.Unmarshal(bytes, t)
+	if err != nil {
+		return
+	}
+
+	return
 }

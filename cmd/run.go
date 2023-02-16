@@ -6,24 +6,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/shiroyk/cloudcat/analyzer"
 	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
+	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
-	"gopkg.in/yaml.v3"
+	"github.com/shiroyk/cloudcat/utils"
 )
 
 var ErrInvalidMeta = errors.New("meta is invalid")
 
-func run(path, output string) (err error) {
-	if err = initDependencies(); err != nil {
+func run(config Config, path, output string) (err error) {
+	if err = initDependencies(config); err != nil {
 		return err
 	}
 
-	meta, err := readMeta(path)
+	meta, err := utils.ReadYaml[schema.Meta](path)
 	if err != nil {
 		return err
 	}
@@ -72,39 +74,38 @@ func run(path, output string) (err error) {
 	return
 }
 
-func initDependencies() error {
-	di.Provide(fetch.NewFetcher(fetch.Options{}))
+func initDependencies(config Config) error {
+	di.Provide(fetch.NewFetcher(fetch.Options{
+		CharsetDetectDisabled: config.Fetch.CharsetDetectDisabled,
+		MaxBodySize:           config.Fetch.MaxBodySize,
+		RetryTimes:            config.Fetch.RetryTimes,
+		RetryHTTPCodes:        config.Fetch.RetryHTTPCodes,
+		Timeout:               config.Fetch.Timeout,
+	}))
 	di.Provide(fetch.DefaultTemplateFuncMap())
-	cache, err := bolt.NewCache("")
+	cache, err := bolt.NewCache(config.Cache.Path)
 	if err != nil {
 		return err
 	}
 	di.Provide(cache)
-	cookie, err := bolt.NewCookie("")
+	cookie, err := bolt.NewCookie(config.Cache.Path)
 	if err != nil {
 		return err
 	}
 	di.Provide(cookie)
-	shortener, err := bolt.NewShortener("")
+	shortener, err := bolt.NewShortener(config.Cache.Path)
 	if err != nil {
 		return err
 	}
 	di.Provide(shortener)
 
+	js.SetScheduler(js.NewScheduler(js.Options{
+		InitialVMs:         utils.ZeroOr(config.JS.InitialVMs, 2),
+		MaxVMs:             utils.ZeroOr(config.JS.MaxVMs, runtime.GOMAXPROCS(0)),
+		MaxRetriesGetVM:    utils.ZeroOr(config.JS.MaxRetriesGetVM, js.DefaultMaxRetriesGetVM),
+		MaxTimeToWaitGetVM: utils.ZeroOr(config.JS.MaxTimeToWaitGetVM, js.DefaultMaxTimeToWaitGetVM),
+		UseStrict:          config.JS.UseStrict,
+	}))
+
 	return nil
-}
-
-func readMeta(path string) (meta *schema.Meta, err error) {
-	bytes, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-
-	meta = new(schema.Meta)
-	err = yaml.Unmarshal(bytes, meta)
-	if err != nil {
-		return
-	}
-
-	return
 }
