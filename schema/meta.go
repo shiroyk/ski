@@ -11,6 +11,7 @@ import (
 type Source struct {
 	Name    string            `yaml:"name"`
 	URL     string            `yaml:"url"`
+	Proxy   []string          `yaml:"proxy"`
 	Timeout time.Duration     `yaml:"timeout"`
 	Header  map[string]string `yaml:"header"`
 }
@@ -18,7 +19,7 @@ type Source struct {
 // Meta the meta
 type Meta struct {
 	Source *Source `yaml:"source"`
-	Schema *Schema
+	Schema *Schema `yaml:"schema"`
 }
 
 // UnmarshalYAML decodes the Schema from yaml

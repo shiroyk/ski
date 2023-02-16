@@ -39,6 +39,7 @@ func DefaultConfig() *Config {
 			RetryTimes:     fetch.DefaultRetryTimes,
 			RetryHTTPCodes: fetch.DefaultRetryHTTPCodes,
 			Timeout:        fetch.DefaultTimeout,
+			CachePolicy:    cache.RFC2616,
 		},
 		JS: js.Options{
 			InitialVMs:         2,

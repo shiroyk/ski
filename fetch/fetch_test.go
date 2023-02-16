@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/andybalholm/brotli"
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -161,5 +162,6 @@ func newFetcherDefault() Fetch {
 		RetryTimes:     DefaultRetryTimes,
 		RetryHTTPCodes: DefaultRetryHTTPCodes,
 		Timeout:        DefaultTimeout,
+		CachePolicy:    cache.RFC2616,
 	})
 }

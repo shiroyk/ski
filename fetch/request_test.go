@@ -12,6 +12,7 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/memory"
 	"github.com/stretchr/testify/assert"
 )
@@ -327,5 +328,6 @@ func newTestFetcher() *fetcher {
 		RetryTimes:     DefaultRetryTimes,
 		RetryHTTPCodes: DefaultRetryHTTPCodes,
 		Timeout:        DefaultTimeout,
+		CachePolicy:    cache.RFC2616,
 	}).(*fetcher)
 }

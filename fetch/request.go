@@ -26,19 +26,12 @@ type Request struct {
 	// Proxy on this Request
 	Proxy []string
 
-	// If true, Request will be synchronized
-	Synchronized bool
-
 	// Optional response body encoding. Leave empty for automatic detection.
 	// If you're having issues with auto-detection, set this.
 	Encoding string
 
 	// Set this true to cancel Request. Should be used on middlewares.
 	Cancelled bool
-
-	RetryTimes int
-
-	RetryHTTPCodes []int
 
 	retryCounter int
 }
@@ -55,19 +48,22 @@ func NewRequest(method, u string, body any, headers map[string]string) (*Request
 		// Convert body to io.Reader
 		switch data := body.(type) {
 		default:
-			if kind := reflect.ValueOf(body).Kind(); kind == reflect.Struct || kind == reflect.Map {
-				j, err := json.Marshal(body)
-				if err != nil {
-					return nil, err
-				}
-				if headers == nil {
-					headers = make(map[string]string)
-				}
-				if _, ok := headers["Content-Type"]; !ok {
-					headers["Content-Type"] = "application/json"
-				}
-				reqBody = bytes.NewReader(j)
+			kind := reflect.ValueOf(body).Kind()
+			if kind != reflect.Struct && kind != reflect.Map {
+				break
 			}
+
+			j, err := json.Marshal(body)
+			if err != nil {
+				return nil, err
+			}
+			if headers == nil {
+				headers = make(map[string]string)
+			}
+			if _, ok := headers["Content-Type"]; !ok {
+				headers["Content-Type"] = "application/json"
+			}
+			reqBody = bytes.NewReader(j)
 		case *bytes.Buffer:
 			reqBody = data
 		case *bytes.Reader:

@@ -71,6 +71,7 @@ type Options struct {
 	RetryTimes            int           `yaml:"retry-times"`
 	RetryHTTPCodes        []int         `yaml:"retry-http-codes"`
 	Timeout               time.Duration `yaml:"timeout"`
+	CachePolicy           cache.Policy  `yaml:"cache-policy"`
 }
 
 // NewFetcher returns a new Fetch instance
@@ -98,10 +99,10 @@ func NewFetcher(opt Options) Fetch {
 	}
 
 	ch, _ := di.Resolve[cache.Cache]()
-	if ch != nil {
+	if ch != nil && opt.CachePolicy != 0 {
 		transport = &cache.Transport{
 			Cache:               ch,
-			Policy:              cache.RFC2616,
+			Policy:              opt.CachePolicy,
 			Transport:           transport,
 			MarkCachedResponses: true,
 		}
@@ -142,7 +143,11 @@ func (f *fetcher) Request(method, url string, body any, headers map[string]strin
 
 // DoRequest sends a fetch.Request and returns an HTTP response
 func (f *fetcher) DoRequest(req *Request) (*Response, error) {
-	f.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy(req.URL.String(), req.Proxy...)
+	if tp, ok := f.Transport.(*cache.Transport); ok {
+		tp.SetProxy(RoundRobinCacheProxy(req.URL.String(), req.Proxy...))
+	} else {
+		f.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy(req.URL.String(), req.Proxy...)
+	}
 	return f.doRequestRetry(req)
 }
 

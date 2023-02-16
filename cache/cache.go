@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -32,13 +33,40 @@ const (
 	// The Dummy policy is useful for testing spiders faster (without having to wait for downloads every time)
 	// and for trying your spider offline, when an Internet connection is not available.
 	// The goal is to be able to “replay” a spider run exactly as it ran before.
-	Dummy Policy = iota
+	Dummy Policy = iota + 1
 
 	// RFC2616 This policy provides a RFC2616 compliant HTTP cache, i.e. with HTTP Cache-Control awareness,
 	// aimed at production and used in continuous runs to avoid downloading unmodified data
 	// (to save bandwidth and speed up crawls).
 	RFC2616
 )
+
+// UnmarshalYAML decode from yaml
+func (p *Policy) UnmarshalYAML(unmarshal func(any) error) error {
+	var str *string
+	err := unmarshal(str)
+	if err != nil {
+		return err
+	}
+	switch *str {
+	case "dummy":
+		*p = Dummy
+	case "rfc2616":
+		*p = RFC2616
+	}
+	return fmt.Errorf("unsupported cache policy %v", str)
+}
+
+// MarshalYAML encode to yaml
+func (p *Policy) MarshalYAML() (any, error) {
+	switch *p {
+	case Dummy:
+		return "dummy", nil
+	case RFC2616:
+		return "rfc2616", nil
+	}
+	return nil, fmt.Errorf("unsupported cache policy %v", p)
+}
 
 const (
 	stale = iota

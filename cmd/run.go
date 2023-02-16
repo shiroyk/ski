@@ -35,6 +35,7 @@ func run(config lib.Config, path, output string) (err error) {
 
 	fetcher := di.MustResolve[fetch.Fetch]()
 	req, err := fetch.NewTemplateRequest(nil, meta.Source.URL, nil)
+	req.Proxy = meta.Source.Proxy
 	if err != nil {
 		return err
 	}
@@ -48,6 +49,7 @@ func run(config lib.Config, path, output string) (err error) {
 		Timeout: meta.Source.Timeout,
 		URL:     meta.Source.URL,
 	})
+	defer ctx.Cancel()
 
 	anal := analyzer.NewAnalyzer()
 	result := anal.ExecuteSchema(ctx, meta.Schema, res.String())
