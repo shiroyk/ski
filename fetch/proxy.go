@@ -7,14 +7,9 @@ import (
 	"sync/atomic"
 
 	"github.com/shiroyk/cloudcat/lib/logger"
-	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 type proxyURLKey int
-
-var (
-	cacheProxy = utils.NewLRUCache[string, roundRobinProxy](64)
-)
 
 type roundRobinProxy struct {
 	proxyURLs []*url.URL
@@ -36,16 +31,9 @@ func (r *roundRobinProxy) getProxy(pr *http.Request) (*url.URL, error) {
 // The proxy type is determined by the URL scheme. "http", "https"
 // and "socks5" are supported. If the scheme is empty,
 // "http" is assumed.
-func RoundRobinCacheProxy(u string, proxyURLs ...string) func(*http.Request) (*url.URL, error) {
-	if len(proxyURLs) < 1 {
+func RoundRobinCacheProxy(proxyURLs ...string) func(*http.Request) (*url.URL, error) {
+	if len(proxyURLs) == 0 {
 		return http.ProxyFromEnvironment
-	}
-
-	var p roundRobinProxy
-	var ok bool
-	p, ok = cacheProxy.Get(u)
-	if ok {
-		return p.getProxy
 	}
 
 	parsedProxyURLs := make([]*url.URL, len(proxyURLs))
@@ -53,12 +41,9 @@ func RoundRobinCacheProxy(u string, proxyURLs ...string) func(*http.Request) (*u
 		parsedURL, err := url.Parse(pu)
 		if err != nil {
 			logger.Errorf("proxy url error %s", err)
-			return nil
 		}
 		parsedProxyURLs[i] = parsedURL
 	}
 
-	p = roundRobinProxy{parsedProxyURLs, 0}
-	cacheProxy.Add(u, p)
-	return p.getProxy
+	return (&roundRobinProxy{parsedProxyURLs, 0}).getProxy
 }

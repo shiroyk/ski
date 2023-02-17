@@ -101,7 +101,7 @@ func TestSOCKS5Proxy(t *testing.T) {
 			}
 			go proxy(t)
 			c := ts.Client()
-			c.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy(ts.URL, "socks5://"+l.Addr().String())
+			c.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy("socks5://" + l.Addr().String())
 			r, err := c.Head(ts.URL)
 			if err != nil {
 				t.Fatal(err)
@@ -212,12 +212,12 @@ func TestTransportProxy(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			_, err = RoundRobinCacheProxy(ts.URL, proxy1.URL)(r)
+			_, err = RoundRobinCacheProxy(proxy1.URL)(r)
 			if err != nil {
 				t.Error(err)
 			}
 
-			c.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy(ts.URL, proxy1.URL, proxy2.URL)
+			c.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy(proxy1.URL, proxy2.URL)
 			if _, err := c.Head(ts.URL); err != nil {
 				t.Error(err)
 			}

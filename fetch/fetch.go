@@ -85,7 +85,6 @@ func NewFetcher(opt Options) Fetch {
 	fetch.retryHTTPCodes = utils.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
 	var transport http.RoundTripper = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -143,12 +142,18 @@ func (f *fetcher) Request(method, url string, body any, headers map[string]strin
 
 // DoRequest sends a fetch.Request and returns an HTTP response
 func (f *fetcher) DoRequest(req *Request) (*Response, error) {
-	if tp, ok := f.Transport.(*cache.Transport); ok {
-		tp.SetProxy(RoundRobinCacheProxy(req.URL.String(), req.Proxy...))
-	} else {
-		f.Transport.(*http.Transport).Proxy = RoundRobinCacheProxy(req.URL.String(), req.Proxy...)
-	}
+	f.setProxy(req)
 	return f.doRequestRetry(req)
+}
+
+// setProxy sets the proxy
+func (f *fetcher) setProxy(req *Request) {
+	switch tp := f.Transport.(type) {
+	case *cache.Transport:
+		tp.SetProxy(RoundRobinCacheProxy(req.Proxy...))
+	case *http.Transport:
+		tp.Proxy = RoundRobinCacheProxy(req.Proxy...)
+	}
 }
 
 func (f *fetcher) doRequestRetry(req *Request) (*Response, error) {
