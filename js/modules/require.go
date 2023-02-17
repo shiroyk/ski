@@ -16,6 +16,7 @@ import (
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/ext"
 	"github.com/shiroyk/cloudcat/fetch"
+	"github.com/shiroyk/cloudcat/js/common"
 )
 
 // NodeJS module search algorithm described by
@@ -48,7 +49,7 @@ func (r *require) Require(name string) goja.Value {
 	}
 	module, err := r.resolve(name)
 	if err != nil {
-		return goja.Undefined()
+		common.Throw(r.vm, err)
 	}
 	return module.Get("exports")
 }
@@ -58,14 +59,12 @@ func (r *require) resolve(name string) (*goja.Object, error) {
 		return nil, ErrIllegalModuleName
 	}
 
-	if strings.Contains(name, "://") {
+	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
 		u, err := url.Parse(name)
 		if err != nil {
 			return nil, err
 		}
-		if u.Scheme == "http" || u.Scheme == "https" {
-			return r.resolveRemote(u)
-		}
+		return r.resolveRemote(u)
 	}
 
 	return r.resolveFile(name)
@@ -113,7 +112,9 @@ func (r *require) resolveRemote(u *url.URL) (module *goja.Object, err error) {
 
 	module = r.vm.NewObject()
 	_ = module.Set("exports", r.vm.NewObject())
-	if err = r.compileModule(p, res.String(), module); err != nil {
+
+	source := "(function(exports, require, module) {" + res.String() + "\n})"
+	if err = r.compileModule(p, source, module); err != nil {
 		return nil, err
 	}
 
@@ -176,6 +177,17 @@ func (r *require) loadAsDirectory(modPath string) (module *goja.Object, err erro
 
 // loadSource is used loads files from the host's filesystem.
 func (r *require) loadSource(filename string) ([]byte, error) {
+	if strings.HasPrefix(filename, "http://") || strings.HasPrefix(filename, "https://") {
+		fetcher, err := di.Resolve[fetch.Fetch]()
+		if err != nil {
+			return nil, err
+		}
+		res, err := fetcher.Get(filename, nil)
+		if err != nil {
+			return nil, err
+		}
+		return res.Body, nil
+	}
 	data, err := os.ReadFile(filepath.FromSlash(filename))
 	if err != nil {
 		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
@@ -290,9 +302,8 @@ func (r *require) compileModule(path, source string, jsModule *goja.Object) erro
 		if err != nil {
 			return err
 		}
-	} else {
-		return ErrInvalidModule
+		return nil
 	}
 
-	return nil
+	return ErrInvalidModule
 }

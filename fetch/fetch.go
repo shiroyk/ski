@@ -90,18 +90,18 @@ func NewFetcher(opt Options) Fetch {
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          0,    // Default: 100
-		MaxIdleConnsPerHost:   1000, // Default: 2
+		MaxIdleConns:          0,
+		MaxIdleConnsPerHost:   1000,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
 	ch, _ := di.Resolve[cache.Cache]()
-	if ch != nil && opt.CachePolicy != 0 {
+	if ch != nil {
 		transport = &cache.Transport{
 			Cache:               ch,
-			Policy:              opt.CachePolicy,
+			Policy:              utils.ZeroOr(opt.CachePolicy, cache.RFC2616),
 			Transport:           transport,
 			MarkCachedResponses: true,
 		}

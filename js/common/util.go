@@ -9,8 +9,7 @@ import (
 
 // Throw js exception
 func Throw(rt *goja.Runtime, err error) {
-	var e *goja.Exception
-	if ok := errors.Is(err, e); ok {
+	if e, ok := err.(*goja.Exception); ok {
 		panic(e)
 	}
 	panic(rt.NewGoError(err))
