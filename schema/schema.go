@@ -2,6 +2,8 @@ package schema
 
 import (
 	"fmt"
+
+	"github.com/spf13/cast"
 )
 
 // Type The property type.
@@ -67,8 +69,8 @@ type Schema struct {
 // Property The Schema property.
 type Property map[string]Schema
 
-// NewSchema returns a new Schema with the given SchemaType.
-// The first argument is the type, second is the format.
+// NewSchema returns a new Schema with the given Type.
+// The first argument is the Schema.Type, second is the Schema.Format.
 func NewSchema(types ...Type) *Schema {
 	if len(types) == 0 {
 		panic("schema must have type")
@@ -145,5 +147,175 @@ func (schema *Schema) CloneWithType(typ Type) *Schema {
 		Type:   typ,
 		Format: schema.Format,
 		Rule:   schema.Rule,
+	}
+}
+
+// UnmarshalYAML decodes the Schema from yaml
+func (schema *Schema) UnmarshalYAML(unmarshal func(any) error) error {
+	var maps map[string]any
+
+	if err := unmarshal(&maps); err != nil {
+		return err
+	}
+
+	*schema = *NewSchema(ObjectType)
+
+	for k, v := range maps {
+		property, err := buildSchema(v)
+		if err != nil {
+			return err
+		}
+		schema.AddProperty(k, property)
+	}
+
+	return nil
+}
+
+// buildSchema builds a Schema
+func buildSchema(object any) (schema Schema, err error) {
+	switch obj := object.(type) {
+	case []any:
+		return buildStringSchema(obj)
+	case map[string]any:
+		if tp, ok := obj["type"]; ok {
+			return buildTypedSchema(tp, obj)
+		}
+		return buildStringSchema(obj)
+	default:
+		return schema, fmt.Errorf("invalid schema %v", obj)
+	}
+}
+
+// buildStringSchema builds a StringType Schema
+func buildStringSchema(obj any) (schema Schema, err error) {
+	schema = *NewSchema(StringType)
+	var act []Action
+	act, err = buildAction(obj)
+	if err != nil {
+		return schema, err
+	}
+	schema.SetRule(act)
+	return
+}
+
+// buildTypedSchema builds a Type with Schema
+func buildTypedSchema(typed any, obj map[string]any) (schema Schema, err error) {
+	var schemaType Type
+	schemaType, err = ToType(typed)
+	if err != nil {
+		return
+	}
+	schema = *NewSchema(schemaType)
+
+	if format, ok := obj["format"]; ok {
+		schema.Format, err = ToType(format)
+		if err != nil {
+			return
+		}
+	}
+
+	if init, ok := obj["init"]; ok {
+		var act []Action
+		act, err = buildAction(init)
+		if err != nil {
+			return schema, err
+		}
+		schema.SetInit(act)
+	}
+
+	if rule, ok := obj["rule"]; ok {
+		var act []Action
+		act, err = buildAction(rule)
+		if err != nil {
+			return schema, err
+		}
+		schema.SetRule(act)
+		return
+	}
+
+	if properties, ok := obj["properties"].(map[string]any); ok {
+		for field, s := range properties {
+			var property Schema
+			property, err = buildSchema(s)
+			if err != nil {
+				return
+			}
+			schema.AddProperty(field, property)
+		}
+	}
+
+	return
+}
+
+// buildSchema builds a slice of Action
+func buildAction(object any) (acts []Action, err error) {
+	switch obj := object.(type) {
+	case []any:
+		for _, action := range obj {
+			if op, ok := action.(string); ok {
+				opAct, err := toActionOp(op)
+				if err != nil {
+					return nil, err
+				}
+				acts = append(acts, opAct)
+				continue
+			}
+
+			steps, err := buildStep(action)
+			if err != nil {
+				return nil, err
+			}
+
+			acts = append(acts, NewAction(steps...))
+		}
+		return acts, nil
+	case map[string]any:
+		steps, err := buildStep(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		return []Action{NewAction(steps...)}, nil
+	default:
+
+		return nil, fmt.Errorf("invalid action %v", obj)
+	}
+}
+
+// toSteps converts a map to slice of Step
+func toSteps(object any) ([]Step, error) {
+	switch obj := object.(type) {
+	case map[string]any:
+		steps := make([]Step, 0, len(obj))
+		for parser, step := range obj {
+			stepStr, err := cast.ToStringE(step)
+			if err != nil {
+				return nil, err
+			}
+			steps = append(steps, NewStep(parser, stepStr))
+		}
+		return steps, nil
+	default:
+		return nil, fmt.Errorf("invalid step %v", obj)
+	}
+}
+
+// buildStep builds a slice of Step
+func buildStep(object any) ([]Step, error) {
+	switch obj := object.(type) {
+	case []any:
+		steps := make([]Step, 0, len(obj))
+
+		for _, step := range obj {
+			s, err := toSteps(step)
+			if err != nil {
+				return nil, err
+			}
+			steps = append(steps, s...)
+		}
+
+		return steps, nil
+	default:
+		return toSteps(obj)
 	}
 }

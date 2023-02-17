@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shiroyk/cloudcat/parser"
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
@@ -66,7 +67,5 @@ func TestActions(t *testing.T) {
 - and
 - act: "3"
 `
-	if string(bytes) != y {
-		t.Errorf("want %q, got %q", y, string(bytes))
-	}
+	assert.Equal(t, y, string(bytes))
 }

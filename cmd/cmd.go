@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	metaFlag       = flag.String("m", "", "Meta yml/yaml file path")
+	modelFlag      = flag.String("m", "", "Model yml/yaml file path")
 	configFlag     = flag.String("c", "~/.config/cloudcat/config.yml", "Config file path")
 	outputFlag     = flag.String("o", "", "Write to file instead of stdout")
 	versionFlag    = flag.Bool("v", false, "Version")
@@ -31,7 +31,7 @@ func Execute() {
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout)))
 
-	if file := *metaFlag; file != "" {
+	if file := *modelFlag; file != "" {
 		config, err := lib.ReadConfig(*configFlag)
 		if err != nil {
 			fmt.Printf("Error reading config file: \n %v", err)
@@ -40,7 +40,7 @@ func Execute() {
 		output := *outputFlag
 		err = run(*config, file, output)
 		if err != nil {
-			fmt.Printf("Error run parse meta: \n %v%v", err, string(debug.Stack()))
+			fmt.Printf("Error run parse model: \n %v%v", err, string(debug.Stack()))
 		}
 		return
 	}

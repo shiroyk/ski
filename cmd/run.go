@@ -18,24 +18,25 @@ import (
 	"github.com/shiroyk/cloudcat/schema"
 )
 
-var ErrInvalidMeta = errors.New("meta is invalid")
+// ErrInvalidModel invalid models error
+var ErrInvalidModel = errors.New("model is invalid")
 
 func run(config lib.Config, path, output string) (err error) {
 	if err = initDependencies(config); err != nil {
 		return err
 	}
 
-	meta, err := utils.ReadYaml[schema.Meta](path)
+	model, err := utils.ReadYaml[schema.Model](path)
 	if err != nil {
 		return err
 	}
-	if meta.Source == nil || meta.Schema == nil {
-		return ErrInvalidMeta
+	if model.Source == nil || model.Schema == nil {
+		return ErrInvalidModel
 	}
 
 	fetcher := di.MustResolve[fetch.Fetch]()
-	req, err := fetch.NewTemplateRequest(nil, meta.Source.URL, nil)
-	req.Proxy = meta.Source.Proxy
+	req, err := fetch.NewTemplateRequest(nil, model.Source.URL, nil)
+	req.Proxy = model.Source.Proxy
 	if err != nil {
 		return err
 	}
@@ -46,13 +47,13 @@ func run(config lib.Config, path, output string) (err error) {
 	}
 
 	ctx := parser.NewContext(parser.Options{
-		Timeout: meta.Source.Timeout,
-		URL:     meta.Source.URL,
+		Timeout: model.Source.Timeout,
+		URL:     model.Source.URL,
 	})
 	defer ctx.Cancel()
 
 	anal := analyzer.NewAnalyzer()
-	result := anal.ExecuteSchema(ctx, meta.Schema, res.String())
+	result := anal.ExecuteSchema(ctx, model.Schema, res.String())
 
 	bytes, err := json.Marshal(result)
 	if err != nil {

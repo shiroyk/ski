@@ -1,11 +1,11 @@
 package schema
 
 import (
-	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
@@ -131,9 +131,7 @@ body:
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(s, test.Schema) {
-				t.Error("not equal")
-			}
+			assert.Equal(t, test.Schema, s)
 		})
 	}
 }
@@ -146,19 +144,18 @@ func TestSourceYaml(t *testing.T) {
   header:
     user-agent: cloudcat
 `
-	meta := new(Meta)
-	err := yaml.Unmarshal([]byte(s), meta)
+	model := new(Model)
+	err := yaml.Unmarshal([]byte(s), model)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(*meta.Source, Source{
+
+	assert.Equal(t, Source{
 		Name:    "test",
 		URL:     "http://localhost",
 		Timeout: time.Minute,
 		Header: map[string]string{
 			"user-agent": "cloudcat",
 		},
-	}) {
-		t.Error("not equal")
-	}
+	}, *model.Source)
 }
