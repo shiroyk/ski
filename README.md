@@ -1,13 +1,4 @@
 # Cloudcat
-<pre style="text-align: center">
-       .__                   .___             __   
-  ____ |  |   ____  __ __  __| _/____ _____ _/  |_ 
-_/ ___\|  |  /  _ \|  |  \/ __ |/ ___\\__  \\   __\
-\  \___|  |_(  <_> )  |  / /_/ \  \___ / __ \|  |  
- \___  >____/\____/|____/\____ |\___  >____  /__|  
-     \/                       \/    \/     \/   
-</pre>
-
 **Cloudcat** is a tool for extracting structured data from websites using YAML configuration and the syntax rule is extensible.
 ## CLI example
 ```shell
