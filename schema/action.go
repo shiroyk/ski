@@ -1,16 +1,79 @@
 package schema
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/shiroyk/cloudcat/parser"
+	"gopkg.in/yaml.v3"
 )
 
 // Action The Schema Action
 type Action struct {
 	operator Operator
 	step     []Step
+}
+
+// UnmarshalYAML decodes the Action from yaml
+func (a *Actions) UnmarshalYAML(value *yaml.Node) (err error) {
+	switch value.Kind {
+	case yaml.MappingNode:
+		steps, err := buildMapSteps(value)
+		if err != nil {
+			return err
+		}
+		*a = []Action{NewAction(steps...)}
+	case yaml.SequenceNode:
+		*a = make(Actions, 0, len(value.Content))
+		var act Action
+		for _, node := range value.Content {
+			switch node.Kind {
+			case yaml.MappingNode:
+				var steps []Step
+				steps, err = buildMapSteps(node)
+				act = NewAction(steps...)
+			case yaml.ScalarNode:
+				act, err = toActionOp(node.Value)
+			case yaml.SequenceNode:
+				act, err = buildAction(node)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			*a = append(*a, act)
+		}
+	}
+	return
+}
+
+// buildMapSteps builds a slice of Step from map
+func buildMapSteps(node *yaml.Node) (steps []Step, err error) {
+	steps = make([]Step, 0, len(node.Content)/2)
+	for i := 0; i < len(node.Content); i += 2 {
+		k, v := node.Content[i], node.Content[i+1]
+		if k.Kind == yaml.ScalarNode && v.Kind == yaml.ScalarNode {
+			steps = append(steps, NewStep(k.Value, v.Value))
+		} else {
+			return nil, errors.New("invalid step")
+		}
+	}
+	return
+}
+
+// buildAction builds an Action for the slice Step
+func buildAction(node *yaml.Node) (act Action, err error) {
+	steps := make([]Step, 0, len(node.Content))
+	for _, stepsNode := range node.Content {
+		s, err := buildMapSteps(stepsNode)
+		if err != nil {
+			return act, err
+		}
+		steps = append(steps, s...)
+	}
+	return NewAction(steps...), nil
 }
 
 // MarshalYAML encodes the action to yaml
@@ -73,8 +136,8 @@ func NewStep(parser string, rule string) Step {
 type Actions []Action
 
 // GetString run the action returns a string
-func (a Actions) GetString(ctx *parser.Context, content any) (string, error) {
-	return runActions(a, ctx, content,
+func (a *Actions) GetString(ctx *parser.Context, content any) (string, error) {
+	return runActions(*a, ctx, content,
 		func(p parser.Parser) func(*parser.Context, any, string) (string, error) {
 			return p.GetString
 		},
@@ -87,8 +150,8 @@ func (a Actions) GetString(ctx *parser.Context, content any) (string, error) {
 }
 
 // GetStrings run the action returns a slice of string
-func (a Actions) GetStrings(ctx *parser.Context, content any) ([]string, error) {
-	return runActions(a, ctx, content,
+func (a *Actions) GetStrings(ctx *parser.Context, content any) ([]string, error) {
+	return runActions(*a, ctx, content,
 		func(p parser.Parser) func(*parser.Context, any, string) ([]string, error) {
 			return p.GetStrings
 		},
@@ -101,8 +164,8 @@ func (a Actions) GetStrings(ctx *parser.Context, content any) ([]string, error) 
 }
 
 // GetElement run the action returns an element string
-func (a Actions) GetElement(ctx *parser.Context, content any) (string, error) {
-	return runActions(a, ctx, content,
+func (a *Actions) GetElement(ctx *parser.Context, content any) (string, error) {
+	return runActions(*a, ctx, content,
 		func(p parser.Parser) func(*parser.Context, any, string) (string, error) {
 			return p.GetElement
 		},
@@ -115,8 +178,8 @@ func (a Actions) GetElement(ctx *parser.Context, content any) (string, error) {
 }
 
 // GetElements run the action returns a slice of element string
-func (a Actions) GetElements(ctx *parser.Context, content any) ([]string, error) {
-	return runActions(a, ctx, content,
+func (a *Actions) GetElements(ctx *parser.Context, content any) ([]string, error) {
+	return runActions(*a, ctx, content,
 		func(p parser.Parser) func(*parser.Context, any, string) ([]string, error) {
 			return p.GetElements
 		},
@@ -162,6 +225,11 @@ func runActions[T any](
 			result = append(result, sr)
 		}
 	}
+
+	if len(result) == 1 {
+		return result[0], nil
+	}
+
 	for _, s := range result {
 		ret = andFn(ret, s)
 	}

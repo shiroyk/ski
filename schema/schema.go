@@ -1,9 +1,11 @@
 package schema
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/spf13/cast"
+	"golang.org/x/exp/slices"
+	"gopkg.in/yaml.v3"
 )
 
 // Type The property type.
@@ -151,171 +153,89 @@ func (schema *Schema) CloneWithType(typ Type) *Schema {
 }
 
 // UnmarshalYAML decodes the Schema from yaml
-func (schema *Schema) UnmarshalYAML(unmarshal func(any) error) error {
-	var maps map[string]any
-
-	if err := unmarshal(&maps); err != nil {
-		return err
+func (schema *Schema) UnmarshalYAML(node *yaml.Node) (err error) {
+	if node.Kind != yaml.MappingNode {
+		return errors.New("invalid schema")
 	}
 
-	*schema = *NewSchema(ObjectType)
+	schema.Type = ObjectType
+	schema.Properties = make(Property, len(node.Content)/2)
 
-	for k, v := range maps {
-		property, err := buildSchema(v)
+	for i := 0; i < len(node.Content); i += 2 {
+		field, value := node.Content[i], node.Content[i+1]
+		schema.Properties[field.Value], err = buildSchema(value)
 		if err != nil {
 			return err
 		}
-		schema.AddProperty(k, property)
 	}
 
-	return nil
+	return
 }
 
 // buildSchema builds a Schema
-func buildSchema(object any) (schema Schema, err error) {
-	switch obj := object.(type) {
-	case []any:
-		return buildStringSchema(obj)
-	case map[string]any:
-		if tp, ok := obj["type"]; ok {
-			return buildTypedSchema(tp, obj)
+func buildSchema(node *yaml.Node) (schema Schema, err error) {
+	switch node.Kind {
+	case yaml.SequenceNode:
+		return buildStringSchema(node)
+	case yaml.MappingNode:
+		typed := slices.ContainsFunc(node.Content,
+			func(node *yaml.Node) bool {
+				return node.Value == "type"
+			})
+		if typed {
+			return buildTypedSchema(node)
 		}
-		return buildStringSchema(obj)
-	default:
-		return schema, fmt.Errorf("invalid schema %v", obj)
+		return buildStringSchema(node)
 	}
+	return
 }
 
 // buildStringSchema builds a StringType Schema
-func buildStringSchema(obj any) (schema Schema, err error) {
-	schema = *NewSchema(StringType)
-	var act []Action
-	act, err = buildAction(obj)
-	if err != nil {
-		return schema, err
+func buildStringSchema(node *yaml.Node) (schema Schema, err error) {
+	var acts Actions
+	if err = node.Decode(&acts); err == nil {
+		schema.Type = StringType
+		schema.Rule = acts
 	}
-	schema.SetRule(act)
 	return
 }
 
-// buildTypedSchema builds a Type with Schema
-func buildTypedSchema(typed any, obj map[string]any) (schema Schema, err error) {
-	var schemaType Type
-	schemaType, err = ToType(typed)
-	if err != nil {
-		return
-	}
-	schema = *NewSchema(schemaType)
-
-	if format, ok := obj["format"]; ok {
-		schema.Format, err = ToType(format)
-		if err != nil {
-			return
-		}
-	}
-
-	if init, ok := obj["init"]; ok {
-		var act []Action
-		act, err = buildAction(init)
-		if err != nil {
-			return schema, err
-		}
-		schema.SetInit(act)
-	}
-
-	if rule, ok := obj["rule"]; ok {
-		var act []Action
-		act, err = buildAction(rule)
-		if err != nil {
-			return schema, err
-		}
-		schema.SetRule(act)
-		return
-	}
-
-	if properties, ok := obj["properties"].(map[string]any); ok {
-		for field, s := range properties {
-			var property Schema
-			property, err = buildSchema(s)
-			if err != nil {
-				return
-			}
-			schema.AddProperty(field, property)
-		}
-	}
-
-	return
-}
-
-// buildSchema builds a slice of Action
-func buildAction(object any) (acts []Action, err error) {
-	switch obj := object.(type) {
-	case []any:
-		for _, action := range obj {
-			if op, ok := action.(string); ok {
-				opAct, err := toActionOp(op)
+// buildTypedSchema builds a specific Type Schema
+func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
+	for i := 0; i < len(node.Content); i += 2 {
+		field, value := node.Content[i], node.Content[i+1]
+		switch field.Value {
+		case "type":
+			schema.Type, err = ToType(value.Value)
+		case "format":
+			schema.Format, err = ToType(value.Value)
+		case "init":
+			var acts Actions
+			err = value.Decode(&acts)
+			schema.Init = acts
+		case "rule":
+			var acts Actions
+			err = value.Decode(&acts)
+			schema.Rule = acts
+		case "properties":
+			schema.Properties = make(Property, len(value.Content)/2)
+			for j := 0; j < len(value.Content); j += 2 {
+				k, v := value.Content[j], value.Content[j+1]
+				schema.Properties[k.Value], err = buildSchema(v)
 				if err != nil {
-					return nil, err
+					return schema, err
 				}
-				acts = append(acts, opAct)
-				continue
 			}
-
-			steps, err := buildStep(action)
-			if err != nil {
-				return nil, err
-			}
-
-			acts = append(acts, NewAction(steps...))
 		}
-		return acts, nil
-	case map[string]any:
-		steps, err := buildStep(obj)
 		if err != nil {
-			return nil, err
+			return schema, err
 		}
-
-		return []Action{NewAction(steps...)}, nil
-	default:
-
-		return nil, fmt.Errorf("invalid action %v", obj)
 	}
+
+	return
 }
 
-// toSteps converts a map to slice of Step
-func toSteps(object any) ([]Step, error) {
-	switch obj := object.(type) {
-	case map[string]any:
-		steps := make([]Step, 0, len(obj))
-		for parser, step := range obj {
-			stepStr, err := cast.ToStringE(step)
-			if err != nil {
-				return nil, err
-			}
-			steps = append(steps, NewStep(parser, stepStr))
-		}
-		return steps, nil
-	default:
-		return nil, fmt.Errorf("invalid step %v", obj)
-	}
-}
-
-// buildStep builds a slice of Step
-func buildStep(object any) ([]Step, error) {
-	switch obj := object.(type) {
-	case []any:
-		steps := make([]Step, 0, len(obj))
-
-		for _, step := range obj {
-			s, err := toSteps(step)
-			if err != nil {
-				return nil, err
-			}
-			steps = append(steps, s...)
-		}
-
-		return steps, nil
-	default:
-		return toSteps(obj)
-	}
+// MarshalYAML encodes the Schema
+func (schema *Schema) MarshalYAML() (any, error) {
+	return schema.Properties, nil
 }
