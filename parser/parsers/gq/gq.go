@@ -28,8 +28,7 @@ func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret str
 		return
 	}
 
-	selection := nodes.Find(rule)
-	var node any = selection
+	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
 		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
@@ -56,9 +55,7 @@ func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []
 		return
 	}
 
-	selection := nodes.Find(rule)
-	var node any
-	node = selection
+	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
 		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
@@ -66,8 +63,7 @@ func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []
 		}
 	}
 
-	sel, ok := node.(*goquery.Selection)
-	if ok {
+	if sel, ok := node.(*goquery.Selection); ok {
 		str := make([]string, sel.Length())
 		var err error
 		sel.EachWithBreak(func(i int, sel *goquery.Selection) bool {
@@ -93,8 +89,7 @@ func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret st
 		return
 	}
 
-	var node any
-	node = nodes.Find(rule)
+	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
 		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
@@ -120,9 +115,7 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret [
 		return
 	}
 
-	selection := nodes.Find(rule)
-	var node any
-	node = selection
+	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
 		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
@@ -130,8 +123,7 @@ func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret [
 		}
 	}
 
-	sel, ok := node.(*goquery.Selection)
-	if ok {
+	if sel, ok := node.(*goquery.Selection); ok {
 		objs := make([]string, sel.Length())
 		sel.EachWithBreak(func(i int, sel *goquery.Selection) bool {
 			if objs[i], err = goquery.OuterHtml(sel); err != nil {
