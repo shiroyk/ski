@@ -12,6 +12,7 @@ var (
 	testCase = []struct{ re, str, want string }{
 		{`/[0-9]/`, `114i`, "i"},
 		{`/[0-9]/i/`, `114`, "iii"},
+		{`/\\//`, `1/`, "1"},
 		{`/[a-z]/1/`, `aaa`, "111"},
 		{`/olang/olang/i`, `GoLAnG`, "Golang"},
 		{`/[^ ]+\s(?<time>)/${time}/`, `08/10/99 16:00`, "16:00"},
