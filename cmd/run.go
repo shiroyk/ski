@@ -15,6 +15,7 @@ import (
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slog"
 )
 
 // ErrInvalidModel invalid models error
@@ -51,16 +52,17 @@ func run(path, output string) (err error) {
 		return err
 	}
 
-	res, err := fetcher.DoRequest(req)
-	if err != nil {
-		return err
-	}
-
 	ctx := parser.NewContext(parser.Options{
 		Timeout: model.Source.Timeout,
+		Logger:  slog.Default().WithGroup(model.Source.URL),
 		URL:     model.Source.URL,
 	})
 	defer ctx.Cancel()
+
+	res, err := fetcher.DoRequest(req.WithContext(ctx))
+	if err != nil {
+		return err
+	}
 
 	result := analyzer.Analyze(ctx, model.Schema, res.String())
 

@@ -3,6 +3,7 @@ package fetch
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,6 +35,22 @@ type Request struct {
 	Cancelled bool
 
 	retryCounter int
+}
+
+// WithContext returns a shallow copy of r with its context changed
+// to ctx. The provided ctx must be non-nil.
+//
+// For outgoing client request, the context controls the entire
+// lifetime of a request and its response: obtaining a connection,
+// sending the request, and reading the response headers and body.
+//
+// To create a new request with a context, use NewRequestWithContext.
+// To change the context of a request, such as an incoming request you
+// want to modify before sending back out, use Request.Clone. Between
+// those two uses, it's rare to need WithContext.
+func (r *Request) WithContext(ctx context.Context) *Request {
+	r.Request = r.Request.WithContext(ctx)
+	return r
 }
 
 // Cancel request.
