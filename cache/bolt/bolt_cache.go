@@ -36,8 +36,8 @@ func (c *Cache) Del(key string) {
 }
 
 // NewCache returns a new Cache that will store items in bolt.DB.
-func NewCache(path string) (cache.Cache, error) {
-	db, err := NewDB(path, "cache", 0)
+func NewCache(opt cache.Options) (cache.Cache, error) {
+	db, err := NewDB(opt.Path, "cache", 0)
 	if err != nil {
 		return nil, err
 	}

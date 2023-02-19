@@ -8,24 +8,34 @@ import (
 	"path/filepath"
 
 	"github.com/shiroyk/cloudcat/analyzer"
-	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
-	"github.com/shiroyk/cloudcat/js"
-	"github.com/shiroyk/cloudcat/lib"
+	"github.com/shiroyk/cloudcat/lib/logger"
 	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
+	"github.com/spf13/cobra"
 )
 
 // ErrInvalidModel invalid models error
 var ErrInvalidModel = errors.New("model is invalid")
 
-func run(config lib.Config, path, output string) (err error) {
-	if err = initDependencies(config); err != nil {
-		return err
-	}
+var (
+	modelPath  = ""
+	outputPath = ""
+)
 
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Run a specific model",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := run(modelPath, outputPath); err != nil {
+			logger.Error("run failed", err)
+		}
+	},
+}
+
+func run(path, output string) (err error) {
 	model, err := utils.ReadYaml[schema.Model](path)
 	if err != nil {
 		return err
@@ -76,38 +86,8 @@ func run(config lib.Config, path, output string) (err error) {
 	return
 }
 
-func initDependencies(config lib.Config) error {
-	di.Provide(fetch.NewFetcher(fetch.Options{
-		CharsetDetectDisabled: config.Fetch.CharsetDetectDisabled,
-		MaxBodySize:           config.Fetch.MaxBodySize,
-		RetryTimes:            config.Fetch.RetryTimes,
-		RetryHTTPCodes:        config.Fetch.RetryHTTPCodes,
-		Timeout:               config.Fetch.Timeout,
-	}))
-	di.Provide(fetch.DefaultTemplateFuncMap())
-	cache, err := bolt.NewCache(config.Cache.Path)
-	if err != nil {
-		return err
-	}
-	di.Provide(cache)
-	cookie, err := bolt.NewCookie(config.Cache.Path)
-	if err != nil {
-		return err
-	}
-	di.Provide(cookie)
-	shortener, err := bolt.NewShortener(config.Cache.Path)
-	if err != nil {
-		return err
-	}
-	di.Provide(shortener)
-
-	js.SetScheduler(js.NewScheduler(js.Options{
-		InitialVMs:         config.JS.InitialVMs,
-		MaxVMs:             config.JS.MaxVMs,
-		MaxRetriesGetVM:    config.JS.MaxRetriesGetVM,
-		MaxTimeToWaitGetVM: config.JS.MaxTimeToWaitGetVM,
-		UseStrict:          config.JS.UseStrict,
-	}))
-
-	return nil
+func init() {
+	runCmd.PersistentFlags().StringVarP(&modelPath, "model", "m", "", "Model yml/yaml file path")
+	runCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Write to file instead of stdout")
+	rootCmd.AddCommand(runCmd)
 }

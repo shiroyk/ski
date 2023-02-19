@@ -14,6 +14,7 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/lib/consts"
 	"github.com/shiroyk/cloudcat/lib/utils"
 	"golang.org/x/exp/slices"
 	"golang.org/x/net/html/charset"
@@ -39,14 +40,12 @@ type fetcher struct {
 }
 
 const (
-	// DefaultUserAgent fetch.Request default user-agent
-	DefaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.0.0 Safari/537.36"
 	// DefaultMaxBodySize fetch.Response default max body size
 	DefaultMaxBodySize int64 = 1024 * 1024 * 1024
 	// DefaultRetryTimes fetch.Request retry times
 	DefaultRetryTimes = 3
 	// DefaultTimeout fetch.Request timeout
-	DefaultTimeout = time.Second * 180
+	DefaultTimeout = time.Minute
 )
 
 var (
@@ -58,7 +57,7 @@ var (
 		"Accept":          "*/*",
 		"Accept-Encoding": "gzip, deflate, br",
 		"Accept-Language": "en-US,en;",
-		"User-Agent":      DefaultUserAgent,
+		"User-Agent":      fmt.Sprintf("cloudcat/%v", consts.Version),
 	}
 	// ErrRequestCancel fetch.Request cancel error
 	ErrRequestCancel = errors.New("request canceled")

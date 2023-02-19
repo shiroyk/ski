@@ -48,8 +48,8 @@ func (c *Cookie) Cookies(u *url.URL) []*http.Cookie {
 }
 
 // NewCookie returns a new Cookie that will store cookies in bolt.DB.
-func NewCookie(path string) (cache.Cookie, error) {
-	db, err := NewDB(path, "cookie", 0)
+func NewCookie(opt cache.Options) (cache.Cookie, error) {
+	db, err := NewDB(opt.Path, "cookie", 0)
 	if err != nil {
 		return nil, err
 	}

@@ -35,8 +35,8 @@ func (s *Shortener) Get(id string) (http string, ok bool) {
 }
 
 // NewShortener returns a new Shortener that will store URL and headers in bolt.DB.
-func NewShortener(path string) (cache.Shortener, error) {
-	db, err := NewDB(path, "shortener", defaultInterval)
+func NewShortener(opt cache.Options) (cache.Shortener, error) {
+	db, err := NewDB(opt.Path, "shortener", defaultInterval)
 	if err != nil {
 		return nil, err
 	}
