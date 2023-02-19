@@ -22,13 +22,14 @@ import (
 var ErrInvalidModel = errors.New("model is invalid")
 
 var (
-	modelPath  = ""
-	outputPath = ""
+	modelPath  string
+	outputPath string
+	debugMode  bool
 )
 
 var runCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Run a specific model",
+	Short: "run a specific model",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := run(modelPath, outputPath); err != nil {
 			logger.Error("run failed", err)
@@ -52,9 +53,14 @@ func run(path, output string) (err error) {
 		return err
 	}
 
+	log := slog.NewTextHandler(os.Stdout)
+	if debugMode {
+		log = slog.HandlerOptions{Level: slog.LevelDebug}.NewTextHandler(os.Stdout)
+	}
+
 	ctx := parser.NewContext(parser.Options{
 		Timeout: model.Source.Timeout,
-		Logger:  slog.Default().WithGroup(model.Source.URL),
+		Logger:  slog.New(log),
 		URL:     model.Source.URL,
 	})
 	defer ctx.Cancel()
@@ -89,7 +95,8 @@ func run(path, output string) (err error) {
 }
 
 func init() {
-	runCmd.PersistentFlags().StringVarP(&modelPath, "model", "m", "", "Model yml/yaml file path")
-	runCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Write to file instead of stdout")
+	runCmd.PersistentFlags().StringVarP(&modelPath, "model", "m", "", "model yml/yaml file path")
+	runCmd.Flags().StringVarP(&outputPath, "output", "o", "", "write to file instead of stdout")
+	runCmd.Flags().BoolVarP(&debugMode, "debug", "d", false, "output log for debugging parsing schema")
 	rootCmd.AddCommand(runCmd)
 }

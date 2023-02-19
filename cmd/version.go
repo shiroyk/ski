@@ -10,7 +10,7 @@ import (
 func init() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
-		Short: "Print version information",
+		Short: "print version information",
 		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Printf("%v\n cloudcat %v/%v\n", consts.Banner, consts.Version, consts.CommitSHA)
 		},

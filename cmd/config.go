@@ -12,7 +12,7 @@ import (
 var configPath = ""
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&configPath, "config", "~/.config/cloudcat/config.yml", "Config file path")
+	rootCmd.PersistentFlags().StringVar(&configPath, "config", "~/.config/cloudcat/config.yml", "config file path")
 }
 
 func initConfig() {

@@ -11,7 +11,7 @@ import (
 var extCmd = &cobra.Command{
 	Use:     "extension",
 	Aliases: []string{"ext"},
-	Short:   "Show extension list",
+	Short:   "show extension list",
 	Run: func(cmd *cobra.Command, args []string) {
 		sb := new(strings.Builder)
 		for _, e := range ext.GetAll() {
