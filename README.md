@@ -73,6 +73,14 @@ cloudcat -m HackerNews.yaml
       * [Parent](#parent)
       * [Parents](#parents)
   * [Js](#js)
+    * [Global Modules](#global-modules)
+      * [Require](#require)
+      * [Console](#console)
+    * [Build in Modules](#build-in-modules)
+      * [Cache](#cache)
+      * [Cookie](#cookie)
+      * [HTTP](#http)
+      * [Shortener](#shortener)
     * [Environment variables](#environment-variables)
       * [Content](#content)
       * [Cat](#cat)
@@ -230,11 +238,11 @@ stories:
 ## Parser
 **Parser** is used to parse the rules.
 The following parsers are built in:
- - gq
- - js
- - json
- - regex
- - xpath
+ - [gq](#gq)
+ - [js](#js)
+ - [json](#json)
+ - [regex](#regex)
+ - [xpath](#xpath)
 ### gq
 **gq** depends on the [Goquery](https://github.com/PuerkitoBio/goquery) library.
 #### Syntax
@@ -296,6 +304,71 @@ Parents get the ancestors of each element in the current Selection.
 If present the selector will return filtered by a selector.
 ### Js
 **js** depends on the [goja](https://github.com/dop251/goja) library.
+#### Global Modules
+ - [require](#require)
+ - [console](#console)
+##### Require
+js module **require** implements the CommonJS modules require.
+**require** can load under node_modules directory module files and remote modules.
+```js
+const localLodash = require("lodash");
+console.log(localLodash.VERSION);
+const remoteLodash = require("https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js");
+console.log(remoteLodash.VERSION);
+```
+##### Console
+console is a tool which is mainly used to log information.
+```js
+console.log("%s test", 1);
+```
+#### Build in Modules
+These modules can be imported by cloudcat/*
+ - [cache](#cache)
+ - [cookie](#cookie)
+ - [http](#http)
+ - [shortener](#shortener)
+##### Cache
+**cache** is used to store data.
+```js
+const cache = require('cloudcat/cache');
+cache.set("cache1", "1");
+cache.del("cache1");
+cache.get("cache2");
+cache.setBytes("cache3", new Uint8Array([50]).buffer);
+cache.getBytes("cache3");
+```
+##### Cookie
+**cookie** manages storage and use of cookies in HTTP requests.
+```js
+const cookie = require('cloudcat/cookie');
+cookie.set("https://github.com", "max-age=3600;");
+cookie.get("https://github.com");
+cookie.del("https://github.com");
+```
+##### HTTP
+**http** fetch resources across the network and return a response object.
+```js
+const http = require('cloudcat/http');
+const url = "http://localhost"
+http.get(url);
+http.get(url, { "User-Agent": "cloudcat" });
+http.head(url);
+http.post(url, {'dark': 'o'}); // application/json
+http.post(url, new URLSearchParams({'key': 'foo'})); // application/x-www-form-url
+http.post(url, new FormData({"name": "foo", "file": new Uint8Array([226, 153, 130, 239, 184, 142]).buffer})); // multipart/form-data
+http.request('PUT', url, {"name": "bar"}, {"Authorization": "token 123456"})
+```
+##### Shortener
+**shortener** is URL shortener to reduce a long http request.
+```js
+const shortener = require('cloudcat/shortener');
+console.log(shortener.set(`POST http://localhost HTTP/2.0
+Pragma: no-cache
+Content-Type: application/octet-stream
+Connection: close
+
+{{ get "image" }}`));
+```
 #### Environment variables
 ##### Content
 **content** is the result of the previous parser execution.
