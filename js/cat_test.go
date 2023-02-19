@@ -40,7 +40,7 @@ func TestCat(t *testing.T) {
 		URL:    "http://localhost/home",
 		Logger: slog.Default().WithGroup("js"),
 	})
-	vm := newVM(true)
+	vm := newVM(true, nil)
 
 	testCase := []string{
 		`cat.log('start test')`,

@@ -10,7 +10,7 @@ import (
 
 func TestVM(t *testing.T) {
 	t.Parallel()
-	vm := newVM(false)
+	vm := newVM(false, nil)
 
 	testCases := []struct {
 		script, want string
@@ -47,13 +47,13 @@ func TestTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	_, err := newVM(false).RunString(ctx, `while(true){}`)
+	_, err := newVM(false, nil).RunString(ctx, `while(true){}`)
 	assert.ErrorContains(t, err, context.DeadlineExceeded.Error())
 }
 
 func TestUseStrict(t *testing.T) {
 	t.Parallel()
-	vm := newVM(true)
+	vm := newVM(true, nil)
 	_, err := vm.RunString(context.Background(), `eval('a = 1');a`)
 	if err != nil {
 		assert.Contains(t, err.Error(), "ReferenceError: a is not defined")
