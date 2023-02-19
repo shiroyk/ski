@@ -18,8 +18,8 @@ func (*Module) Exports() any {
 	return &Cookie{di.MustResolve[cache.Cookie]()}
 }
 
-// Native returns is it is a native module
-func (*Module) Native() bool {
+// Global returns is it is a global module
+func (*Module) Global() bool {
 	return false
 }
 

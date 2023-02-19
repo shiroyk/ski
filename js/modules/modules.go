@@ -22,24 +22,24 @@ var (
 // Module is what a module needs to return
 type Module interface {
 	Exports() any // module instance
-	Native() bool // is it a native module
+	Global() bool // is it a global module
 }
 
 // Register the given mod as an external JavaScript module that can be imported
 // by name.
 func Register(name string, mod Module) {
-	if !mod.Native() {
+	if !mod.Global() {
 		name = extPrefix + name
 	}
 	ext.Register(name, ext.JSExtension, mod)
 }
 
-// InitNativeModule init all native modules
+// InitNativeModule init all global modules
 func InitNativeModule(vm *goja.Runtime) {
-	// Init native modules
+	// Init global modules
 	for _, extension := range ext.Get(ext.JSExtension) {
 		if mod, ok := extension.Module.(Module); ok {
-			if mod.Native() {
+			if mod.Global() {
 				_ = vm.Set(extension.Name, mod.Exports())
 			}
 		}

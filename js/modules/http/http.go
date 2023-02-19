@@ -22,8 +22,8 @@ func (*Module) Exports() any {
 	return &Http{di.MustResolve[fetch.Fetch]()}
 }
 
-// Native returns is it is a native module
-func (*Module) Native() bool {
+// Global returns is it is a global module
+func (*Module) Global() bool {
 	return false
 }
 

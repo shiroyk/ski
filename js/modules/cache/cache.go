@@ -18,8 +18,8 @@ func (*Module) Exports() any {
 	return &Cache{di.MustResolve[cache.Cache]()}
 }
 
-// Native returns is it is a native module
-func (*Module) Native() bool {
+// Global returns is it is a global module
+func (*Module) Global() bool {
 	return false
 }
 

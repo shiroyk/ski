@@ -20,7 +20,7 @@ type FormData struct {
 	data map[string][]any
 }
 
-// NativeFormData js native module
+// NativeFormData js global module
 type NativeFormData struct{}
 
 // Exports returns module instance
@@ -60,8 +60,8 @@ func (*NativeFormData) Exports() any {
 	}
 }
 
-// Native returns is it is a native module
-func (*NativeFormData) Native() bool {
+// Global returns is it is a global module
+func (*NativeFormData) Global() bool {
 	return true
 }
 

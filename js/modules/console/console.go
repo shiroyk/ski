@@ -15,8 +15,8 @@ func (*Module) Exports() any {
 	return &Console{}
 }
 
-// Native returns is it is a native module
-func (*Module) Native() bool {
+// Global returns is it is a global module
+func (*Module) Global() bool {
 	return true
 }
 

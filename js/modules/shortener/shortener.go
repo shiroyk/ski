@@ -17,8 +17,8 @@ func (*Module) Exports() any {
 	return &Shortener{di.MustResolve[cache.Shortener]()}
 }
 
-// Native returns is it is a native module
-func (*Module) Native() bool {
+// Global returns is it is a global module
+func (*Module) Global() bool {
 	return false
 }
 

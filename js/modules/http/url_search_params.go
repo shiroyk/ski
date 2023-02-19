@@ -50,8 +50,8 @@ func (*NativeURLSearchParams) Exports() any {
 	}
 }
 
-// Native returns is it is a native module
-func (*NativeURLSearchParams) Native() bool {
+// Global returns is it is a global module
+func (*NativeURLSearchParams) Global() bool {
 	return true
 }
 
