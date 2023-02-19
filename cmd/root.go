@@ -6,9 +6,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "cloudcat",
-	Short: "cloudcat is a tool for extracting structured data from websites",
-	Long: `cloudcat is a tool for extracting structured data from websites 
-using YAML configuration and the syntax rule is extensible.`,
+	Short: "cloudcat is a tool for extracting structured data from websites.",
 	Run: func(cmd *cobra.Command, args []string) {
 		_ = cmd.Help()
 	},

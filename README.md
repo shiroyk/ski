@@ -252,36 +252,64 @@ body: { gq: '#hnmain tbody -> slice(2) -> join('')' }
 ```
 #### Build in functions
 ##### Get
-Get returns the value associated with this [context](#context) for key
+Get returns the value associated with this [context](#context) for key.
+```yaml
+title: { gq: get(titleText) }
+```
 ##### Set
 Set value associated with key to the [context](#context). 
 The first argument is the key, and the second argument is value.
 If the value is present will store the previous execute result.
+```yaml
+title: { gq: .title -> text -> set(titleText) }
+```
 ##### Text
 Text gets the combined text contents of each element in the set of matched
 elements, including their descendants.
+```yaml
+body: { gq: .body -> text }
+```
 ##### Join
 Join the text with the separator, if not present separator uses the default separator ", ".
+```yaml
+tag: { gq: .tag -> join(' - ') }
+```
 ##### Attr
 Attr gets the specified attribute's value for the first element in the Selection.
 The first argument is the name of the attribute, the second is the default value.
+```yaml
+name: { gq: .img -> attr(title) }
+img: { gq: .img -> attr(src, 'http://localhost/noimage') }
+```
 ##### Href
 Href gets the href attribute's value, if URL is not absolute get the base URL from context
 and return the absolute URL.
+```yaml
+a: { gq: a -> href }
+```
 ##### Html
 Html the first argument is outer.
 If true returns the outer HTML rendering of the first item in
 the selection - that is, the HTML including the first element's
 tag and attributes, or gets the HTML contents of the first element
 in the set of matched elements. It includes text and comment nodes.
+```yaml
+element: { gq: .body div -> html }
+```
 ##### Prev
 Prev gets the immediately preceding sibling of each element in the Selection.
 If present selector gets all preceding siblings of each element up to but not
 including the element matched by the selector.
+```yaml
+element: { gq: ul:last-child -> prev }
+```
 ##### Next
 Next gets the immediately following sibling of each element in the Selection.
 If present selector gets all following siblings of each element up to but not
 including the element matched by the selector.
+```yaml
+element: { gq: ul:first-child -> next }
+```
 ##### Slice
 Slice reduces the set of matched elements to a subset specified by a range
 of indices. The start index is 0-based and indicates the index of the first
@@ -293,15 +321,32 @@ specified start index.
 
 The indices may be negative, in which case they represent an offset from the
 end of the selection.
+```yaml
+element1: { gq: ul li -> slice(3) }
+element2: { gq: ul li -> slice(3, 6) }
+element3: { gq: ul li -> slice(-1) }
+```
 ##### Child
 Child gets the child elements of each element in the Selection.
 If present the selector will return filtered by the specified selector.
+```yaml
+element1: { gq: .body -> child }
+element2: { gq: .body -> child(.title) }
+```
 ##### Parent
 Parent gets the parent of each element in the Selection.
 If present the selector will return filtered by a selector.
+```yaml
+element1: { gq: .title -> parent }
+element2: { gq: .title -> parent(.body) }
+```
 ##### Parents
 Parents get the ancestors of each element in the current Selection.
 If present the selector will return filtered by a selector.
+```yaml
+element1: { gq: li -> parents }
+element2: { gq: li -> parents(ul) }
+```
 ### Js
 **js** depends on the [goja](https://github.com/dop251/goja) library.
 #### Global Modules
