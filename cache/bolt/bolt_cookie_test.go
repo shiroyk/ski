@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +16,7 @@ func TestCookie(t *testing.T) {
 	os.MkdirAll(tempDir, os.ModePerm)
 	defer os.RemoveAll(tempDir)
 
-	c, err := NewCookie(tempDir)
+	c, err := NewCookie(cache.Options{Path: tempDir})
 	if err != nil {
 		t.Fatal(err)
 	}

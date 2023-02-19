@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,7 +16,7 @@ func TestShortener(t *testing.T) {
 	os.MkdirAll(tempDir, os.ModePerm)
 	defer os.RemoveAll(tempDir)
 
-	s, err := NewShortener(tempDir)
+	s, err := NewShortener(cache.Options{Path: tempDir})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +14,7 @@ func TestCache(t *testing.T) {
 	os.MkdirAll(tempDir, os.ModePerm)
 	defer os.RemoveAll(tempDir)
 
-	c, err := NewCache(tempDir)
+	c, err := NewCache(cache.Options{Path: tempDir})
 	if err != nil {
 		t.Fatal(err)
 	}
