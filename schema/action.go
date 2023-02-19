@@ -141,9 +141,6 @@ func (a *Actions) GetString(ctx *parser.Context, content any) (string, error) {
 		func(p parser.Parser) func(*parser.Context, any, string) (string, error) {
 			return p.GetString
 		},
-		func(s string) bool {
-			return len(s) == 0
-		},
 		func(s1 string, s2 string) string {
 			return s1 + s2
 		})
@@ -154,9 +151,6 @@ func (a *Actions) GetStrings(ctx *parser.Context, content any) ([]string, error)
 	return runActions(*a, ctx, content,
 		func(p parser.Parser) func(*parser.Context, any, string) ([]string, error) {
 			return p.GetStrings
-		},
-		func(s []string) bool {
-			return len(s) == 0
 		},
 		func(s1 []string, s2 []string) []string {
 			return append(s1, s2...)
@@ -169,9 +163,6 @@ func (a *Actions) GetElement(ctx *parser.Context, content any) (string, error) {
 		func(p parser.Parser) func(*parser.Context, any, string) (string, error) {
 			return p.GetElement
 		},
-		func(s string) bool {
-			return len(s) == 0
-		},
 		func(s1 string, s2 string) string {
 			return s1 + s2
 		})
@@ -183,21 +174,17 @@ func (a *Actions) GetElements(ctx *parser.Context, content any) ([]string, error
 		func(p parser.Parser) func(*parser.Context, any, string) ([]string, error) {
 			return p.GetElements
 		},
-		func(s []string) bool {
-			return len(s) == 0
-		},
 		func(s1 []string, s2 []string) []string {
 			return append(s1, s2...)
 		})
 }
 
 // runActions runs the Actions
-func runActions[T any](
+func runActions[T string | []string](
 	action Actions,
 	ctx *parser.Context,
 	content any,
 	runFn func(parser.Parser) func(*parser.Context, any, string) (T, error),
-	orFn func(T) bool,
 	andFn func(T, T) T,
 ) (ret T, err error) {
 	var op Operator
@@ -211,7 +198,7 @@ func runActions[T any](
 		for _, step := range act.step {
 			p, ok := parser.GetParser(step.parser)
 			if !ok {
-				return ret, fmt.Errorf("schema %s not found", step.parser)
+				return ret, fmt.Errorf("parser %s not found", step.parser)
 			}
 			stepResult, err = runFn(p)(ctx, stepResult, step.rule)
 			if err != nil {
@@ -219,7 +206,7 @@ func runActions[T any](
 			}
 		}
 		if sr, ok := stepResult.(T); ok {
-			if op == OperatorOr && orFn(sr) {
+			if op == OperatorOr && len(sr) == 0 {
 				break
 			}
 			result = append(result, sr)
