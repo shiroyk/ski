@@ -30,11 +30,11 @@ type vmImpl struct {
 	useStrict bool
 }
 
-func newVM(useStrict bool) VM {
+func newVM(useStrict bool, modulePath []string) VM {
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
-	modules.EnableRequire(vm)
-	modules.InitNativeModule(vm)
+	modules.EnableRequire(vm, modulePath...)
+	modules.InitGlobalModule(vm)
 
 	return &vmImpl{vm, make(chan struct{}, 1), useStrict}
 }

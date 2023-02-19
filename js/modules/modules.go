@@ -34,8 +34,8 @@ func Register(name string, mod Module) {
 	ext.Register(name, ext.JSExtension, mod)
 }
 
-// InitNativeModule init all global modules
-func InitNativeModule(vm *goja.Runtime) {
+// InitGlobalModule init all global modules
+func InitGlobalModule(vm *goja.Runtime) {
 	// Init global modules
 	for _, extension := range ext.Get(ext.JSExtension) {
 		if mod, ok := extension.Module.(Module); ok {

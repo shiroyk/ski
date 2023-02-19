@@ -117,7 +117,7 @@ func New() *VM {
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
 	modules.EnableRequire(vm)
-	modules.InitNativeModule(vm)
+	modules.InitGlobalModule(vm)
 	_, _ = vm.RunProgram(goja.MustCompile("testlib.js", TestLib, false))
 	return &VM{vm}
 }

@@ -52,8 +52,7 @@ func run(config lib.Config, path, output string) (err error) {
 	})
 	defer ctx.Cancel()
 
-	anal := analyzer.NewAnalyzer()
-	result := anal.ExecuteSchema(ctx, model.Schema, res.String())
+	result := analyzer.Analyze(ctx, model.Schema, res.String())
 
 	bytes, err := json.Marshal(result)
 	if err != nil {

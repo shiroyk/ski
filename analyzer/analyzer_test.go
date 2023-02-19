@@ -132,7 +132,6 @@ array2:
 `, `{"array2":[3]}`,
 		},
 	}
-	a := NewAnalyzer()
 	for i, testCase := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			s := new(schema.Schema)
@@ -140,7 +139,7 @@ array2:
 			if err != nil {
 				t.Fatal(err)
 			}
-			bytes, err := json.Marshal(a.ExecuteSchema(ctx, s, content))
+			bytes, err := json.Marshal(Analyze(ctx, s, content))
 			if err != nil {
 				t.Error(err)
 			}
