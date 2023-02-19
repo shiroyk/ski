@@ -8,6 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var ErrInvalidSchema = errors.New("invalid schema")
+
 // Type The property type.
 type Type string
 
@@ -155,7 +157,7 @@ func (schema *Schema) CloneWithType(typ Type) *Schema {
 // UnmarshalYAML decodes the Schema from yaml
 func (schema *Schema) UnmarshalYAML(node *yaml.Node) (err error) {
 	if node.Kind != yaml.MappingNode {
-		return errors.New("invalid schema")
+		return ErrInvalidSchema
 	}
 
 	schema.Type = ObjectType
@@ -165,7 +167,7 @@ func (schema *Schema) UnmarshalYAML(node *yaml.Node) (err error) {
 		field, value := node.Content[i], node.Content[i+1]
 		schema.Properties[field.Value], err = buildSchema(value)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
@@ -223,12 +225,12 @@ func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
 				k, v := value.Content[j], value.Content[j+1]
 				schema.Properties[k.Value], err = buildSchema(v)
 				if err != nil {
-					return schema, err
+					return
 				}
 			}
 		}
 		if err != nil {
-			return schema, err
+			return
 		}
 	}
 

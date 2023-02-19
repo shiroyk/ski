@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var ErrInvalidStep = errors.New("invalid step")
+
 // Action The Schema Action
 type Action struct {
 	operator Operator
@@ -19,9 +21,10 @@ type Action struct {
 func (a *Actions) UnmarshalYAML(value *yaml.Node) (err error) {
 	switch value.Kind {
 	case yaml.MappingNode:
-		steps, err := buildMapSteps(value)
+		var steps []Step
+		steps, err = buildMapSteps(value)
 		if err != nil {
-			return err
+			return
 		}
 		*a = []Action{NewAction(steps...)}
 	case yaml.SequenceNode:
@@ -40,7 +43,7 @@ func (a *Actions) UnmarshalYAML(value *yaml.Node) (err error) {
 			}
 
 			if err != nil {
-				return err
+				return
 			}
 
 			*a = append(*a, act)
@@ -57,7 +60,7 @@ func buildMapSteps(node *yaml.Node) (steps []Step, err error) {
 		if k.Kind == yaml.ScalarNode && v.Kind == yaml.ScalarNode {
 			steps = append(steps, NewStep(k.Value, v.Value))
 		} else {
-			return nil, errors.New("invalid step")
+			return nil, ErrInvalidStep
 		}
 	}
 	return
@@ -65,15 +68,16 @@ func buildMapSteps(node *yaml.Node) (steps []Step, err error) {
 
 // buildAction builds an Action for the slice Step
 func buildAction(node *yaml.Node) (act Action, err error) {
-	steps := make([]Step, 0, len(node.Content))
+	actSteps := make([]Step, 0, len(node.Content))
 	for _, stepsNode := range node.Content {
-		s, err := buildMapSteps(stepsNode)
+		var steps []Step
+		steps, err = buildMapSteps(stepsNode)
 		if err != nil {
 			return act, err
 		}
-		steps = append(steps, s...)
+		actSteps = append(actSteps, steps...)
 	}
-	return NewAction(steps...), nil
+	return NewAction(actSteps...), nil
 }
 
 // MarshalYAML encodes the action to yaml
