@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
@@ -20,7 +18,7 @@ func init() {
 func initConfig() {
 	config, err := lib.ReadConfig(configPath)
 	if err != nil {
-		fmt.Printf("error reading config file: \n %v", err)
+		logger.Error("error reading config file", err)
 	}
 	err = initDependencies(*config)
 	if err != nil {
