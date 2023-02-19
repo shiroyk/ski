@@ -82,13 +82,9 @@ func (a Action) MarshalYAML() (any, error) {
 		return a.operator, nil
 	}
 	if len(a.step) == 1 {
-		return a.step[0].ToMap(), nil
+		return a.step[0], nil
 	}
-	var slice []any
-	for _, step := range a.step {
-		slice = append(slice, step.ToMap())
-	}
-	return slice, nil
+	return a.step, nil
 }
 
 // NewAction returns a new Action with the given Step
@@ -119,9 +115,9 @@ type Step struct {
 	rule   string
 }
 
-// ToMap returns a map of Step
-func (s *Step) ToMap() map[string]string {
-	return map[string]string{s.parser: s.rule}
+// MarshalYAML encodes to yaml
+func (s Step) MarshalYAML() (any, error) {
+	return map[string]string{s.parser: s.rule}, nil
 }
 
 // NewStep returns a new Step with the given params
@@ -188,7 +184,6 @@ func runActions[T string | []string](
 	andFn func(T, T) T,
 ) (ret T, err error) {
 	var op Operator
-	var result []T
 	for _, act := range action {
 		if act.operator != OperatorNil {
 			op = act.operator
@@ -209,16 +204,9 @@ func runActions[T string | []string](
 			if op == OperatorOr && len(sr) == 0 {
 				break
 			}
-			result = append(result, sr)
+			ret = andFn(ret, sr)
 		}
 	}
 
-	if len(result) == 1 {
-		return result[0], nil
-	}
-
-	for _, s := range result {
-		ret = andFn(ret, s)
-	}
 	return
 }
