@@ -106,6 +106,7 @@ func parseRegexp(arg string) (re *regexp2.Regexp, replace string, start, count i
 		case '\\':
 			if nextCh := arg[offset]; nextCh == '/' {
 				pattern.WriteByte(nextCh)
+				offset++
 			} else {
 				pattern.WriteByte(ch)
 			}
