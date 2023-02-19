@@ -7,6 +7,7 @@ import (
 
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
+	"golang.org/x/exp/slog"
 )
 
 var formatter atomic.Value
@@ -29,117 +30,157 @@ func GetFormatter() FormatHandler {
 func Analyze(ctx *parser.Context, s *schema.Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger().Error("analyzer error %v", r.(error), debug.Stack())
+			ctx.Logger().Error(fmt.Sprintf("analyzer error %s", debug.Stack()), r.(error))
 		}
 	}()
 
-	return process(ctx, s, content)
+	return analyze(ctx, s, content, "$")
 }
 
-func process(ctx *parser.Context, s *schema.Schema, content any) any {
+func analyze(
+	ctx *parser.Context,
+	s *schema.Schema,
+	content any,
+	path string,
+) any {
 	switch s.Type {
 	default:
 		return nil
 	case schema.StringType, schema.IntegerType, schema.NumberType, schema.BooleanType:
-		return processString(ctx, s, content)
+		return analyzeString(ctx, s, content, path)
 	case schema.ObjectType:
-		return processObject(ctx, s, content)
+		return analyzeObject(ctx, s, content, path)
 	case schema.ArrayType:
-		return processArray(ctx, s, content)
+		return analyzeArray(ctx, s, content, path)
 	}
 }
 
-func processString(ctx *parser.Context, s *schema.Schema, content any) any {
-	var result any
+func analyzeString(
+	ctx *parser.Context,
+	s *schema.Schema,
+	content any,
+	path string,
+) (result any) {
 	var err error
 	if s.Type == schema.ArrayType {
 		result, err = s.Rule.GetStrings(ctx, content)
 		if err != nil {
-			ctx.Logger().Error("process failed", err)
+			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
+			return
 		}
+		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", result))
 	} else {
 		result, err = s.Rule.GetString(ctx, content)
 		if err != nil {
-			ctx.Logger().Error("process failed", err)
+			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
+			return
 		}
+		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", result))
 
 		if s.Type != schema.StringType {
 			result, err = GetFormatter().Format(result, s.Type)
 			if err != nil {
-				ctx.Logger().Error(fmt.Sprintf("format failed %v to %v", result, s.Format), err)
+				ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
+					path, result, s.Format), err)
+				return
 			}
+			ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", result))
 		}
 	}
 
 	if s.Format != "" {
 		result, err = GetFormatter().Format(result, s.Format)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("format failed %v to %v", result, s.Format), err)
+			ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
+				path, result, s.Format), err)
+			return
 		}
+		ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", result))
 	}
 
-	return result
+	return
 }
 
-func processObject(ctx *parser.Context, s *schema.Schema, content any) any {
+func analyzeObject(
+	ctx *parser.Context,
+	s *schema.Schema,
+	content any,
+	path string,
+) (ret any) {
 	if s.Properties != nil {
-		element := processInit(ctx, s, content)[0]
+		element := analyzeInit(ctx, s, content, path)
+		if len(element) == 0 {
+			return
+		}
 		object := make(map[string]any, len(s.Properties))
 
 		for field, s := range s.Properties {
-			object[field] = process(ctx, &s, element)
+			object[field] = analyze(ctx, &s, element[0], path+"."+field)
 		}
 
 		return object
 	} else if s.Rule != nil {
-		return processString(ctx, s.CloneWithType(schema.ObjectType), content)
+		return analyzeString(ctx, s.CloneWithType(schema.ObjectType), content, path)
 	}
 
-	return nil
+	return
 }
 
-func processArray(ctx *parser.Context, s *schema.Schema, content any) any {
+func analyzeArray(
+	ctx *parser.Context,
+	s *schema.Schema,
+	content any,
+	path string,
+) any {
 	if s.Properties != nil {
-		elements := processInit(ctx, s, content)
+		elements := analyzeInit(ctx, s, content, path)
 		array := make([]any, len(elements))
 
 		for i, item := range elements {
 			s := schema.NewSchema(schema.ObjectType).SetProperty(s.Properties)
-			array[i] = processObject(ctx, s, item)
+			array[i] = analyzeObject(ctx, s, item, fmt.Sprintf("%s.[%v]", path, i))
 		}
 
 		return array
 	} else if s.Rule != nil {
-		return processString(ctx, s.CloneWithType(schema.ArrayType), content)
+		return analyzeString(ctx, s.CloneWithType(schema.ArrayType), content, path)
 	}
 
 	return nil
 }
 
-func processInit(ctx *parser.Context, s *schema.Schema, content any) []string {
-	if s.Init == nil || len(s.Init) == 0 {
+func analyzeInit(
+	ctx *parser.Context,
+	s *schema.Schema,
+	content any,
+	path string,
+) (ret []string) {
+	if len(s.Init) == 0 {
 		switch data := content.(type) {
-		case []string, nil:
-			return data.([]string)
+		case []string:
+			return data
 		case string:
 			return []string{data}
 		default:
-			ctx.Logger().Error("process init failed", fmt.Errorf("unexpected content type %T", content))
-			return nil
+			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path),
+				fmt.Errorf("unexpected content type %T", content))
+			return
 		}
 	}
 
 	if s.Type == schema.ArrayType {
 		elements, err := s.Init.GetElements(ctx, content)
 		if err != nil {
-			ctx.Logger().Error("process init failed", err)
+			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), err)
+			return
 		}
 		return elements
 	}
 
 	element, err := s.Init.GetElement(ctx, content)
 	if err != nil {
-		ctx.Logger().Error("process init failed", err)
+		ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), err)
+		return
 	}
 	return []string{element}
 }
