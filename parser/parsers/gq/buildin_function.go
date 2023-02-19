@@ -235,7 +235,7 @@ func (gqBuildInFunc) Next(_ *parser.Context, content any, args ...string) (any, 
 // element to select. The end index is 0-based and indicates the index at which
 // the elements stop being selected (the end index is not selected).
 //
-// If not present the end reduces the set of matched elements to the one at the
+// If the end index is not specified reduces the set of matched elements to the one at the
 // specified start index.
 //
 // The indices may be negative, in which case they represent an offset from the
