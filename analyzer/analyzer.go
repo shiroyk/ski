@@ -16,8 +16,8 @@ func init() {
 	formatter.Store(new(defaultFormatHandler))
 }
 
-// SetDefaultFormatter set the default formatter
-func SetDefaultFormatter(formatHandler FormatHandler) {
+// SetFormatter set the formatter
+func SetFormatter(formatHandler FormatHandler) {
 	formatter.Store(formatHandler)
 }
 
@@ -37,11 +37,12 @@ func Analyze(ctx *parser.Context, s *schema.Schema, content string) any {
 	return analyze(ctx, s, content, "$")
 }
 
+// analyze execute the corresponding to analyze by schema.Type
 func analyze(
 	ctx *parser.Context,
 	s *schema.Schema,
 	content any,
-	path string,
+	path string, // the path of properties
 ) any {
 	switch s.Type {
 	default:
@@ -55,57 +56,62 @@ func analyze(
 	}
 }
 
+// analyzeString get string or slice string and convert it to the specified type.
+// If the type is not schema.StringType then convert to the specified type.
 func analyzeString(
 	ctx *parser.Context,
 	s *schema.Schema,
 	content any,
-	path string,
-) (result any) {
+	path string, // the path of properties
+) (ret any) {
 	var err error
 	if s.Type == schema.ArrayType {
-		result, err = s.Rule.GetStrings(ctx, content)
+		ret, err = s.Rule.GetStrings(ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
 			return
 		}
-		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", result))
+		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", ret))
 	} else {
-		result, err = s.Rule.GetString(ctx, content)
+		ret, err = s.Rule.GetString(ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
 			return
 		}
-		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", result))
+		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", ret))
 
 		if s.Type != schema.StringType {
-			result, err = GetFormatter().Format(result, s.Type)
+			ret, err = GetFormatter().Format(ret, s.Type)
 			if err != nil {
 				ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
-					path, result, s.Format), err)
+					path, ret, s.Format), err)
 				return
 			}
-			ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", result))
+			ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", ret))
 		}
 	}
 
 	if s.Format != "" {
-		result, err = GetFormatter().Format(result, s.Format)
+		ret, err = GetFormatter().Format(ret, s.Format)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
-				path, result, s.Format), err)
+				path, ret, s.Format), err)
 			return
 		}
-		ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", result))
+		ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", ret))
 	}
 
 	return
 }
 
+// analyzeObject get object.
+// If properties is not empty, execute analyzeInit to get the object element then analyze properties.
+// If rule is not empty, execute analyzeString to get object.
 func analyzeObject(
 	ctx *parser.Context,
 	s *schema.Schema,
 	content any,
-	path string,
+	path string, // the path of properties
 ) (ret any) {
 	if s.Properties != nil {
 		element := analyzeInit(ctx, s, content, path)
@@ -126,11 +132,14 @@ func analyzeObject(
 	return
 }
 
+// analyzeArray get array.
+// If properties is not empty, execute analyzeInit to get the slice of elements then analyze properties.
+// If rule is not empty, execute analyzeString to get array
 func analyzeArray(
 	ctx *parser.Context,
 	s *schema.Schema,
 	content any,
-	path string,
+	path string, // the path of properties
 ) any {
 	if s.Properties != nil {
 		elements := analyzeInit(ctx, s, content, path)
@@ -149,11 +158,12 @@ func analyzeArray(
 	return nil
 }
 
+// analyzeInit get type of object or array elements
 func analyzeInit(
 	ctx *parser.Context,
 	s *schema.Schema,
 	content any,
-	path string,
+	path string, // the path of properties
 ) (ret []string) {
 	if len(s.Init) == 0 {
 		switch data := content.(type) {
