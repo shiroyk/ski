@@ -41,6 +41,13 @@ func (c *Cat) ClearVar(_ goja.FunctionCall) (ret goja.Value) {
 	return
 }
 
+// Cancel this context releases resources associated with it, so code should
+// call cancel as soon as the operations running in this Context complete.
+func (c *Cat) Cancel(_ goja.FunctionCall) (ret goja.Value) {
+	c.ctx.Cancel()
+	return
+}
+
 // GetString gets the string of the content with the given arguments
 func (c *Cat) GetString(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 	key := call.Argument(0).String()
