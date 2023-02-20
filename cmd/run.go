@@ -53,9 +53,9 @@ func run(path, output string) (err error) {
 		return err
 	}
 
-	log := slog.NewTextHandler(os.Stdout)
+	var log slog.Handler = slog.NewTextHandler(os.Stdout)
 	if debugMode {
-		log = slog.HandlerOptions{Level: slog.LevelDebug}.NewTextHandler(os.Stdout)
+		log = logger.NewConsoleHandler(slog.LevelDebug)
 	}
 
 	ctx := parser.NewContext(parser.Options{
