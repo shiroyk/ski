@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cast"
 )
 
+// Parser the goquery parser
 type Parser struct{}
 
 const key string = "gq"
@@ -17,6 +18,10 @@ func init() {
 	parser.Register(key, new(Parser))
 }
 
+// GetString gets the string of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetString(ctx, content, "ul li") returns "1\n2"
 func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
@@ -44,6 +49,10 @@ func (p Parser) GetString(ctx *parser.Context, content any, arg string) (ret str
 	return cast.ToStringE(join)
 }
 
+// GetStrings gets the strings of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetStrings(ctx, content, "ul li") returns []string{"1", "2"}
 func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
@@ -78,6 +87,10 @@ func (p Parser) GetStrings(ctx *parser.Context, content any, arg string) (ret []
 	return cast.ToStringSliceE(node)
 }
 
+// GetElement gets the element of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetElement(ctx, content, "ul li") returns "<li>1</li>\n<li>2</li>"
 func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
@@ -104,6 +117,10 @@ func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (ret st
 	return cast.ToStringE(node)
 }
 
+// GetElements gets the elements of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetElements(ctx, content, "ul li") returns []string{"<li>1</li>", "<li>2</li>"}
 func (p Parser) GetElements(ctx *parser.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {

@@ -6,13 +6,33 @@ import (
 
 // Parser the content schema
 type Parser interface {
-	// GetString gets the string of the content with the given arguments
+	// GetString gets the string of the content with the given arguments.
+	// e.g.:
+	//
+	// content := `<ul><li>1</li><li>2</li></ul>`
+	// GetString(ctx, content, "ul li") returns "1\n2"
+	//
 	GetString(*Context, any, string) (string, error)
-	// GetStrings gets the string of the content with the given arguments
+	// GetStrings gets the strings of the content with the given arguments.
+	// e.g.:
+	//
+	// content := `<ul><li>1</li><li>2</li></ul>`
+	// GetStrings(ctx, content, "ul li") returns []string{"1", "2"}
+	//
 	GetStrings(*Context, any, string) ([]string, error)
-	// GetElement gets the string of the content with the given arguments
+	// GetElement gets the element of the content with the given arguments.
+	// e.g.:
+	//
+	// content := `<ul><li>1</li><li>2</li></ul>`
+	// GetElement(ctx, content, "ul li") returns "<li>1</li>\n<li>2</li>"
+	//
 	GetElement(*Context, any, string) (string, error)
-	// GetElements gets the string of the content with the given arguments
+	// GetElements gets the elements of the content with the given arguments.
+	// e.g.:
+	//
+	// content := `<ul><li>1</li><li>2</li></ul>`
+	// GetElements(ctx, content, "ul li") returns []string{"<li>1</li>", "<li>2</li>"}
+	//
 	GetElements(*Context, any, string) ([]string, error)
 }
 

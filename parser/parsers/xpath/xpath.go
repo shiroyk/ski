@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Parser the xpath schema
+// Parser the xpath parser
 type Parser struct{}
 
 const key string = "xpath"
@@ -18,6 +18,10 @@ func init() {
 	parser.Register(key, new(Parser))
 }
 
+// GetString gets the string of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetString(ctx, content, "//li/text()") returns "1\n2"
 func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
@@ -38,6 +42,10 @@ func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, e
 	return str.String(), nil
 }
 
+// GetStrings gets the strings of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetStrings(ctx, content, "//li/text()") returns []string{"1", "2"}
 func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
@@ -56,6 +64,10 @@ func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string
 	return result, err
 }
 
+// GetElement gets the element of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetStrings(ctx, content, "//li..") returns "<li>1</li>\n<li>2</li>"
 func (p Parser) GetElement(_ *parser.Context, content any, arg string) (string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {
@@ -76,6 +88,10 @@ func (p Parser) GetElement(_ *parser.Context, content any, arg string) (string, 
 	return str.String(), nil
 }
 
+// GetElements gets the elements of the content with the given arguments.
+//
+// content := `<ul><li>1</li><li>2</li></ul>`
+// GetStrings(ctx, content, "//li..") returns []string{"<li>1</li>", "<li>2</li>"}
 func (p Parser) GetElements(_ *parser.Context, content any, arg string) ([]string, error) {
 	nodes, err := getHTMLNode(content, arg)
 	if err != nil {

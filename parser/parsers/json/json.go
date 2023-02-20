@@ -9,7 +9,7 @@ import (
 	"github.com/shiroyk/cloudcat/parser"
 )
 
-// Parser the json schema
+// Parser the json parser
 type Parser struct{}
 
 const key string = "json"
@@ -18,6 +18,10 @@ func init() {
 	parser.Register(key, new(Parser))
 }
 
+// GetString gets the string of the content with the given arguments.
+//
+// content := `{"keys": [{"key":"foo"},{"key":"bar"}]}`
+// GetString(ctx, content, "$.key[*].key") returns "foo\nbar"
 func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, error) {
 	obj, err := getDoc(content, arg)
 	if err != nil {
@@ -33,9 +37,13 @@ func (p Parser) GetString(_ *parser.Context, content any, arg string) (string, e
 		}
 	}
 
-	return strings.Join(str, ""), nil
+	return strings.Join(str, "\n"), nil
 }
 
+// GetStrings gets the strings of the content with the given arguments.
+//
+// content := `{"keys": [{"key":"foo"},{"key":"bar"}]}`
+// GetStrings(ctx, content, "$.key[*].key") returns []string{"foo", "bar"}
 func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
 	obj, err := getDoc(content, arg)
 	if err != nil {
@@ -54,10 +62,14 @@ func (p Parser) GetStrings(_ *parser.Context, content any, arg string) ([]string
 	return str, nil
 }
 
+// GetElement gets the element of the content with the given arguments.
+// sames as the GetString.
 func (p Parser) GetElement(ctx *parser.Context, content any, arg string) (string, error) {
 	return p.GetString(ctx, content, arg)
 }
 
+// GetElements gets the elements of the content with the given arguments.
+// sames as the GetStrings.
 func (p Parser) GetElements(ctx *parser.Context, content any, arg string) ([]string, error) {
 	return p.GetStrings(ctx, content, arg)
 }
