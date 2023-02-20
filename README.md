@@ -1,4 +1,7 @@
 # Cloudcat
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/shiroyk/cloudcat)
+[![Go Report Card](https://goreportcard.com/badge/github.com/shiroyk/cloudcat)](https://goreportcard.com/report/github.com/shiroyk/cloudcat)
+![GitHub](https://img.shields.io/github/license/shiroyk/cloudcat)<br/>
 **Cloudcat** is a tool for extracting structured data from websites using YAML configuration and the syntax rule is extensible.<br/>
 ⚠️**This project is still in development**.
 ## CLI example
