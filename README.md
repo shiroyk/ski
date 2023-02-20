@@ -1,5 +1,6 @@
 # Cloudcat
-**Cloudcat** is a tool for extracting structured data from websites using YAML configuration and the syntax rule is extensible.
+**Cloudcat** is a tool for extracting structured data from websites using YAML configuration and the syntax rule is extensible.<br/>
+⚠️**This project is still in development**.
 ## CLI example
 ```shell
 cat << EOF > HackerNews.yaml
