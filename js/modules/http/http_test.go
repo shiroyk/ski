@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
-	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/js/modulestest"
 )
 
 func TestHttp(t *testing.T) {
-	di.Override(fetch.NewFetcher(fetch.Options{}))
+	di.Provide(fetch.NewFetcher(fetch.Options{}), false)
 	ctx := context.Background()
 	vm := modulestest.New()
 

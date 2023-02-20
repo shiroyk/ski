@@ -6,13 +6,13 @@ import (
 
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/memory"
-	"github.com/shiroyk/cloudcat/internal/di"
+	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/js/modulestest"
 )
 
 func TestCache(t *testing.T) {
 	t.Parallel()
-	di.Override[cache.Cache](memory.NewCache())
+	di.Provide[cache.Cache](memory.NewCache(), false)
 	ctx := context.Background()
 	vm := modulestest.New()
 

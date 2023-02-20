@@ -1,9 +1,10 @@
 package cmd
 
 import (
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/bolt"
+	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
-	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/lib"
 	"github.com/shiroyk/cloudcat/lib/logger"
@@ -27,23 +28,18 @@ func initConfig() {
 }
 
 func initDependencies(config lib.Config) error {
-	di.Provide(fetch.NewFetcher(config.Fetch))
-	di.Provide(fetch.DefaultTemplateFuncMap())
-	cache, err := bolt.NewCache(config.Cache)
-	if err != nil {
-		return err
-	}
-	di.Provide(cache)
-	cookie, err := bolt.NewCookie(config.Cache)
-	if err != nil {
-		return err
-	}
-	di.Provide(cookie)
-	shortener, err := bolt.NewShortener(config.Cache)
-	if err != nil {
-		return err
-	}
-	di.Provide(shortener)
+	di.Provide(fetch.NewFetcher(config.Fetch), false)
+	di.Provide(fetch.DefaultTemplateFuncMap(), false)
+
+	di.ProvideLazy(func() (cache.Cache, error) {
+		return bolt.NewCache(config.Cache)
+	}, false)
+	di.ProvideLazy(func() (cache.Cookie, error) {
+		return bolt.NewCookie(config.Cache)
+	}, false)
+	di.ProvideLazy(func() (cache.Shortener, error) {
+		return bolt.NewShortener(config.Cache)
+	}, false)
 
 	js.SetScheduler(js.NewScheduler(config.JS))
 

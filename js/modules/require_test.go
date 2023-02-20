@@ -5,14 +5,14 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
-	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRequire(t *testing.T) {
-	di.Override(fetch.NewFetcher(fetch.Options{}))
+	di.Provide(fetch.NewFetcher(fetch.Options{}), false)
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
 	EnableRequire(vm)

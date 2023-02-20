@@ -6,13 +6,13 @@ import (
 
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/memory"
-	"github.com/shiroyk/cloudcat/internal/di"
+	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/js/modulestest"
 )
 
 func TestCookie(t *testing.T) {
 	t.Parallel()
-	di.Override[cache.Cookie](memory.NewCookie())
+	di.Provide[cache.Cookie](memory.NewCookie(), false)
 	ctx := context.Background()
 	vm := modulestest.New()
 
