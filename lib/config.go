@@ -3,10 +3,8 @@ package lib
 import (
 	"errors"
 	"os"
-	"os/user"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/bolt"
@@ -53,15 +51,11 @@ func DefaultConfig() *Config {
 // ReadConfig read configuration from the file.
 // if the configuration file is not existing then create it with default configuration
 func ReadConfig(path string) (config *Config, err error) {
-	file := path
-	if strings.HasPrefix(strings.TrimSpace(path), "~") {
-		usr, err := user.Current()
-		if err != nil {
-			return nil, err
-		}
-		file = filepath.Join(usr.HomeDir, path[2:])
-		path = filepath.Dir(file)
+	file, err := utils.ExpandPath(path)
+	if err != nil {
+		return nil, err
 	}
+	path = filepath.Dir(file)
 	if _, err = os.Stat(file); errors.Is(err, os.ErrNotExist) {
 		err = os.MkdirAll(path, os.ModePerm)
 		if err != nil {

@@ -2,6 +2,8 @@ package utils
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,8 +31,30 @@ func EmptyOr[T any](value, defaultValue []T) []T {
 	return value
 }
 
+// ExpandPath expands path "." or "~"
+func ExpandPath(path string) (string, error) {
+	// expand local directory
+	if strings.HasPrefix(path, ".") {
+		if cwd, err := os.Getwd(); err != nil {
+			return "", err
+		} else {
+			return filepath.Join(cwd, path[1:]), nil
+		}
+	}
+	// expand ~ as shortcut for home directory
+	if strings.HasPrefix(path, "~") {
+		if home, err := os.UserHomeDir(); err != nil {
+			return "", err
+		} else {
+			return filepath.Join(home, path[1:]), nil
+		}
+	}
+	return path, nil
+}
+
 // ReadYaml read the YAML file and convert it to T
 func ReadYaml[T any](path string) (t *T, err error) {
+	path, err = ExpandPath(path)
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return
