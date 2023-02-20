@@ -22,6 +22,9 @@ func (s *lazyService[T]) initOrGet() (instance T, err error) {
 	}
 	if !s.load.Swap(true) {
 		s.instance, err = s.initFunc()
+		if err != nil {
+			s.load.Store(false)
+		}
 	}
 	return s.instance, err
 }
