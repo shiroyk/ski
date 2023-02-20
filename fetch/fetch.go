@@ -13,7 +13,7 @@ import (
 
 	"github.com/andybalholm/brotli"
 	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/lib/consts"
 	"github.com/shiroyk/cloudcat/lib/utils"
 	"golang.org/x/exp/slices"

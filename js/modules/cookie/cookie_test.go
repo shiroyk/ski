@@ -6,7 +6,7 @@ import (
 
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/memory"
-	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/js/modulestest"
 )
 

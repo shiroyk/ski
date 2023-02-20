@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/shiroyk/cloudcat/analyzer"
-	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
+	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/lib/logger"
 	"github.com/shiroyk/cloudcat/lib/utils"
 	"github.com/shiroyk/cloudcat/parser"

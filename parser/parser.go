@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/shiroyk/cloudcat/ext"
+	"github.com/shiroyk/cloudcat/internal/ext"
 )
 
 // Parser the content schema

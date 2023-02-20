@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"github.com/shiroyk/cloudcat/cache/bolt"
-	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
+	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/lib"
 	"github.com/shiroyk/cloudcat/lib/logger"

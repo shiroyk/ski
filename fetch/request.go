@@ -16,7 +16,7 @@ import (
 	"text/template"
 
 	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/internal/di"
 	"golang.org/x/net/http/httpguts"
 )
 

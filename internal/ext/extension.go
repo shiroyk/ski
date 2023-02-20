@@ -39,9 +39,9 @@ func (e ExtensionType) String() string {
 
 // Extension a generic container.
 type Extension struct {
-	Name, Path, Desc, Version string
-	Type                      ExtensionType
-	Module                    any
+	Name, Path, Version string
+	Type                ExtensionType
+	Module              any
 }
 
 func (e Extension) String() string {
@@ -53,7 +53,6 @@ func (e Extension) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
 		"name":    e.Name,
 		"path":    e.Path,
-		"desc":    e.Desc,
 		"version": e.Version,
 		"type":    e.Type.String(),
 	})

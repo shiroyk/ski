@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/ext"
+	"github.com/shiroyk/cloudcat/internal/ext"
 )
 
 const extPrefix = "cloudcat/"

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
+	"github.com/shiroyk/cloudcat/internal/di"
 	"github.com/shiroyk/cloudcat/js/modulestest"
 )
 

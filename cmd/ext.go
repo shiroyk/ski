@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/shiroyk/cloudcat/ext"
+	"github.com/shiroyk/cloudcat/internal/ext"
 	"github.com/spf13/cobra"
 )
 
