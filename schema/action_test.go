@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -11,61 +12,129 @@ import (
 
 type testParser struct{}
 
-func (t *testParser) GetString(*parser.Context, any, string) (string, error) {
+func (t *testParser) GetString(_ *parser.Context, content any, arg string) (string, error) {
+	if str, ok := content.(string); ok {
+		if str == arg {
+			return str, nil
+		}
+	}
 	return "", nil
 }
 
-func (t *testParser) GetStrings(*parser.Context, any, string) ([]string, error) {
+func (t *testParser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
+	if str, ok := content.(string); ok {
+		if str == arg {
+			return []string{str}, nil
+		}
+	}
 	return nil, nil
 }
 
-func (t *testParser) GetElement(*parser.Context, any, string) (string, error) {
-	return "", nil
+func (t *testParser) GetElement(ctx *parser.Context, content any, arg string) (string, error) {
+	return t.GetString(ctx, content, arg)
 }
 
-func (t *testParser) GetElements(*parser.Context, any, string) ([]string, error) {
-	return nil, nil
+func (t *testParser) GetElements(ctx *parser.Context, content any, arg string) ([]string, error) {
+	return t.GetStrings(ctx, content, arg)
 }
 
 func TestActions(t *testing.T) {
 	t.Parallel()
-	var actions Actions
-	var err error
+
 	if _, ok := parser.GetParser("act"); !ok {
 		parser.Register("act", new(testParser))
 	}
-	actions = []Action{NewAction(NewStep("act", "1"), NewStep("act", "2")), NewActionOp(OperatorAnd), NewAction(NewStep("act", "3"))}
 	ctx := parser.NewContext(parser.Options{Timeout: time.Second})
 
-	_, err = actions.GetString(ctx, "action")
-	if err != nil {
-		t.Error(err)
-	}
-
-	_, err = actions.GetStrings(ctx, "action")
-	if err != nil {
-		t.Error(err)
-	}
-
-	_, err = actions.GetElement(ctx, "action")
-	if err != nil {
-		t.Error(err)
-	}
-
-	_, err = actions.GetElements(ctx, "action")
-	if err != nil {
-		t.Error(err)
-	}
-
-	bytes, err := yaml.Marshal(actions)
-	if err != nil {
-		t.Error(err)
-	}
-
-	y := `- - act: "1"
-  - act: "2"
+	testCases := []struct {
+		acts, content string
+		want          any
+		str           bool
+	}{
+		{`
+- act: 1
 - and
-- act: "3"
-`
-	assert.Equal(t, y, string(bytes))
+- act: 1
+`, `1`, `11`, true,
+		},
+		{`
+- act: 1
+- and
+- act: 1
+`, `1`, []string{`1`, `1`}, false,
+		},
+		{`
+- act: 2
+- or
+- act: 1
+`, `1`, `1`, true,
+		},
+		{`
+- act: 2
+- or
+- act: 1
+`, `1`, []string{`1`}, false,
+		},
+		{`
+- act: 1
+- and
+- act: 2
+- or
+- act: 1
+`, `1`, `11`, true,
+		},
+		{`
+- act: 1
+- and
+- act: 2
+- or
+- act: 1
+`, `1`, []string{`1`, `1`}, false,
+		},
+		{`
+- - act: 1
+    act: 1
+- and
+- - act: 2
+- or
+- - act: 1
+`, `1`, `11`, true,
+		},
+		{`
+- - act: 1
+    act: 1
+- and
+- - act: 2
+- or
+- - act: 1
+`, `1`, []string{`1`}, false,
+		},
+	}
+	if _, ok := parser.GetParser("act"); !ok {
+		parser.Register("act", new(testParser))
+	}
+
+	for i, testCase := range testCases {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			var act Actions
+			err := yaml.Unmarshal([]byte(testCase.acts), &act)
+			if err != nil {
+				t.Error(err)
+			}
+			var result any
+			if testCase.str {
+				result, err = act.GetString(ctx, testCase.content)
+				if err != nil {
+					t.Error(err)
+				}
+			} else {
+				result, err = act.GetStrings(ctx, testCase.content)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			assert.Equal(t, testCase.want, result)
+		})
+	}
+
 }
