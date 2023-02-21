@@ -20,7 +20,7 @@ var (
 type ExtensionType uint
 
 const (
-	// JSExtension The modules.Module or modules.NativeModule
+	// JSExtension The modules.Module
 	JSExtension ExtensionType = iota + 1
 	// ParserExtension The parser.Parser.
 	ParserExtension
