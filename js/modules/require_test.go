@@ -13,34 +13,45 @@ import (
 
 func TestRequire(t *testing.T) {
 	di.Provide(fetch.NewFetcher(fetch.Options{}), false)
+
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
 	EnableRequire(vm)
 
+	assertObject := vm.NewObject()
+	_ = assertObject.Set("equal", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+		a, err := common.Unwrap(call.Argument(0))
+		if err != nil {
+			common.Throw(vm, err)
+		}
+		b, err := common.Unwrap(call.Argument(1))
+		if err != nil {
+			common.Throw(vm, err)
+		}
+		return vm.ToValue(assert.Equal(t, a, b, call.Argument(2).String()))
+	})
+	_ = assertObject.Set("true", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+		return vm.ToValue(assert.True(t, call.Argument(0).ToBoolean(), call.Argument(2).String()))
+	})
+	_ = vm.Set("assert", assertObject)
+
 	testCases := []struct {
-		script, want string
+		script string
 	}{
 		{`const lodash = require("https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js");
-		lodash.VERSION;`,
-			"4.17.21",
+		 assert.equal(lodash.VERSION, "4.17.21")`,
 		},
 		{`const base64 = require("https://cdn.jsdelivr.net/npm/js-base64@3.7.5/base64.min.js");
-		base64.version;`,
-			"3.7.5",
+		 assert.equal(base64.version, "3.7.5")`,
 		},
 	}
 
 	for i, testCase := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			value, err := vm.RunString(testCase.script)
+			_, err := vm.RunString(testCase.script)
 			if err != nil {
 				t.Error(err)
 			}
-			v, err := common.Unwrap(value)
-			if err != nil {
-				t.Error(err)
-			}
-			assert.Equal(t, testCase.want, v)
 		})
 	}
 }

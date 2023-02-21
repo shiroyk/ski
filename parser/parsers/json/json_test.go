@@ -96,7 +96,7 @@ func TestParser(t *testing.T) {
 
 func TestGetString(t *testing.T) {
 	t.Parallel()
-	assertString(t, `$.store.book[*].author`, `Nigel ReesEvelyn WaughHerman MelvilleJ. R. R. Tolkien`)
+	assertString(t, `$.store.book[*].author`, "Nigel Rees\nEvelyn Waugh\nHerman Melville\nJ. R. R. Tolkien")
 }
 
 func TestGetStrings(t *testing.T) {

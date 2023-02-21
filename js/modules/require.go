@@ -3,7 +3,7 @@ package modules
 import (
 	"encoding/json"
 	"errors"
-	"net/url"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/internal/ext"
@@ -26,6 +27,7 @@ import (
 func EnableRequire(vm *goja.Runtime, path ...string) {
 	req := &require{
 		vm:            vm,
+		modules:       make(map[string]*goja.Object),
 		nodeModules:   make(map[string]*goja.Object),
 		globalFolders: path,
 	}
@@ -35,6 +37,7 @@ func EnableRequire(vm *goja.Runtime, path ...string) {
 
 type require struct {
 	vm          *goja.Runtime
+	modules     map[string]*goja.Object
 	nodeModules map[string]*goja.Object
 
 	globalFolders []string
@@ -60,11 +63,7 @@ func (r *require) resolve(name string) (*goja.Object, error) {
 	}
 
 	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
-		u, err := url.Parse(name)
-		if err != nil {
-			return nil, err
-		}
-		return r.resolveRemote(u)
+		return r.resolveRemote(name)
 	}
 
 	return r.resolveFile(name)
@@ -85,12 +84,26 @@ func (r *require) resolveFile(modPath string) (module *goja.Object, err error) {
 	}
 
 	p := path.Join(start, modPath)
-	if module = r.nodeModules[p]; module != nil {
-		return
-	}
-	module, err = r.loadNodeModules(modPath, start)
-	if err == nil && module != nil {
-		r.nodeModules[p] = module
+
+	if strings.HasPrefix(origPath, "./") ||
+		strings.HasPrefix(origPath, "/") ||
+		strings.HasPrefix(origPath, "../") ||
+		origPath == "." || origPath == ".." {
+		if module = r.modules[p]; module != nil {
+			return
+		}
+		module, err = r.loadAsFileOrDirectory(p)
+		if err == nil && module != nil {
+			r.modules[p] = module
+		}
+	} else {
+		if module = r.nodeModules[p]; module != nil {
+			return
+		}
+		module, err = r.loadNodeModules(modPath, start)
+		if err == nil && module != nil {
+			r.nodeModules[p] = module
+		}
 	}
 
 	if module == nil && err == nil {
@@ -99,22 +112,29 @@ func (r *require) resolveFile(modPath string) (module *goja.Object, err error) {
 	return
 }
 
-func (r *require) resolveRemote(u *url.URL) (module *goja.Object, err error) {
-	p := u.String()
+func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
 	fetcher, err := di.Resolve[fetch.Fetch]()
 	if err != nil {
 		return nil, err
 	}
-	res, err := fetcher.Get(p, nil)
+	res, err := fetcher.Get(name, nil)
 	if err != nil {
 		return nil, err
 	}
 
+	if mod, exists := r.modules[name]; exists {
+		if cached := res.Header.Get(cache.XFromCache); cached == "1" {
+			return mod, nil
+		}
+	}
+
 	module = r.vm.NewObject()
 	_ = module.Set("exports", r.vm.NewObject())
+	r.modules[name] = module
 
 	source := "(function(exports, require, module) {" + res.String() + "\n})"
-	if err = r.compileModule(p, source, module); err != nil {
+	if err = r.compileModule(name, source, module); err != nil {
+		delete(r.modules, name)
 		return nil, err
 	}
 
@@ -227,7 +247,7 @@ func (r *require) loadNodeModules(modPath, start string) (module *goja.Object, e
 		start = parent
 	}
 
-	return nil, ErrInvalidModule
+	return nil, fmt.Errorf("not found module %s", modPath)
 }
 
 func (r *require) getCurrentModulePath() string {
@@ -240,15 +260,15 @@ func (r *require) getCurrentModulePath() string {
 }
 
 func (r *require) loadModule(path string) (*goja.Object, error) {
-	module := r.nodeModules[path]
+	module := r.modules[path]
 	if module == nil {
 		module = r.vm.NewObject()
 		_ = module.Set("exports", r.vm.NewObject())
-		r.nodeModules[path] = module
+		r.modules[path] = module
 		err := r.loadModuleFile(path, module)
 		if err != nil {
 			module = nil
-			delete(r.nodeModules, path)
+			delete(r.modules, path)
 			if errors.Is(err, ErrModuleFileDoesNotExist) {
 				err = nil
 			}
