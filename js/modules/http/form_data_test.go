@@ -10,14 +10,14 @@ import (
 
 func TestFormData(t *testing.T) {
 	ctx := context.Background()
-	vm := modulestest.New()
+	vm := modulestest.New(t)
 
 	testCase := []string{
 		`mp = new FormData();`,
 		`try {
 			mp = new FormData(0);
 		 } catch (e) {
-			assert(e.toString().includes('unsupported type'))
+			assert.true(e.toString().includes('unsupported type'))
 		 }`,
 		`mp = new FormData({
 			'file': new Uint8Array([50]).buffer,
@@ -32,7 +32,7 @@ func TestFormData(t *testing.T) {
 		`assert.equal(mp.entries().length, 2)`,
 		`mp.delete('name');
 		 assert.equal(mp.getAll('name').length, 0)`,
-		`assert(!mp.has('name'))`,
+		`assert.true(!mp.has('name'))`,
 		`mp.set('name', 'foobar');
 		 assert.equal(mp.values().length, 2)`,
 	}

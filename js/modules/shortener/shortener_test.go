@@ -14,7 +14,7 @@ func TestShortener(t *testing.T) {
 	t.Parallel()
 	di.Provide[cache.Shortener](memory.NewShortener(), false)
 	ctx := context.Background()
-	vm := modulestest.New()
+	vm := modulestest.New(t)
 
 	tpl := `POST http://localhost
 Content-Type: application/json

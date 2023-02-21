@@ -17,7 +17,7 @@ import (
 func TestHttp(t *testing.T) {
 	di.Provide(fetch.NewFetcher(fetch.Options{}), false)
 	ctx := context.Background()
-	vm := modulestest.New()
+	vm := modulestest.New(t)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut {
@@ -87,7 +87,7 @@ func TestHttp(t *testing.T) {
 		`try {
 			http.request('PATCH', url, 114514, null);
 		 } catch (e) {
-			assert(e.toString().includes("unsupported request body"));
+			assert.true(e.toString().includes("unsupported request body"));
 		 }`}
 
 	for i, s := range testCase {

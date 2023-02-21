@@ -14,7 +14,7 @@ func TestCookie(t *testing.T) {
 	t.Parallel()
 	di.Provide[cache.Cookie](memory.NewCookie(), false)
 	ctx := context.Background()
-	vm := modulestest.New()
+	vm := modulestest.New(t)
 
 	_, _ = vm.RunString(ctx, `const cookie = require('cloudcat/cookie')`)
 
@@ -30,7 +30,7 @@ func TestCookie(t *testing.T) {
 	_, err = vm.RunString(ctx, `
 		cookie.set("https://github.com", "max-age=3600;");
 		cookie.del("https://github.com");
-		assert(!cookie.get("https://github.com"), "cookie should be deleted");
+		assert.true(!cookie.get("https://github.com"), "cookie should be deleted");
 		cookie.set("http://localhost", "max-age=3600;");
 		assert.equal(cookie.get("http://localhost"), "max-age=3600;");
 	`)
