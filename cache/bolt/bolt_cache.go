@@ -1,8 +1,11 @@
 package bolt
 
 import (
+	"time"
+
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/lib/logger"
+	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 // Cache is an implementation of Cache that stores bytes in bolt.DB.
@@ -27,6 +30,14 @@ func (c *Cache) Set(key string, value []byte) {
 	}
 }
 
+// SetWithTimeout saves []byte to the cache with key and timeout.
+func (c *Cache) SetWithTimeout(key string, value []byte, timeout time.Duration) {
+	err := c.db.PutWithTimeout([]byte(key), value, timeout)
+	if err != nil {
+		logger.Errorf("failed to set cache with key %s %s", key, err)
+	}
+}
+
 // Del removes key from the cache.
 func (c *Cache) Del(key string) {
 	err := c.db.Delete([]byte(key))
@@ -37,7 +48,7 @@ func (c *Cache) Del(key string) {
 
 // NewCache returns a new Cache that will store items in bolt.DB.
 func NewCache(opt cache.Options) (cache.Cache, error) {
-	db, err := NewDB(opt.Path, "cache", 0)
+	db, err := NewDB(opt.Path, "cache", utils.ZeroOr(opt.ExpireCleanInterval, defaultInterval))
 	if err != nil {
 		return nil, err
 	}

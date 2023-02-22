@@ -1,9 +1,11 @@
 package bolt
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/stretchr/testify/assert"
@@ -31,5 +33,16 @@ func TestCache(t *testing.T) {
 	c.Del(key)
 	if _, ok := c.Get(key); ok {
 		t.Fatal("delete failed")
+	}
+
+	c.SetWithTimeout(key, []byte(value), time.Second)
+	v1, _ := c.Get(key)
+	assert.Equal(t, value, string(v1))
+
+	time.Sleep(2 * time.Second)
+
+	_, ok := c.Get(key)
+	if ok {
+		t.Fatal(fmt.Sprintf("not expired: %v", key))
 	}
 }

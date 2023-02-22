@@ -37,9 +37,6 @@ func initDependencies(config lib.Config) error {
 	di.ProvideLazy(func() (cache.Cookie, error) {
 		return bolt.NewCookie(config.Cache)
 	}, false)
-	di.ProvideLazy(func() (cache.Shortener, error) {
-		return bolt.NewShortener(config.Cache)
-	}, false)
 
 	js.SetScheduler(js.NewScheduler(config.JS))
 

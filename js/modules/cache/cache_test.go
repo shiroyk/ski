@@ -21,7 +21,7 @@ func TestCache(t *testing.T) {
 			cache.set("cache1", "1");
 			cache.del("cache1");
 			assert.true(!cache.get("cache1"), "cache should be deleted");
-			cache.set("cache2", "2");
+			cache.set("cache2", "2", "1s");
 			cache.get("cache2");
 			assert.equal(cache.get("cache2"), "2");
 			cache.setBytes("cache3", new Uint8Array([50]).buffer);

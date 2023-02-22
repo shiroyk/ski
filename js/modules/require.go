@@ -123,7 +123,7 @@ func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
 	}
 
 	if mod, exists := r.modules[name]; exists {
-		if cached := res.Header.Get(cache.XFromCache); cached == "1" {
+		if cache.IsFromCache(res.Response) {
 			return mod, nil
 		}
 	}
@@ -197,7 +197,7 @@ func (r *require) loadAsDirectory(modPath string) (module *goja.Object, err erro
 
 // loadSource is used loads files from the host's filesystem.
 func (r *require) loadSource(filename string) ([]byte, error) {
-	if strings.HasPrefix(filename, "http://") || strings.HasPrefix(filename, "https://") {
+	if isHTTP(filename) {
 		fetcher, err := di.Resolve[fetch.Fetch]()
 		if err != nil {
 			return nil, err
@@ -326,4 +326,8 @@ func (r *require) compileModule(path, source string, jsModule *goja.Object) erro
 	}
 
 	return ErrInvalidModule
+}
+
+func isHTTP(name string) bool {
+	return strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://")
 }

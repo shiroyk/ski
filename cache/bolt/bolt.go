@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	defaultBatchSize = 100000
+	// DefaultPath the default cache path
 	DefaultPath      = "cache"
+	defaultBatchSize = 100000
 	defaultInterval  = 10 * time.Minute
 	defaultKeysClean = 64
 	fillPercent      = 0.9
@@ -132,7 +133,11 @@ func (db *DB) Get(key []byte) (value []byte, err error) {
 // Delete a specified key from DB.
 func (db *DB) Delete(key []byte) error {
 	return db.db.Update(func(tx *bbolt.Tx) error {
-		return tx.Bucket(db.bucketName).Delete(key)
+		err := tx.Bucket(db.bucketName).Delete(key)
+		if err != nil {
+			return tx.Bucket(expireBucketName).Delete(key)
+		}
+		return err
 	})
 }
 
@@ -220,6 +225,7 @@ func (db *DB) expire() {
 			}
 
 		case <-exitSign:
+			return
 		case <-db.closedC:
 			return
 		}

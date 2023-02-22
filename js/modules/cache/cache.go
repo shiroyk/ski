@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/cache"
@@ -49,18 +50,54 @@ func (c *Cache) GetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Val
 }
 
 // Set saves string to the cache with key.
-func (c *Cache) Set(call goja.FunctionCall) (ret goja.Value) {
-	c.cache.Set(call.Argument(0).String(), []byte(call.Argument(1).String()))
+func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+	key := call.Argument(0).String()
+	value := call.Argument(1).String()
+	ddl := call.Argument(2)
+
+	var timeout time.Duration
+	if !goja.IsUndefined(ddl) {
+		var err error
+		timeout, err = time.ParseDuration(ddl.String())
+		if err != nil {
+			common.Throw(vm, err)
+		}
+	}
+
+	if timeout > 0 {
+		c.cache.SetWithTimeout(key, []byte(value), timeout)
+		return
+	}
+
+	c.cache.Set(key, []byte(value))
 	return
 }
 
 // SetBytes saves ArrayBuffer to the cache with key.
 func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	if buffer, ok := call.Argument(1).Export().(goja.ArrayBuffer); ok {
-		c.cache.Set(call.Argument(0).String(), buffer.Bytes())
-	} else {
+	key := call.Argument(0).String()
+	buffer, ok := call.Argument(1).Export().(goja.ArrayBuffer)
+	ddl := call.Argument(2)
+
+	if !ok {
 		common.Throw(vm, fmt.Errorf("setBytes unsupport type %T", call.Argument(1).Export()))
 	}
+
+	var timeout time.Duration
+	if !goja.IsUndefined(ddl) {
+		var err error
+		timeout, err = time.ParseDuration(ddl.String())
+		if err != nil {
+			common.Throw(vm, err)
+		}
+	}
+
+	if timeout > 0 {
+		c.cache.SetWithTimeout(key, buffer.Bytes(), timeout)
+		return
+	}
+
+	c.cache.Set(call.Argument(0).String(), buffer.Bytes())
 	return
 }
 

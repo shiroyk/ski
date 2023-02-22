@@ -16,6 +16,7 @@ import (
 type Cache interface {
 	Get(key string) ([]byte, bool)
 	Set(key string, value []byte)
+	SetWithTimeout(key string, value []byte, timeout time.Duration)
 	Del(key string)
 }
 
@@ -589,7 +590,11 @@ func (r *cachingReadCloser) Close() error {
 	return r.R.Close()
 }
 
+// IsFromCache returns true if the response is from cache
+func IsFromCache(res *http.Response) bool { return res.Header.Get(XFromCache) == "1" }
+
 // Options the cache configuration
 type Options struct {
-	Path string `yaml:"path"`
+	Path                string        `yaml:"path"`
+	ExpireCleanInterval time.Duration `yaml:"expire-clean-interval"`
 }

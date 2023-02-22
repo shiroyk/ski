@@ -5,5 +5,4 @@ import (
 	_ "github.com/shiroyk/cloudcat/js/modules/console"
 	_ "github.com/shiroyk/cloudcat/js/modules/cookie"
 	_ "github.com/shiroyk/cloudcat/js/modules/http"
-	_ "github.com/shiroyk/cloudcat/js/modules/shortener"
 )
