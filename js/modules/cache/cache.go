@@ -19,11 +19,6 @@ func (*Module) Exports() any {
 	return &Cache{di.MustResolve[cache.Cache]()}
 }
 
-// Global returns is it is a global module
-func (*Module) Global() bool {
-	return false
-}
-
 func init() {
 	modules.Register("cache", &Module{})
 }

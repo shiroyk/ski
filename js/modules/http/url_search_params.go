@@ -50,10 +50,8 @@ func (*NativeURLSearchParams) Exports() any {
 	}
 }
 
-// Global returns is it is a global module
-func (*NativeURLSearchParams) Global() bool {
-	return true
-}
+// Global it is a global module
+func (*NativeURLSearchParams) Global() {}
 
 // encode encodes the values into “URL encoded” form
 // ("bar=baz&foo=qux") sorted by key.

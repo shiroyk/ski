@@ -22,11 +22,6 @@ func (*Module) Exports() any {
 	return &Http{di.MustResolve[fetch.Fetch]()}
 }
 
-// Global returns is it is a global module
-func (*Module) Global() bool {
-	return false
-}
-
 func init() {
 	modules.Register("http", &Module{})
 	modules.Register("FormData", &NativeFormData{})

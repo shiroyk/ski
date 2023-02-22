@@ -18,11 +18,6 @@ func (*Module) Exports() any {
 	return &Cookie{di.MustResolve[cache.Cookie]()}
 }
 
-// Global returns is it is a global module
-func (*Module) Global() bool {
-	return false
-}
-
 func init() {
 	modules.Register("cookie", &Module{})
 }
