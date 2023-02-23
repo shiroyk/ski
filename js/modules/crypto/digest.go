@@ -17,6 +17,8 @@ import (
 	"golang.org/x/crypto/ripemd160"
 )
 
+// Copyright grafana/k6, licensed under the AGPL License.
+
 // RandomBytes returns random data of the given size.
 func RandomBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 	size := int(call.Argument(0).ToInteger())

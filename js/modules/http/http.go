@@ -9,9 +9,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
-	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
-	"github.com/spf13/cast"
 )
 
 // Module js module
@@ -67,6 +65,8 @@ func handleBody(body any, header map[string]string) (any, error) {
 	case URLSearchParams:
 		header["Content-Type"] = "application/x-www-form-url"
 		return data.encode(), nil
+	case goja.ArrayBuffer:
+		return data.Bytes(), nil
 	case []byte, map[string]any, string, nil:
 		return body, nil
 	default:
@@ -75,15 +75,13 @@ func handleBody(body any, header map[string]string) (any, error) {
 }
 
 // Get Make a GET request with URL and optional headers.
-func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	header := cast.ToStringMapString(call.Argument(1).Export())
-
-	res, err := h.fetch.Get(call.Argument(0).String(), header)
+func (h *Http) Get(u string, header map[string]string) (*Response, error) {
+	res, err := h.fetch.Get(u, header)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
-	return vm.ToValue(NewResponse(res))
+	return NewResponse(res), nil
 }
 
 // Post Make a POST request with URL, optional body, optional headers.
@@ -93,73 +91,68 @@ func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 // http.post(url, new URLSearchParams({'key': 'foo', 'value': 'bar'}))
 // Send POST with json:
 // http.post(url, {'key': 'foo'})
-func (h *Http) Post(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	u := call.Argument(0).String()
-	body, _ := common.Unwrap(call.Argument(1))
-	header := cast.ToStringMapString(call.Argument(2).Export())
+func (h *Http) Post(u string, body any, header map[string]string) (*Response, error) {
+	if header == nil {
+		header = make(map[string]string)
+	}
 
 	var err error
 	body, err = handleBody(body, header)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
 	res, err := h.fetch.Post(u, body, header)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
-	return vm.ToValue(NewResponse(res))
+	return NewResponse(res), nil
 }
 
 // Head Make a HEAD request with URL and optional headers.
-func (h *Http) Head(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	header := cast.ToStringMapString(call.Argument(1).Export())
-
-	res, err := h.fetch.Head(call.Argument(0).String(), header)
+func (h *Http) Head(u string, header map[string]string) (*Response, error) {
+	res, err := h.fetch.Head(u, header)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
-	return vm.ToValue(NewResponse(res))
+	return NewResponse(res), nil
 }
 
 // Request Make a request with method and URL, optional body, optional headers.
-func (h *Http) Request(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	method := call.Argument(0).String()
-	u := call.Argument(1).String()
-	body, _ := common.Unwrap(call.Argument(2))
-	header := cast.ToStringMapString(call.Argument(3).Export())
+func (h *Http) Request(method, u string, body any, header map[string]string) (*Response, error) {
+	if header == nil {
+		header = make(map[string]string)
+	}
 
 	var err error
 	body, err = handleBody(body, header)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
 	res, err := h.fetch.Request(method, u, body, header)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
-	return vm.ToValue(NewResponse(res))
+	return NewResponse(res), nil
 }
 
 // Template Make a request with an HTTP template, template argument.
-func (h *Http) Template(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	tpl := call.Argument(0).String()
-	arg := cast.ToStringMap(call.Argument(1).Export())
+func (h *Http) Template(tpl string, arg map[string]any) (*Response, error) {
 	funcs, _ := di.Resolve[template.FuncMap]()
 
 	req, err := fetch.NewTemplateRequest(funcs, tpl, arg)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
 	res, err := h.fetch.DoRequest(req)
 	if err != nil {
-		common.Throw(vm, err)
+		return nil, err
 	}
 
-	return vm.ToValue(NewResponse(res))
+	return NewResponse(res), nil
 }

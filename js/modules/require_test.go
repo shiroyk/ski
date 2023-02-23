@@ -11,12 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type testModule struct{}
+
+func (testModule) Exports() any {
+	return map[string]string{"key": "test"}
+}
+
 func TestRequire(t *testing.T) {
 	di.Provide(fetch.NewFetcher(fetch.Options{}), false)
 
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
 	EnableRequire(vm)
+	Register("test", &testModule{})
 
 	assertObject := vm.NewObject()
 	_ = assertObject.Set("equal", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
@@ -38,6 +45,9 @@ func TestRequire(t *testing.T) {
 	testCases := []struct {
 		script string
 	}{
+		{`const test = require("cloudcat/test");
+		 assert.equal(test.key, "test")`,
+		},
 		{`const lodash = require("https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js");
 		 assert.equal(lodash.VERSION, "4.17.21")`,
 		},

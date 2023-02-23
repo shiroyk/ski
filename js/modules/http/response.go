@@ -29,18 +29,25 @@ func NewResponse(res *fetch.Response) *Response {
 }
 
 // String body resolves with a string. The response is always decoded using UTF-8.
-func (r *Response) String(_ goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	return vm.ToValue(string(r.body))
+func (r *Response) String() string {
+	return string(r.body)
 }
 
 // Json parsing the body text as JSON.
-func (r *Response) Json(_ goja.FunctionCall, vm *goja.Runtime) goja.Value { //nolint:var-naming
+func (r *Response) Json() any { //nolint:var-naming
 	j := make(map[string]any)
 	_ = json.Unmarshal(r.body, &j)
-	return vm.ToValue(j)
+	return j
 }
 
 // Bytes returns an ArrayBuffer.
 func (r *Response) Bytes(_ goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return vm.ToValue(vm.NewArrayBuffer(r.body))
+}
+
+// JsonEncodable allows custom JSON encoding by JSON.stringify()
+func (r *Response) JsonEncodable() any {
+	j := make(map[string]any)
+	_ = json.Unmarshal(r.body, &j)
+	return j
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/di"
-	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
 )
 
@@ -29,11 +28,11 @@ type Cache struct {
 }
 
 // Get returns string.
-func (c *Cache) Get(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	if bytes, ok := c.cache.Get(call.Argument(0).String()); ok {
-		return vm.ToValue(string(bytes))
+func (c *Cache) Get(name string) string {
+	if bytes, ok := c.cache.Get(name); ok {
+		return string(bytes)
 	}
-	return
+	return ""
 }
 
 // GetBytes returns ArrayBuffer.
@@ -45,17 +44,12 @@ func (c *Cache) GetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Val
 }
 
 // Set saves string to the cache with key.
-func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	key := call.Argument(0).String()
-	value := call.Argument(1).String()
-	ddl := call.Argument(2)
-
+func (c *Cache) Set(key, value, ddl string) (err error) {
 	var timeout time.Duration
-	if !goja.IsUndefined(ddl) {
-		var err error
-		timeout, err = time.ParseDuration(ddl.String())
+	if ddl != "" {
+		timeout, err = time.ParseDuration(ddl)
 		if err != nil {
-			common.Throw(vm, err)
+			return
 		}
 	}
 
@@ -69,21 +63,16 @@ func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 }
 
 // SetBytes saves ArrayBuffer to the cache with key.
-func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	key := call.Argument(0).String()
-	buffer, ok := call.Argument(1).Export().(goja.ArrayBuffer)
-	ddl := call.Argument(2)
-
-	if !ok {
-		common.Throw(vm, fmt.Errorf("setBytes unsupport type %T", call.Argument(1).Export()))
-	}
-
+func (c *Cache) SetBytes(key string, value any, ddl string) (err error) {
 	var timeout time.Duration
-	if !goja.IsUndefined(ddl) {
-		var err error
-		timeout, err = time.ParseDuration(ddl.String())
+	buffer, ok := value.(goja.ArrayBuffer)
+	if !ok {
+		return fmt.Errorf("setBytes value type unsupport")
+	}
+	if ddl != "" {
+		timeout, err = time.ParseDuration(ddl)
 		if err != nil {
-			common.Throw(vm, err)
+			return
 		}
 	}
 
@@ -92,12 +81,11 @@ func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Val
 		return
 	}
 
-	c.cache.Set(call.Argument(0).String(), buffer.Bytes())
+	c.cache.Set(key, buffer.Bytes())
 	return
 }
 
 // Del removes key from the cache.
-func (c *Cache) Del(call goja.FunctionCall) (ret goja.Value) {
-	c.cache.Del(call.Argument(0).String())
-	return
+func (c *Cache) Del(key string) {
+	c.cache.Del(key)
 }

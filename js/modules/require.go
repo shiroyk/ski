@@ -17,9 +17,9 @@ import (
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/internal/ext"
-	"github.com/shiroyk/cloudcat/js/common"
 )
 
+// Copyright dop251/goja_nodejs, licensed under the MIT License.
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
 
@@ -44,29 +44,36 @@ type require struct {
 }
 
 // Require load a js module from path or URL
-func (r *require) Require(name string) goja.Value {
-	if e, ok := ext.Get(ext.JSExtension)[name]; ok {
-		if module, ok := e.Module.(Module); ok {
-			return r.vm.ToValue(module.Exports())
-		}
+func (r *require) Require(name string) (export goja.Value, err error) {
+	var module *goja.Object
+	switch {
+	case name == "":
+		err = ErrIllegalModuleName
+	case isHTTP(name):
+		module, err = r.resolveRemote(name)
+	case strings.HasPrefix(name, extPrefix):
+		return r.resolveNative(name)
+	default:
+		module, err = r.resolveFile(name)
 	}
-	module, err := r.resolve(name)
 	if err != nil {
-		common.Throw(r.vm, err)
+		return nil, err
 	}
-	return module.Get("exports")
+	return module.Get("exports"), nil
 }
 
-func (r *require) resolve(name string) (*goja.Object, error) {
-	if name == "" {
-		return nil, ErrIllegalModuleName
+func (r *require) resolveNative(name string) (*goja.Object, error) {
+	if native, ok := r.modules[name]; ok {
+		return native, nil
 	}
-
-	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
-		return r.resolveRemote(name)
+	if e, ok := ext.Get(ext.JSExtension)[name]; ok {
+		if module, ok := e.Module.(Module); ok {
+			mod := r.vm.ToValue(module.Exports()).ToObject(r.vm)
+			r.modules[name] = mod
+			return mod, nil
+		}
 	}
-
-	return r.resolveFile(name)
+	return nil, ErrIllegalModuleName
 }
 
 func (r *require) resolveFile(modPath string) (module *goja.Object, err error) {

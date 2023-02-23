@@ -16,6 +16,7 @@ type FileData struct {
 
 // FormData provides a way to construct a set of key/value pairs representing form fields and their values.
 // which can be sent using the http() method and encoding type were set to "multipart/form-data".
+// Implement the https://developer.mozilla.org/en-US/docs/Web/API/FormData
 type FormData struct {
 	data map[string][]any
 }
@@ -65,16 +66,10 @@ func (*NativeFormData) Global() {}
 
 // Append method of the FormData interface appends a new value onto an existing key inside a FormData object,
 // or adds the key if it does not already exist.
-func (f *FormData) Append(call goja.FunctionCall) (ret goja.Value) {
-	name := call.Argument(0).String()
-	value := call.Argument(1).Export()
-	var filename string
-
-	if goja.IsUndefined(call.Argument(2)) {
+func (f *FormData) Append(name string, value any, filename string) (ret goja.Value) {
+	if filename == "" {
 		// Default filename "blob".
 		filename = "blob"
-	} else {
-		filename = call.Argument(2).String()
 	}
 
 	var ele []any
@@ -99,64 +94,56 @@ func (f *FormData) Append(call goja.FunctionCall) (ret goja.Value) {
 }
 
 // Delete method of the FormData interface deletes a key and its value(s) from a FormData object.
-func (f *FormData) Delete(call goja.FunctionCall) (ret goja.Value) {
-	delete(f.data, call.Argument(0).String())
-	return
+func (f *FormData) Delete(name string) {
+	delete(f.data, name)
 }
 
 // Entries method returns an iterator which iterates through all key/value pairs contained in the FormData.
-func (f *FormData) Entries(_ goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (f *FormData) Entries() any {
 	entries := make([][2]any, 0, len(f.data))
 	for k, v := range f.data {
 		entries = append(entries, [2]any{k, v})
 	}
-	return vm.ToValue(entries)
+	return entries
 }
 
 // Get method of the FormData interface returns the first value associated
 // with a given key from within a FormData object.
 // If you expect multiple values and want all of them, use the getAll() method instead.
-func (f *FormData) Get(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	if v, ok := f.data[call.Argument(0).String()]; ok {
-		return vm.ToValue(v[0])
+func (f *FormData) Get(name string) any {
+	if v, ok := f.data[name]; ok {
+		return v[0]
 	}
-	return
+	return nil
 }
 
 // GetAll method of the FormData interface returns all the values associated
 // with a given key from within a FormData object.
-func (f *FormData) GetAll(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	if v, ok := f.data[call.Argument(0).String()]; ok {
-		return vm.ToValue(v)
+func (f *FormData) GetAll(name string) any {
+	v, ok := f.data[name]
+	if ok {
+		return v
 	}
-	return vm.ToValue([0]any{})
+	return [0]any{}
 }
 
 // Has method of the FormData interface returns whether a FormData object contains a certain key.
-func (f *FormData) Has(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	if _, ok := f.data[call.Argument(0).String()]; ok {
-		return vm.ToValue(true)
-	}
-	return vm.ToValue(false)
+func (f *FormData) Has(name string) bool {
+	_, ok := f.data[name]
+	return ok
 }
 
 // Keys method returns an iterator which iterates through all keys contained in the FormData.
 // The keys are strings.
-func (f *FormData) Keys(_ goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	return vm.ToValue(maps.Keys(f.data))
+func (f *FormData) Keys() any {
+	return maps.Keys(f.data)
 }
 
 // Set method of the FormData interface sets a new value for an existing key inside a FormData object,
 // or adds the key/value if it does not already exist.
-func (f *FormData) Set(call goja.FunctionCall) (ret goja.Value) {
-	name := call.Argument(0).String()
-	value := call.Argument(1).Export()
-
-	var filename string
-	if goja.IsUndefined(call.Argument(2)) {
+func (f *FormData) Set(name string, value any, filename string) {
+	if filename == "" {
 		filename = "blob"
-	} else {
-		filename = call.Argument(2).String()
 	}
 
 	switch v := value.(type) {
@@ -170,11 +157,9 @@ func (f *FormData) Set(call goja.FunctionCall) (ret goja.Value) {
 	default:
 		f.data[name] = []any{fmt.Sprintf("%v", v)}
 	}
-
-	return
 }
 
 // Values method returns an iterator which iterates through all values contained in the FormData.
-func (f *FormData) Values(_ goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	return vm.ToValue(maps.Values(f.data))
+func (f *FormData) Values() any {
+	return maps.Values(f.data)
 }
