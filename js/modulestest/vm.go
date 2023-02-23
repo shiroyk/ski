@@ -25,6 +25,11 @@ func (vm *VM) Run(_ context.Context, program common.Program) (goja.Value, error)
 	return vm.vm.RunString(program.Code)
 }
 
+// Runtime returns the runtime
+func (vm *VM) Runtime() *goja.Runtime {
+	return vm.vm
+}
+
 // New returns a test VM instance
 func New(t *testing.T) *VM {
 	vm := goja.New()
