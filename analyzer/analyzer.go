@@ -7,7 +7,6 @@ import (
 
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
-	"golang.org/x/exp/slog"
 )
 
 var formatter atomic.Value
@@ -71,14 +70,14 @@ func analyzeString(
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
 			return
 		}
-		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", ret))
+		ctx.Logger().Debug("parse", "path", path, "result", ret)
 	} else {
 		ret, err = s.Rule.GetString(ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
 			return
 		}
-		ctx.Logger().Debug("parse", slog.String("path", path), slog.Any("result", ret))
+		ctx.Logger().Debug("parse", "path", path, "result", ret)
 
 		if s.Type != schema.StringType {
 			ret, err = GetFormatter().Format(ret, s.Type)
@@ -87,7 +86,7 @@ func analyzeString(
 					path, ret, s.Format), err)
 				return
 			}
-			ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", ret))
+			ctx.Logger().Debug("format", "path", path, "result", ret)
 		}
 	}
 
@@ -98,7 +97,7 @@ func analyzeString(
 				path, ret, s.Format), err)
 			return
 		}
-		ctx.Logger().Debug("format", slog.String("path", path), slog.Any("result", ret))
+		ctx.Logger().Debug("format", "path", path, "result", ret)
 	}
 
 	return
@@ -184,6 +183,7 @@ func analyzeInit(
 			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), err)
 			return
 		}
+		ctx.Logger().Debug("init", "path", path, "result", len(elements))
 		return elements
 	}
 
@@ -192,5 +192,6 @@ func analyzeInit(
 		ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), err)
 		return
 	}
+	ctx.Logger().Debug("init", "path", path, "result", 1)
 	return []string{element}
 }
