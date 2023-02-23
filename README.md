@@ -40,7 +40,7 @@ schema:
             regex: /[^\d]/
 EOF
 
-cloudcat -m HackerNews.yaml
+cloudcat run -m HackerNews.yaml
 ```
 ## Documentation
 See [Wiki](https://github.com/shiroyk/cloudcat/wiki)
