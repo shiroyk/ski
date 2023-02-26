@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
@@ -134,7 +135,7 @@ func newResponseHandler(res *echo.Response, l slog.Leveler) *responseHandler {
 
 // Enabled reports whether the handler handles records at the given level.
 // The handler ignores records whose level is lower.
-func (c *responseHandler) Enabled(l slog.Level) bool {
+func (c *responseHandler) Enabled(_ context.Context, l slog.Level) bool {
 	minLevel := slog.LevelInfo
 	if c.level != nil {
 		minLevel = c.level.Level()
@@ -172,7 +173,7 @@ func (c *responseHandler) WithGroup(name string) slog.Handler {
 
 // Handle formats its argument Record as single line.
 // Each call to Handle results in a single serialized call to io.Writer.Write.
-func (c *responseHandler) Handle(r slog.Record) (err error) {
+func (c *responseHandler) Handle(_ context.Context, r slog.Record) (err error) {
 	data := make(map[string]any, r.NumAttrs()+3)
 	data["level"] = r.Level.String()
 	data["msg"] = r.Message

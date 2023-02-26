@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -49,7 +50,7 @@ func NewConsoleHandler(l slog.Leveler) *ConsoleHandler {
 
 // Enabled reports whether the handler handles records at the given level.
 // The handler ignores records whose level is lower.
-func (c *ConsoleHandler) Enabled(l slog.Level) bool {
+func (c *ConsoleHandler) Enabled(_ context.Context, l slog.Level) bool {
 	minLevel := slog.LevelInfo
 	if c.level != nil {
 		minLevel = c.level.Level()
@@ -97,7 +98,7 @@ func (c *ConsoleHandler) WithGroup(name string) slog.Handler {
 // and the value of [Level.String] is output.
 //
 // Each call to Handle results in a single serialized call to io.Writer.Write.
-func (c *ConsoleHandler) Handle(r slog.Record) (err error) {
+func (c *ConsoleHandler) Handle(_ context.Context, r slog.Record) (err error) {
 	time := ""
 	if !r.Time.IsZero() {
 		time = r.Time.Format("15:04:05.000")

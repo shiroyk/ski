@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 
 	"golang.org/x/exp/slog"
@@ -8,7 +9,7 @@ import (
 
 // Logf calls on the default logger.
 func Logf(level slog.Level, format string, args ...any) {
-	slog.Log(level, fmt.Sprintf(format, args...))
+	slog.Log(context.Background(), level, fmt.Sprintf(format, args...))
 }
 
 // Debugf calls LevelDebug on the default logger.

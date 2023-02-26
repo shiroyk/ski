@@ -1,6 +1,8 @@
 package console
 
 import (
+	"context"
+
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
@@ -28,7 +30,7 @@ func init() {
 type Console struct{}
 
 func (c *Console) log(level slog.Level, call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	slog.Log(level, common.Format(call, vm).String())
+	slog.Log(context.Background(), level, common.Format(call, vm).String())
 	return goja.Undefined()
 }
 
