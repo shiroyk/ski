@@ -6,11 +6,10 @@ import (
 
 // Source the Model source
 type Source struct {
-	Name    string            `yaml:"name"`
-	URL     string            `yaml:"url"`
-	Proxy   []string          `yaml:"proxy"`
-	Timeout time.Duration     `yaml:"timeout"`
-	Header  map[string]string `yaml:"header"`
+	Name    string        `yaml:"name"`
+	HTTP    string        `yaml:"http"`
+	Proxy   []string      `yaml:"proxy"`
+	Timeout time.Duration `yaml:"timeout"`
 }
 
 // Model the model

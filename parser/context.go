@@ -32,6 +32,7 @@ type Context struct {
 
 // Options The Context options
 type Options struct {
+	Parent  context.Context
 	Timeout time.Duration
 	Logger  *slog.Logger
 	URL     string
@@ -40,6 +41,15 @@ type Options struct {
 // NewContext creates a new Context with Options
 func NewContext(opt Options) *Context {
 	d := time.Now().Add(utils.ZeroOr(opt.Timeout, DefaultTimeout))
+	if opt.Parent != nil {
+		p, ok := opt.Parent.Deadline()
+		if ok {
+			// parent deadline
+			if d.After(p) {
+				d = p
+			}
+		}
+	}
 	if opt.Logger == nil {
 		opt.Logger = slog.Default()
 	}

@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/js"
-	"github.com/shiroyk/cloudcat/lib"
+	"github.com/shiroyk/cloudcat/lib/config"
 	"github.com/shiroyk/cloudcat/lib/logger"
 )
 
@@ -17,17 +19,18 @@ func init() {
 }
 
 func initConfig() {
-	config, err := lib.ReadConfig(configPath)
+	cfg, err := config.ReadConfig(configPath)
 	if err != nil {
 		logger.Error("error reading config file", err)
 	}
-	err = initDependencies(*config)
+	err = initDependencies(*cfg)
 	if err != nil {
 		logger.Error("error initializing dependencies", err)
 	}
+	rootCmd.SetContext(config.NewContext(context.Background(), *cfg))
 }
 
-func initDependencies(config lib.Config) error {
+func initDependencies(config config.Config) error {
 	di.Provide(fetch.NewFetcher(config.Fetch), false)
 	di.Provide(fetch.DefaultTemplateFuncMap(), false)
 

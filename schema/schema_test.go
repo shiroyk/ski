@@ -139,10 +139,10 @@ body:
 func TestSourceYaml(t *testing.T) {
 	s := `source:
   name: test
-  url: http://localhost
-  timeout: 60s
-  header:
+  http: |
+    http://localhost
     user-agent: cloudcat
+  timeout: 60s
 `
 	model := new(Model)
 	err := yaml.Unmarshal([]byte(s), model)
@@ -152,10 +152,7 @@ func TestSourceYaml(t *testing.T) {
 
 	assert.Equal(t, Source{
 		Name:    "test",
-		URL:     "http://localhost",
+		HTTP:    "http://localhost\nuser-agent: cloudcat\n",
 		Timeout: time.Minute,
-		Header: map[string]string{
-			"user-agent": "cloudcat",
-		},
 	}, *model.Source)
 }

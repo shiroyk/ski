@@ -47,7 +47,7 @@ func run(path, output string) (err error) {
 	}
 
 	fetcher := di.MustResolve[fetch.Fetch]()
-	req, err := fetch.NewTemplateRequest(nil, model.Source.URL, nil)
+	req, err := fetch.NewTemplateRequest(nil, model.Source.HTTP, nil)
 	req.Proxy = model.Source.Proxy
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func run(path, output string) (err error) {
 	ctx := parser.NewContext(parser.Options{
 		Timeout: model.Source.Timeout,
 		Logger:  slog.New(log),
-		URL:     model.Source.URL,
+		URL:     model.Source.HTTP,
 	})
 	defer ctx.Cancel()
 

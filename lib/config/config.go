@@ -1,11 +1,13 @@
-package lib
+package config
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 
+	"github.com/shiroyk/cloudcat/api"
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/fetch"
@@ -14,8 +16,27 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type configKey struct{}
+
+// NewContext returns a context that contains the given Config.
+func NewContext(ctx context.Context, config Config) context.Context {
+	return context.WithValue(ctx, configKey{}, config)
+}
+
+// FromContext returns the Config stored in ctx by NewContext, or the default
+// Config if there is none.
+func FromContext(ctx context.Context) Config {
+	if config, ok := ctx.Value(configKey{}).(Config); ok {
+		return config
+	}
+	return *DefaultConfig()
+}
+
 // Config The cloudcat configuration
 type Config struct {
+	// Api
+	Api api.Options `yaml:"api"`
+
 	// Cache
 	Cache cache.Options `yaml:"cache"`
 
@@ -29,6 +50,10 @@ type Config struct {
 // DefaultConfig The default configuration
 func DefaultConfig() *Config {
 	return &Config{
+		Api: api.Options{
+			Timeout: api.DefaultTimeout,
+			Address: api.DefaultAddress,
+		},
 		Cache: cache.Options{
 			Path: bolt.DefaultPath,
 		},
@@ -49,7 +74,7 @@ func DefaultConfig() *Config {
 }
 
 // ReadConfig read configuration from the file.
-// if the configuration file is not existing then create it with default configuration
+// If the configuration file is not existing then create it with default configuration.
 func ReadConfig(path string) (config *Config, err error) {
 	file, err := utils.ExpandPath(path)
 	if err != nil {
