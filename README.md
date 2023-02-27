@@ -9,7 +9,7 @@
 cat << EOF > HackerNews.yaml
 source:
   name: HackerNews
-  url: https://news.ycombinator.com/best
+  http: https://news.ycombinator.com/best
   timeout: 60s
 schema:
   stories:
