@@ -18,9 +18,7 @@ func (*Module) Exports() any {
 }
 
 // Global returns is it is a global module
-func (*Module) Global() bool {
-	return true
-}
+func (*Module) Global() {}
 
 func init() {
 	modules.Register("console", &Module{})

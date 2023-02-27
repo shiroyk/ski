@@ -8,6 +8,7 @@ import (
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/js/modules"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/slog"
 )
 
 // VM test vm
@@ -51,6 +52,12 @@ func New(t *testing.T) *VM {
 	})
 	_ = assertObject.Set("true", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 		return vm.ToValue(assert.True(t, call.Argument(0).ToBoolean(), call.Argument(2).String()))
+	})
+
+	consoleObject := vm.NewObject()
+	_ = consoleObject.Set("log", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+		slog.Info(common.Format(call, vm).String())
+		return
 	})
 
 	_ = vm.Set("assert", assertObject)
