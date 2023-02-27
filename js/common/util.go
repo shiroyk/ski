@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
+	"github.com/spf13/cast"
 )
 
 // Throw js exception
@@ -26,6 +27,22 @@ func ToBytes(data any) ([]byte, error) {
 		return dt.Bytes(), nil
 	default:
 		return nil, fmt.Errorf("invalid type %T, expected string, []byte or ArrayBuffer", data)
+	}
+}
+
+// ToStrings tries to return a string slice or string from compatible types.
+func ToStrings(data any) (s any, err error) {
+	switch dt := data.(type) {
+	case string:
+		return dt, nil
+	case []string:
+		return dt, nil
+	case []any:
+		return cast.ToStringSliceE(dt)
+	case goja.ArrayBuffer:
+		return string(dt.Bytes()), nil
+	default:
+		return nil, fmt.Errorf("invalid type %T, expected string, string array or ArrayBuffer", data)
 	}
 }
 

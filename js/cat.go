@@ -1,6 +1,8 @@
 package js
 
 import (
+	"fmt"
+
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/shiroyk/cloudcat/parser"
@@ -30,88 +32,78 @@ func (c *Cat) GetVar(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 }
 
 // SetVar value associated with key is val.
-func (c *Cat) SetVar(call goja.FunctionCall) (ret goja.Value) {
-	c.ctx.SetValue(call.Argument(0).String(), call.Argument(1).Export())
-	return
+func (c *Cat) SetVar(key string, value goja.Value) error {
+	v, err := common.Unwrap(value)
+	if err != nil {
+		return err
+	}
+	c.ctx.SetValue(key, v)
+	return nil
 }
 
 // ClearVar clean all values
-func (c *Cat) ClearVar(_ goja.FunctionCall) (ret goja.Value) {
+func (c *Cat) ClearVar() {
 	c.ctx.ClearValue()
-	return
 }
 
 // Cancel this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this Context complete.
-func (c *Cat) Cancel(_ goja.FunctionCall) (ret goja.Value) {
+func (c *Cat) Cancel() {
 	c.ctx.Cancel()
-	return
 }
 
 // GetString gets the string of the content with the given arguments
-func (c *Cat) GetString(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	key := call.Argument(0).String()
-	content := call.Argument(1).String()
-	arg := call.Argument(2).String()
-
-	if p, ok := parser.GetParser(key); ok {
-		str, err := p.GetString(c.ctx, content, arg)
-		if err != nil {
-			common.Throw(vm, err)
-		}
-		return vm.ToValue(str)
+func (c *Cat) GetString(key string, value any, arg string) (str string, err error) {
+	content, err := common.ToStrings(value)
+	if err != nil {
+		return
 	}
 
-	return
+	if p, ok := parser.GetParser(key); ok {
+		return p.GetString(c.ctx, content, arg)
+	}
+
+	return str, fmt.Errorf("parser %s not found", key)
 }
 
 // GetStrings gets the string of the content with the given arguments
-func (c *Cat) GetStrings(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	key := call.Argument(0).String()
-	content := call.Argument(1).String()
-	arg := call.Argument(2).String()
-
-	if p, ok := parser.GetParser(key); ok {
-		str, err := p.GetStrings(c.ctx, content, arg)
-		if err != nil {
-			common.Throw(vm, err)
-		}
-		return vm.ToValue(str)
+func (c *Cat) GetStrings(key string, value any, arg string) (str []string, err error) {
+	content, err := common.ToStrings(value)
+	if err != nil {
+		return
 	}
 
-	return
+	if p, ok := parser.GetParser(key); ok {
+		return p.GetStrings(c.ctx, content, arg)
+	}
+
+	return str, fmt.Errorf("parser %s not found", key)
 }
 
 // GetElement gets the string of the content with the given arguments
-func (c *Cat) GetElement(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	key := call.Argument(0).String()
-	content := call.Argument(1).String()
-	arg := call.Argument(2).String()
-
-	if p, ok := parser.GetParser(key); ok {
-		str, err := p.GetElement(c.ctx, content, arg)
-		if err != nil {
-			common.Throw(vm, err)
-		}
-		return vm.ToValue(str)
+func (c *Cat) GetElement(key string, value any, arg string) (str string, err error) {
+	content, err := common.ToStrings(value)
+	if err != nil {
+		return
 	}
 
-	return
+	if p, ok := parser.GetParser(key); ok {
+		return p.GetElement(c.ctx, content, arg)
+	}
+
+	return str, fmt.Errorf("parser %s not found", key)
 }
 
 // GetElements gets the string of the content with the given arguments
-func (c *Cat) GetElements(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	key := call.Argument(0).String()
-	content := call.Argument(1).String()
-	arg := call.Argument(2).String()
-
-	if p, ok := parser.GetParser(key); ok {
-		str, err := p.GetElements(c.ctx, content, arg)
-		if err != nil {
-			common.Throw(vm, err)
-		}
-		return vm.ToValue(str)
+func (c *Cat) GetElements(key string, value any, arg string) (str []string, err error) {
+	content, err := common.ToStrings(value)
+	if err != nil {
+		return
 	}
 
-	return
+	if p, ok := parser.GetParser(key); ok {
+		return p.GetElements(c.ctx, content, arg)
+	}
+
+	return str, fmt.Errorf("parser %s not found", key)
 }

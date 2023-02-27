@@ -17,12 +17,11 @@ func (t *testParser) GetString(_ *parser.Context, content any, arg string) (stri
 	return "", fmt.Errorf("type not supported")
 }
 
-func (t *testParser) GetStrings(ctx *parser.Context, content any, arg string) ([]string, error) {
-	str, err := t.GetString(ctx, content, arg)
-	if err != nil {
-		return nil, err
+func (t *testParser) GetStrings(_ *parser.Context, content any, arg string) ([]string, error) {
+	if str, ok := content.([]string); ok {
+		return append(str, arg), nil
 	}
-	return []string{str}, nil
+	return nil, fmt.Errorf("type not supported")
 }
 
 func (t *testParser) GetElement(ctx *parser.Context, content any, arg string) (string, error) {
@@ -51,9 +50,9 @@ func TestCat(t *testing.T) {
 		`cat.clearVar()
 		 if (cat.getVar('v1')) throw ("variable should be cleared");`,
 		`if (cat.getString('test', 'foo', '1') !== 'foo1') throw ("unexpect result");`,
-		`if (cat.getStrings('test', 'foo', '2')[0] !== 'foo2') throw ("unexpect result");`,
+		`if (cat.getStrings('test', ['foo'], '2')[1] !== '2') throw ("unexpect result");`,
 		`if (cat.getElement('test', 'foo', '3') !== 'foo3') throw ("unexpect result");`,
-		`if (cat.getElements('test', 'foo', '4')[0] !== 'foo4') throw ("unexpect result");`,
+		`if (cat.getElements('test', ['foo'], '4')[1] !== '4') throw ("unexpect result");`,
 	}
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
