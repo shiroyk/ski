@@ -2,17 +2,26 @@ package fetch
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync/atomic"
 
 	"github.com/shiroyk/cloudcat/lib/logger"
+	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 type proxyURLKey int
 
+var (
+	proxyMap = utils.NewLRUCache[string, roundRobinProxy](128)
+)
+
 type roundRobinProxy struct {
 	proxyURLs []*url.URL
+	hash      string
 	index     uint32
 }
 
@@ -26,16 +35,18 @@ func (r *roundRobinProxy) getProxy(pr *http.Request) (*url.URL, error) {
 	return u, nil
 }
 
-// RoundRobinCacheProxy creates a cache proxy switcher function which rotates
-// ProxyURLs on specific request.
+// AddRoundRobinProxy add the proxy URLs for the specified URL.
 // The proxy type is determined by the URL scheme. "http", "https"
 // and "socks5" are supported. If the scheme is empty,
 // "http" is assumed.
-func RoundRobinCacheProxy(proxyURLs ...string) func(*http.Request) (*url.URL, error) {
-	if len(proxyURLs) == 0 {
-		return http.ProxyFromEnvironment
+func AddRoundRobinProxy(u string, proxyURLs ...string) {
+	sum := sha256.Sum256([]byte(strings.Join(proxyURLs, "")))
+	hash := hex.EncodeToString(sum[:])
+	if p, ok := proxyMap.Get(u); ok {
+		if p.hash == hash {
+			return
+		}
 	}
-
 	parsedProxyURLs := make([]*url.URL, len(proxyURLs))
 	for i, pu := range proxyURLs {
 		parsedURL, err := url.Parse(pu)
@@ -45,5 +56,13 @@ func RoundRobinCacheProxy(proxyURLs ...string) func(*http.Request) (*url.URL, er
 		parsedProxyURLs[i] = parsedURL
 	}
 
-	return (&roundRobinProxy{parsedProxyURLs, 0}).getProxy
+	proxyMap.Add(u, roundRobinProxy{parsedProxyURLs, hash, 0})
+}
+
+// RoundRobinProxy returns a proxy URL on specific request.
+func RoundRobinProxy(req *http.Request) (*url.URL, error) {
+	if p, ok := proxyMap.Get(req.URL.String()); ok {
+		return p.getProxy(req)
+	}
+	return http.ProxyFromEnvironment(req)
 }

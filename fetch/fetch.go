@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -70,12 +71,13 @@ var (
 
 // Options The Fetch instance options
 type Options struct {
-	CharsetDetectDisabled bool          `yaml:"charset-detect-disabled"`
-	MaxBodySize           int64         `yaml:"max-body-size"`
-	RetryTimes            int           `yaml:"retry-times"`
-	RetryHTTPCodes        []int         `yaml:"retry-http-codes"`
-	Timeout               time.Duration `yaml:"timeout"`
-	CachePolicy           cache.Policy  `yaml:"cache-policy"`
+	CharsetDetectDisabled bool                                  `yaml:"charset-detect-disabled"`
+	MaxBodySize           int64                                 `yaml:"max-body-size"`
+	RetryTimes            int                                   `yaml:"retry-times"`
+	RetryHTTPCodes        []int                                 `yaml:"retry-http-codes"`
+	Timeout               time.Duration                         `yaml:"timeout"`
+	CachePolicy           cache.Policy                          `yaml:"cache-policy"`
+	ProxyFunc             func(*http.Request) (*url.URL, error) `yaml:"-"`
 }
 
 // NewFetcher returns a new Fetch instance
@@ -88,7 +90,13 @@ func NewFetcher(opt Options) Fetch {
 	fetch.retryTimes = utils.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
 	fetch.retryHTTPCodes = utils.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
+	proxy := opt.ProxyFunc
+	if proxy == nil {
+		proxy = RoundRobinProxy
+	}
+
 	var transport http.RoundTripper = &http.Transport{
+		Proxy: proxy,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -146,18 +154,8 @@ func (f *fetcher) Request(method, url string, body any, headers map[string]strin
 
 // DoRequest sends a fetch.Request and returns an HTTP response.
 func (f *fetcher) DoRequest(req *Request) (*Response, error) {
-	f.setProxy(req)
+	AddRoundRobinProxy(req.URL.String(), req.Proxy...)
 	return f.doRequestRetry(req)
-}
-
-// setProxy sets the proxy
-func (f *fetcher) setProxy(req *Request) {
-	switch tp := f.Transport.(type) {
-	case *cache.Transport:
-		tp.SetProxy(RoundRobinCacheProxy(req.Proxy...))
-	case *http.Transport:
-		tp.Proxy = RoundRobinCacheProxy(req.Proxy...)
-	}
 }
 
 func (f *fetcher) doRequestRetry(req *Request) (*Response, error) {
