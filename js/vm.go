@@ -45,7 +45,7 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 	vm.runtime.ClearInterrupt()
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Errorf("vm run error %v %v", r, debug.Stack())
+			logger.Errorf("vm run error %v %s", r, debug.Stack())
 		}
 
 		vm.done <- struct{}{} // End of run

@@ -13,7 +13,6 @@ import (
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/lib/utils"
-	"gopkg.in/yaml.v3"
 )
 
 type configKey struct{}
@@ -29,7 +28,7 @@ func FromContext(ctx context.Context) Config {
 	if config, ok := ctx.Value(configKey{}).(Config); ok {
 		return config
 	}
-	return *DefaultConfig()
+	return DefaultConfig()
 }
 
 // Config The cloudcat configuration
@@ -48,8 +47,8 @@ type Config struct {
 }
 
 // DefaultConfig The default configuration
-func DefaultConfig() *Config {
-	return &Config{
+func DefaultConfig() Config {
+	return Config{
 		Api: api.Options{
 			Timeout: api.DefaultTimeout,
 			Address: api.DefaultAddress,
@@ -75,27 +74,18 @@ func DefaultConfig() *Config {
 
 // ReadConfig read configuration from the file.
 // If the configuration file is not existing then create it with default configuration.
-func ReadConfig(path string) (config *Config, err error) {
+func ReadConfig(path string) (config Config, err error) {
 	file, err := utils.ExpandPath(path)
 	if err != nil {
-		return nil, err
+		return config, err
 	}
 	path = filepath.Dir(file)
 	if _, err = os.Stat(file); errors.Is(err, os.ErrNotExist) {
 		err = os.MkdirAll(path, os.ModePerm)
 		if err != nil {
-			return nil, err
+			return config, err
 		}
-		config = DefaultConfig()
-		bytes, err := yaml.Marshal(config)
-		if err != nil {
-			return nil, err
-		}
-		err = os.WriteFile(file, bytes, 0644)
-		if err != nil {
-			return nil, err
-		}
-		return config, nil
+		return DefaultConfig(), nil
 	}
 
 	return utils.ReadYaml[Config](file)

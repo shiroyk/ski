@@ -53,15 +53,14 @@ func ExpandPath(path string) (string, error) {
 }
 
 // ReadYaml read the YAML file and convert it to T
-func ReadYaml[T any](path string) (t *T, err error) {
+func ReadYaml[T any](path string) (t T, err error) {
 	path, err = ExpandPath(path)
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return
 	}
 
-	t = new(T)
-	err = yaml.Unmarshal(bytes, t)
+	err = yaml.Unmarshal(bytes, &t)
 	if err != nil {
 		return
 	}
