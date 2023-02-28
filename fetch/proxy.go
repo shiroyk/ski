@@ -40,6 +40,9 @@ func (r *roundRobinProxy) getProxy(pr *http.Request) (*url.URL, error) {
 // and "socks5" are supported. If the scheme is empty,
 // "http" is assumed.
 func AddRoundRobinProxy(u string, proxyURLs ...string) {
+	if len(proxyURLs) == 0 {
+		return
+	}
 	sum := sha256.Sum256([]byte(strings.Join(proxyURLs, "")))
 	hash := hex.EncodeToString(sum[:])
 	if p, ok := proxyMap.Get(u); ok {
