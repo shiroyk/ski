@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,31 +14,26 @@ func TestVM(t *testing.T) {
 	vm := newVM(false, nil)
 
 	testCases := []struct {
-		script, want string
-		isErr        bool
+		script string
+		want   any
 	}{
-		{"return 1", "1", true},
-		{"2", "2", false},
-		{"a = 1; a + 2", "3", false},
-		{"(() => 4)()", "4", false},
-		{"[5]", "5", false},
-		{"a = {'key':6}; a", "[object Object]", false},
-		{"JSON.stringify({'key':7})", `{"key":7}`, false},
-		{"JSON.stringify([8])", `[8]`, false},
-		{"(async () => 9)()", `[object Promise]`, false},
+		{"2", 2},
+		{"a = 1; a + 2", 3},
+		{"(() => 4)()", 4},
+		{"[5]", []any{int64(5)}},
+		{"a = {'key':'foo'}; a", map[string]any{"key": "foo"}},
+		{"JSON.stringify({'key':7})", `{"key":7}`},
+		{"JSON.stringify([8])", `[8]`},
+		{"(async () => 9)()", 9},
 	}
 
 	for _, c := range testCases {
 		t.Run(c.script, func(t *testing.T) {
 			v, err := vm.RunString(context.Background(), c.script)
-			if err != nil {
-				if c.isErr {
-					return
-				}
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, c.want, v.String())
+			assert.NoError(t, err)
+			vv, err := common.Unwrap(v)
+			assert.NoError(t, err)
+			assert.EqualValues(t, c.want, vv)
 		})
 	}
 }

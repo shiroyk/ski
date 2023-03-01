@@ -19,15 +19,15 @@ const (
 
 // Context The Parser context
 type Context struct {
-	mu                   sync.Mutex  // protects following fields
-	timer                *time.Timer // Under Context.mu.
-	deadline             time.Time
-	done                 atomic.Value // of chan struct{}, created lazily, closed by first cancel call
-	err                  error        // set to non-nil by the first cancel call
-	cancelFunc           context.CancelFunc
-	opt                  Options
-	value                *sync.Map
-	baseURL, redirectURL string
+	mu           sync.Mutex  // protects following fields
+	timer        *time.Timer // Under Context.mu.
+	deadline     time.Time
+	done         atomic.Value // of chan struct{}, created lazily, closed by first cancel call
+	err          error        // set to non-nil by the first cancel call
+	cancelFunc   context.CancelFunc
+	opt          Options
+	value        *sync.Map
+	baseURL, url string
 }
 
 // Options The Context options
@@ -41,15 +41,6 @@ type Options struct {
 // NewContext creates a new Context with Options
 func NewContext(opt Options) *Context {
 	d := time.Now().Add(utils.ZeroOr(opt.Timeout, DefaultTimeout))
-	if opt.Parent != nil {
-		p, ok := opt.Parent.Deadline()
-		if ok {
-			// parent deadline
-			if d.After(p) {
-				d = p
-			}
-		}
-	}
 	if opt.Logger == nil {
 		opt.Logger = slog.Default()
 	}
@@ -58,15 +49,18 @@ func NewContext(opt Options) *Context {
 		value:    new(sync.Map),
 		opt:      opt,
 	}
+	propagateCancel(opt.Parent, c)
 	dur := time.Until(d)
 	if dur <= 0 {
 		c.cancel(context.DeadlineExceeded) // deadline has already passed
 		c.cancelFunc = func() { c.cancel(context.Canceled) }
 		return c
 	}
-	c.redirectURL = opt.URL
-	if u, err := url.Parse(c.redirectURL); err == nil {
-		c.baseURL = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+	if opt.URL != "" {
+		c.url = opt.URL
+		if u, err := url.Parse(c.url); err == nil {
+			c.baseURL = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+		}
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -169,7 +163,30 @@ func (c *Context) Value(key any) any {
 	if v, ok := c.value.Load(key); ok {
 		return v
 	}
+	if c.opt.Parent != nil {
+		return c.opt.Parent.Value(key)
+	}
 	return nil
+}
+
+// propagateCancel arranges for child to be canceled when parent is.
+func propagateCancel(parent context.Context, child *Context) {
+	if parent == nil {
+		return
+	}
+	done := parent.Done()
+	if done == nil {
+		return // parent is never canceled
+	}
+
+	go func() {
+		select {
+		case <-done:
+			// parent is already canceled
+			child.cancel(parent.Err())
+			return
+		}
+	}()
 }
 
 // GetValue returns the value associated with this context for key, or nil
@@ -189,12 +206,12 @@ func (c *Context) Logger() *slog.Logger {
 	return c.opt.Logger
 }
 
-// BaseURL returns the base URL string
+// BaseURL returns the baseURL string
 func (c *Context) BaseURL() string {
 	return c.baseURL
 }
 
-// RedirectURL returns the redirect URL string
-func (c *Context) RedirectURL() string {
-	return c.redirectURL
+// URL returns the absolute URL string
+func (c *Context) URL() string {
+	return c.url
 }

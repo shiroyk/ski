@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"context"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ func TestContext(t *testing.T) {
 		Logger:  slog.Default(),
 		Timeout: time.Second,
 	})
+	defer ctx.Cancel()
 	if _, ok := ctx.Deadline(); !ok {
 		t.Error("deadline not set")
 	}
@@ -32,24 +35,31 @@ func TestContext(t *testing.T) {
 	if _, ok := ctx.GetValue(key); ok {
 		t.Error("value not clear")
 	}
-	if ctx.Logger() == nil {
-		t.Error("context logger not set")
-	}
-	if ctx.BaseURL() == "" {
-		t.Error("context baseURL not set")
-	}
-	if ctx.RedirectURL() == "" {
-		t.Error("context redirectURL not set")
-	}
+
+	assert.NotNil(t, ctx.Logger())
+	assert.NotEmpty(t, ctx.BaseURL())
+	assert.NotEmpty(t, ctx.URL())
+
 	ctx.Cancel()
-	if ctx.Err() == nil {
-		t.Error("context cancel error must not be none")
-	}
+	assert.ErrorIs(t, ctx.Err(), context.Canceled)
+
 	<-ctx.Done()
 
 	ctx1 := NewContext(Options{Timeout: time.Nanosecond})
 	<-ctx1.Done()
+}
 
-	ctx2 := NewContext(Options{Timeout: time.Millisecond})
-	<-ctx2.Done()
+func TestParentContext(t *testing.T) {
+	key := "parentKey"
+	value := "foo"
+	valueCtx := context.WithValue(context.Background(), key, value)
+	parent, cancel := context.WithTimeout(valueCtx, time.Minute)
+
+	ctx := NewContext(Options{Parent: parent})
+	assert.Equal(t, value, ctx.Value(key))
+	cancel()
+
+	time.Sleep(time.Millisecond)
+
+	assert.ErrorIs(t, ctx.Err(), context.Canceled)
 }

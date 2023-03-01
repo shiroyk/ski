@@ -10,13 +10,14 @@ import (
 
 // Cat an analyzer context
 type Cat struct {
-	ctx                  *parser.Context
-	BaseURL, RedirectURL string
+	ctx     *parser.Context
+	BaseURL string
+	URL     string `js:"url"`
 }
 
 // NewCat returns a new Cat instance
 func NewCat(ctx *parser.Context) *Cat {
-	return &Cat{ctx, ctx.BaseURL(), ctx.RedirectURL()}
+	return &Cat{ctx, ctx.BaseURL(), ctx.URL()}
 }
 
 // Log print the msg to logger

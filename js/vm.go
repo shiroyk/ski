@@ -32,7 +32,7 @@ type vmImpl struct {
 
 func newVM(useStrict bool, modulePath []string) VM {
 	vm := goja.New()
-	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
+	vm.SetFieldNameMapper(common.FieldNameMapper{})
 	modules.EnableRequire(vm, modulePath...)
 	modules.InitGlobalModule(vm)
 
@@ -52,19 +52,17 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 	}()
 
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				// Interrupt running JavaScript.
-				vm.runtime.Interrupt(ctx.Err())
-				// Release vm
-				GetScheduler().Release(vm)
-				return
-			case <-vm.done:
-				// Release vm
-				GetScheduler().Release(vm)
-				return
-			}
+		select {
+		case <-ctx.Done():
+			// Interrupt running JavaScript.
+			vm.runtime.Interrupt(ctx.Err())
+			// Release vm
+			GetScheduler().Release(vm)
+			return
+		case <-vm.done:
+			// Release vm
+			GetScheduler().Release(vm)
+			return
 		}
 	}()
 
