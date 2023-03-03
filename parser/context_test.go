@@ -2,10 +2,10 @@ package parser
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/slog"
 )
 
@@ -47,6 +47,7 @@ func TestContext(t *testing.T) {
 
 	ctx1 := NewContext(Options{Timeout: time.Nanosecond})
 	<-ctx1.Done()
+	assert.ErrorIs(t, ctx1.Err(), context.DeadlineExceeded)
 }
 
 func TestParentContext(t *testing.T) {

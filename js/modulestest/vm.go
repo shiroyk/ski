@@ -60,6 +60,7 @@ func New(t *testing.T) *VM {
 		return
 	})
 
+	_ = vm.Set("console", consoleObject)
 	_ = vm.Set("assert", assertObject)
 
 	return &VM{vm}

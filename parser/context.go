@@ -184,7 +184,7 @@ func propagateCancel(parent context.Context, child *Context) {
 		case <-done:
 			// parent is already canceled
 			child.cancel(parent.Err())
-			return
+		case <-child.Done():
 		}
 	}()
 }
