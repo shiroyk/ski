@@ -377,7 +377,10 @@ func (p *Page) Release(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value
 
 // Screenshot captures the screenshot of current page.
 func (p *Page) Screenshot(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	fullPage := call.Argument(0).ToBoolean()
+	var fullPage bool
+	if !goja.IsUndefined(call.Argument(0)) {
+		fullPage = call.Argument(0).ToBoolean()
+	}
 	target := toGoStruct[proto.PageCaptureScreenshot](call.Argument(1), vm)
 	screenshot, err := p.Page.Screenshot(fullPage, &target)
 	if err != nil {

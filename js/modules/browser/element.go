@@ -13,10 +13,10 @@ type Element struct {
 }
 
 // Elements provides some helpers to deal with element list
-type Elements []Element
+type Elements []map[string]any
 
 // First returns the first element, if the list is empty returns nil
-func (els Elements) First() *Element {
+func (els Elements) First() any {
 	if els.Empty() {
 		return nil
 	}
@@ -24,7 +24,7 @@ func (els Elements) First() *Element {
 }
 
 // Last returns the last element, if the list is empty returns nil
-func (els Elements) Last() *Element {
+func (els Elements) Last() any {
 	if els.Empty() {
 		return nil
 	}
@@ -45,7 +45,7 @@ func NewElement(ele *rod.Element, vm *goja.Runtime) goja.Value {
 func NewElements(elements rod.Elements) Elements {
 	mapping := make(Elements, 0, len(elements))
 	for _, element := range elements {
-		mapping = append(mapping, Element{element})
+		mapping = append(mapping, mappingElement(Element{element}))
 	}
 	return mapping
 }
@@ -316,9 +316,12 @@ func (el *Element) Resource(_ goja.FunctionCall, vm *goja.Runtime) (ret goja.Val
 
 // Screenshot of the area of the element
 func (el *Element) Screenshot(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	quality := call.Argument(1).ToInteger()
+	var quality int
+	if !goja.IsUndefined(call.Argument(1)) {
+		quality = int(call.Argument(1).ToInteger())
+	}
 	target := toGoStruct[proto.PageCaptureScreenshotFormat](call.Argument(0), vm)
-	screenshot, err := el.Element.Screenshot(target, int(quality))
+	screenshot, err := el.Element.Screenshot(target, quality)
 	if err != nil {
 		common.Throw(vm, err)
 	}

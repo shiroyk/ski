@@ -47,6 +47,9 @@ func (b *Browser) Page(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 
 // toGoStruct mapping the js object to golang struct.
 func toGoStruct[T any](value goja.Value, vm *goja.Runtime) (t T) {
+	if goja.IsUndefined(value) {
+		return
+	}
 	bytes, err := value.ToObject(vm).MarshalJSON()
 	if err != nil {
 		common.Throw(vm, err)
@@ -60,6 +63,9 @@ func toGoStruct[T any](value goja.Value, vm *goja.Runtime) (t T) {
 
 // toJSObject mapping the golang struct to js object.
 func toJSObject(value any, vm *goja.Runtime) goja.Value {
+	if value == nil {
+		return goja.Undefined()
+	}
 	bytes, err := json.Marshal(value)
 	if err != nil {
 		common.Throw(vm, err)
