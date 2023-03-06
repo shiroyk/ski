@@ -20,7 +20,7 @@ func (els Elements) First() any {
 	if els.Empty() {
 		return nil
 	}
-	return &(els[0])
+	return els[0]
 }
 
 // Last returns the last element, if the list is empty returns nil
@@ -28,7 +28,7 @@ func (els Elements) Last() any {
 	if els.Empty() {
 		return nil
 	}
-	return &(els[len(els)-1])
+	return els[len(els)-1]
 }
 
 // Empty returns true if the list is empty
