@@ -37,16 +37,16 @@ func (b *Browser) Page(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 		return vm.ToValue(Page{page})
 	}
 
-	target := jsonValue[proto.TargetCreateTarget](call.Argument(0), vm)
+	target := toGoStruct[proto.TargetCreateTarget](call.Argument(0), vm)
 	page, err := b.browser.Page(target)
 	if err != nil {
 		common.Throw(vm, err)
 	}
-	return vm.ToValue(Page{page})
+	return NewPage(page, vm)
 }
 
-// jsonValue serializes the js object to golang struct.
-func jsonValue[T any](value goja.Value, vm *goja.Runtime) (t T) {
+// toGoStruct mapping the js object to golang struct.
+func toGoStruct[T any](value goja.Value, vm *goja.Runtime) (t T) {
 	bytes, err := value.ToObject(vm).MarshalJSON()
 	if err != nil {
 		common.Throw(vm, err)
@@ -56,4 +56,18 @@ func jsonValue[T any](value goja.Value, vm *goja.Runtime) (t T) {
 		common.Throw(vm, err)
 	}
 	return
+}
+
+// toJSObject mapping the golang struct to js object.
+func toJSObject(value any, vm *goja.Runtime) goja.Value {
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		common.Throw(vm, err)
+	}
+	var obj map[string]any
+	err = json.Unmarshal(bytes, &obj)
+	if err != nil {
+		common.Throw(vm, err)
+	}
+	return vm.ToValue(obj)
 }
