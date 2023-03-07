@@ -30,6 +30,9 @@ var content = `<!DOCTYPE html>
 		</ul>
 	</div>
   </body>
+  <script type="text/javascript">
+    const url = "https://go.dev";
+  </script>
 </html>
 `
 
@@ -44,6 +47,18 @@ func TestAnalyzer(t *testing.T) {
 		{`
 { gq: '.body ul #a2 a -> href' }
 `, `"https://localhost/home"`,
+		},
+		{`
+- gq: foo
+- or
+- gq: title
+`, `"Tests for Analyzer"`,
+		},
+		{`
+- gq: script
+  js: |
+    eval(content + 'url;');
+`, `"https://go.dev"`,
 		},
 		{`
 type: integer
@@ -70,12 +85,6 @@ properties:
   item:
     - gq: div, li -> attr(id)
 `, `[{"item":"n1"},{"item":"n2"},{"item":"n3"},{"item":"n4"},{"item":"a1"},{"item":"a2"}]`,
-		},
-		{`
-- gq: foo
-- or
-- gq: title
-`, `"Tests for Analyzer"`,
 		},
 		{`
 type: array
