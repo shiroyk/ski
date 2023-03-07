@@ -13,43 +13,41 @@ source:
   http: https://news.ycombinator.com/best
   timeout: 60s
 schema:
-  stories:
-    type: array
-    init:
-      - gq: "#hnmain tbody -> slice(2) -> child('tr:not(.spacer,.morespace,:last-child)')"
-        js: |
-          items = content.length ? content : []
-          items.reduce((acc, v, i, arr) => {
-            if (i % 2 === 0) {
-              acc.push(arr.slice(i, i + 2).join(''));
-            }
-            return acc;
-          }, [])
-    properties:
-      index:
-        type: integer
-        rule:
-          - gq: .rank
-            regex: /[^\d]/
-      title: { gq: .titleline>:first-child }
-      by: { gq: .hnuser }
-      age: { gq: .age }
-      comments:
-        type: integer
-        rule:
-          - gq: .subline>:last-child
-            regex: /[^\d]/
+  type: array
+  init:
+    - gq: "#hnmain tbody -> slice(2) -> child('tr:not(.spacer,.morespace,:last-child)')"
+      js: |
+        content?.reduce((acc, v, i, arr) => {
+          if (i % 2 === 0) {
+            acc.push(arr.slice(i, i + 2).join(''));
+          }
+          return acc;
+        }, []);
+  properties:
+    index:
+      type: integer
+      rule:
+        - gq: .rank
+          regex: /[^\d]/
+    title: { gq: .titleline>:first-child }
+    by: { gq: .hnuser }
+    age: { gq: .age }
+    comments:
+      type: integer
+      rule:
+        - gq: .subline>:last-child
+          regex: /[^\d]/
 EOF
 ```
 run a js script
 ```shell
 cat << EOF | cloudcat run -s -
 const http = require('cloudcat/http');
-let res = http.get('https://news.ycombinator.com/best')
-let stories = cat.getElements('gq', res.string(), "#hnmain tbody -> slice(2) -> child('tr:not(.spacer,.morespace,:last-child)')")
+let res = http.get('https://news.ycombinator.com/best');
+let stories = cat.getElements('gq', res.string(), "#hnmain tbody -> slice(2) -> child('tr:not(.spacer,.morespace,:last-child)')");
 stories?.reduce((acc, v, i, arr) => {
     if (i % 2 === 0) {
-        let item = arr.slice(i, i + 2).join('')
+        let item = arr.slice(i, i + 2).join('');
         let index = cat.getString('gq', item, '.rank');
         let title = cat.getString('gq', item, '.titleline>:first-child');
         let by = cat.getString('gq', item, '.hnuser');
@@ -64,7 +62,7 @@ stories?.reduce((acc, v, i, arr) => {
         });
     }
     return acc;
-}, [])
+}, []);
 EOF
 ```
 ## Documentation
