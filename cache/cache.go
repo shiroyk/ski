@@ -47,6 +47,8 @@ const (
 	transparent
 	// XFromCache is the header added to responses that are returned from the cache
 	XFromCache = "X-From-Cache"
+	// DefaultPath the default cache path
+	DefaultPath = "cache"
 )
 
 // Transport is an implementation of http.RoundTripper that will return values from a cache

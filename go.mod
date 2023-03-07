@@ -8,7 +8,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/dlclark/regexp2 v1.8.1
 	github.com/dop251/goja v0.0.0-20230226152633-7c93113e17ac
-	github.com/labstack/echo/v4 v4.10.2
+	github.com/go-rod/rod v0.112.6
 	github.com/ohler55/ojg v1.17.5
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.6.1
@@ -25,22 +25,14 @@ require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/antchfx/xpath v1.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-rod/rod v0.112.6 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/labstack/gommon v0.4.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/gson v0.7.3 // indirect
 	github.com/ysmood/leakless v0.8.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
 )

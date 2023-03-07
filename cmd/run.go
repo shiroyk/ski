@@ -26,11 +26,11 @@ import (
 var ErrInvalidModel = errors.New("model is invalid")
 
 var (
-	modelArg   string
-	outputArg  string
-	scriptArg  string
-	timeoutArg string
-	debugArg   bool
+	runModelArg   string
+	runOutputArg  string
+	runScriptArg  string
+	runTimeoutArg time.Duration
+	runDebugArg   bool
 )
 
 var runCmd = &cobra.Command{
@@ -38,9 +38,9 @@ var runCmd = &cobra.Command{
 	Short: "run a specified model or script",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		switch {
-		case scriptArg != "":
+		case runScriptArg != "":
 			return runScript()
-		case modelArg != "":
+		case runModelArg != "":
 			return analyzeModel()
 		default:
 			return errors.New("model and script cannot both be empty")
@@ -51,10 +51,10 @@ var runCmd = &cobra.Command{
 func analyzeModel() (err error) {
 	var model schema.Model
 	var bytes []byte
-	if modelArg == "-" {
+	if runModelArg == "-" {
 		bytes, err = io.ReadAll(os.Stdin)
 	} else {
-		bytes, err = os.ReadFile(modelArg)
+		bytes, err = os.ReadFile(runModelArg)
 	}
 	if err != nil {
 		return
@@ -75,13 +75,8 @@ func analyzeModel() (err error) {
 		return err
 	}
 
-	timeout, err := timeoutDuration()
-	if err != nil {
-		return err
-	}
-
 	ctx := parser.NewContext(parser.Options{
-		Timeout: utils.ZeroOr(model.Source.Timeout, timeout),
+		Timeout: utils.ZeroOr(model.Source.Timeout, runTimeoutArg),
 		Logger:  slog.New(loggerHandler()),
 		URL:     model.Source.HTTP,
 	})
@@ -97,22 +92,17 @@ func analyzeModel() (err error) {
 
 func runScript() (err error) {
 	var bytes []byte
-	if scriptArg == "-" {
+	if runScriptArg == "-" {
 		bytes, err = io.ReadAll(os.Stdin)
 	} else {
-		bytes, err = os.ReadFile(scriptArg)
+		bytes, err = os.ReadFile(runScriptArg)
 	}
 	if err != nil {
 		return
 	}
 
-	timeout, err := timeoutDuration()
-	if err != nil {
-		return err
-	}
-
 	ctx := parser.NewContext(parser.Options{
-		Timeout: timeout,
+		Timeout: runTimeoutArg,
 		Logger:  slog.New(loggerHandler()),
 	})
 	defer ctx.Cancel()
@@ -127,20 +117,10 @@ func runScript() (err error) {
 
 func loggerHandler() slog.Handler {
 	var log slog.Handler = slog.NewTextHandler(os.Stdout)
-	if debugArg {
+	if runDebugArg {
 		log = logger.NewConsoleHandler(slog.LevelDebug)
 	}
 	return log
-}
-
-func timeoutDuration() (timeout time.Duration, err error) {
-	if timeoutArg != "" {
-		timeout, err = time.ParseDuration(timeoutArg)
-		if err != nil {
-			return
-		}
-	}
-	return
 }
 
 func outputJSON(data any) (err error) {
@@ -149,16 +129,16 @@ func outputJSON(data any) (err error) {
 		return err
 	}
 
-	if outputArg == "" {
+	if runOutputArg == "" {
 		fmt.Println(string(bytes))
 		return
 	}
 
-	ext := filepath.Ext(outputArg)
+	ext := filepath.Ext(runOutputArg)
 	if ext == "" {
-		outputArg += ".json"
+		runOutputArg += ".json"
 	}
-	err = os.WriteFile(outputArg, bytes, 0644)
+	err = os.WriteFile(runOutputArg, bytes, 0644)
 	if err != nil {
 		return
 	}
@@ -166,10 +146,10 @@ func outputJSON(data any) (err error) {
 }
 
 func init() {
-	runCmd.Flags().StringVarP(&modelArg, "model", "m", "", "run a model")
-	runCmd.Flags().StringVarP(&scriptArg, "script", "s", "", "run a script")
-	runCmd.Flags().StringVarP(&timeoutArg, "timeout", "t", "", "run timeout")
-	runCmd.Flags().StringVarP(&outputArg, "output", "o", "", "write to file instead of stdout")
-	runCmd.Flags().BoolVarP(&debugArg, "debug", "d", false, "output the debug log for running")
+	runCmd.Flags().StringVarP(&runModelArg, "model", "m", "", "run a model")
+	runCmd.Flags().StringVarP(&runScriptArg, "script", "s", "", "run a script")
+	runCmd.Flags().DurationVarP(&runTimeoutArg, "timeout", "t", parser.DefaultTimeout, "run timeout")
+	runCmd.Flags().StringVarP(&runOutputArg, "output", "o", "", "write to file instead of stdout")
+	runCmd.Flags().BoolVarP(&runDebugArg, "debug", "d", false, "output the debug log for running")
 	rootCmd.AddCommand(runCmd)
 }

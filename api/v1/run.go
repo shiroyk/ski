@@ -3,49 +3,83 @@ package v1
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 	"text/template"
 
-	"github.com/labstack/echo/v4"
 	"github.com/shiroyk/cloudcat/analyzer"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
+	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/parser"
 	"github.com/shiroyk/cloudcat/schema"
-	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	requestHeader                    = "X-Request-Header"
-	responseHeader                   = "X-Response-Header"
 	debugHeader                      = "X-Debug"
+	mimeApplicationJavaScript        = "application/javascript"
+	mimeApplicationJSONCharsetUTF8   = "application/json; charset=UTF-8"
 	mimeApplicationNDJSONCharsetUTF8 = "application/x-ndjson; charset=UTF-8"
+	contentType                      = "Content-Type"
 )
 
-var skipOverrideHeader = []string{
-	echo.HeaderContentType, echo.HeaderContentLength,
-	echo.HeaderCookie, echo.HeaderSetCookie,
-	echo.HeaderAccept, echo.HeaderAcceptEncoding,
-	echo.HeaderContentEncoding,
+// RouteRun the run routes
+func RouteRun(token string) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/v1/run", HandleFunc(run))
+	mux.Handle("/", HandleFunc(func(w *Response, r *http.Request) error {
+		if r.URL.Path != "/" {
+			return w.JSON(http.StatusNotFound, Msg{http.StatusText(http.StatusNotFound)})
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return nil
+	}))
+	mux.Handle("/ping", HandleFunc(ping))
+
+	return auth(token, mux)
 }
 
-// RouteAnalyze tha analyze routes
-func RouteAnalyze(e *echo.Echo) {
-	analyze := e.Group("/analyze")
-	analyze.POST("", ModelAnalyze)
+func ping(res *Response, _ *http.Request) error {
+	res.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
-// ModelAnalyze analyzes the model
-func ModelAnalyze(ctx echo.Context) error {
-	overrideRequest := ctx.Request().Header.Get(requestHeader) != ""
-	overrideResponse := ctx.Request().Header.Get(responseHeader) != ""
-	debug := ctx.Request().Header.Get(debugHeader) != ""
+func run(res *Response, req *http.Request) error {
+	debug := req.Header.Get(debugHeader) != ""
+
+	resContentType := mimeApplicationJSONCharsetUTF8
+	var log slog.Handler = slog.NewTextHandler(os.Stdout)
+	if debug {
+		log = newResponseHandler(res, slog.LevelDebug)
+		resContentType = mimeApplicationNDJSONCharsetUTF8
+	}
+	res.Header().Set(contentType, resContentType)
+
+	isJs := strings.HasPrefix(req.Header.Get(contentType), mimeApplicationJavaScript)
+	if isJs {
+		parserCtx := parser.NewContext(parser.Options{
+			Parent: req.Context(),
+			Logger: slog.New(log),
+		})
+		defer parserCtx.Cancel()
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return err
+		}
+		result, err := js.RunString(parserCtx, string(body))
+		if err != nil {
+			return err
+		}
+
+		return res.JSON(http.StatusOK, result)
+	}
 
 	model := new(schema.Model)
-	err := yaml.NewDecoder(ctx.Request().Body).Decode(model)
+	err := yaml.NewDecoder(req.Body).Decode(model)
 	if err != nil {
 		return err
 	}
@@ -55,78 +89,39 @@ func ModelAnalyze(ctx echo.Context) error {
 		return err
 	}
 	tplFunc, _ := di.Resolve[template.FuncMap]()
-	req, err := fetch.NewTemplateRequest(tplFunc, model.Source.HTTP, nil)
-	req.Proxy = model.Source.Proxy
+	mReq, err := fetch.NewTemplateRequest(tplFunc, model.Source.HTTP, nil)
+	mReq.Proxy = model.Source.Proxy
 	if err != nil {
 		return err
 	}
 
-	if overrideRequest {
-		for k, v := range req.Header {
-			if slices.Contains(skipOverrideHeader, k) {
-				continue
-			}
-			for _, vv := range v {
-				req.Header.Add(k, vv)
-			}
-		}
-	}
-
-	ctx.Response().Header().Set(echo.HeaderContentType, mimeApplicationNDJSONCharsetUTF8)
-	var log slog.Handler = slog.NewTextHandler(os.Stdout)
-	if debug {
-		log = newResponseHandler(ctx.Response(), slog.LevelDebug)
-	}
 	parserCtx := parser.NewContext(parser.Options{
-		Parent: ctx.Request().Context(),
+		Parent: req.Context(),
 		Logger: slog.New(log),
 		URL:    model.Source.HTTP,
 	})
 	defer parserCtx.Cancel()
-
-	res, err := fetcher.DoRequest(req.WithContext(parserCtx))
+	mRes, err := fetcher.DoRequest(mReq.WithContext(parserCtx))
 	if err != nil {
 		return err
 	}
 
-	if overrideResponse {
-		for k, v := range res.Header {
-			if slices.Contains(skipOverrideHeader, k) {
-				continue
-			}
-			for _, vv := range v {
-				ctx.Response().Header().Add(k, vv)
-			}
-		}
-	}
+	result := analyzer.Analyze(parserCtx, model.Schema, mRes.String())
 
-	result := analyzer.Analyze(parserCtx, model.Schema, res.String())
-
-	bytes, err := json.Marshal(result)
-	if err != nil {
-		return err
-	}
-
-	_, err = ctx.Response().Write(bytes)
-	if err != nil {
-		return err
-	}
-	ctx.Response().Flush()
-
-	return nil
+	return res.JSON(http.StatusOK, result)
 }
 
 // responseHandler is a Handler that writes Records to an echo.Response as
 // line-delimited JSON objects.
 type responseHandler struct {
 	level        slog.Leveler
-	w            *echo.Response
+	w            *Response
 	attrs, group string
 }
 
 // newResponseHandler creates a responseHandler that writes to w,
 // using the default options.
-func newResponseHandler(res *echo.Response, l slog.Leveler) *responseHandler {
+func newResponseHandler(res *Response, l slog.Leveler) *responseHandler {
 	return &responseHandler{
 		level: l,
 		w:     res,

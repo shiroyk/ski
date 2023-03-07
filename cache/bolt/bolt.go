@@ -10,13 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/lib/logger"
 	"go.etcd.io/bbolt"
 )
 
 const (
-	// DefaultPath the default cache path
-	DefaultPath      = "cache"
 	defaultBatchSize = 100000
 	defaultInterval  = 10 * time.Minute
 	defaultKeysClean = 64
@@ -41,7 +40,7 @@ type DB struct {
 // if interval above 0, will not clear expired keys
 func NewDB(path, name string, interval time.Duration) (*DB, error) {
 	if path == "" {
-		path = DefaultPath
+		path = cache.DefaultPath
 	}
 	err := os.MkdirAll(path, 0700)
 	if err != nil {

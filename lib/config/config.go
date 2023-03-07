@@ -7,9 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/shiroyk/cloudcat/api"
 	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/cache/bolt"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/lib/utils"
@@ -33,9 +31,6 @@ func FromContext(ctx context.Context) Config {
 
 // Config The cloudcat configuration
 type Config struct {
-	// Api
-	Api api.Options `yaml:"api"`
-
 	// Cache
 	Cache cache.Options `yaml:"cache"`
 
@@ -49,12 +44,8 @@ type Config struct {
 // DefaultConfig The default configuration
 func DefaultConfig() Config {
 	return Config{
-		Api: api.Options{
-			Timeout: api.DefaultTimeout,
-			Address: api.DefaultAddress,
-		},
 		Cache: cache.Options{
-			Path: bolt.DefaultPath,
+			Path: cache.DefaultPath,
 		},
 		Fetch: fetch.Options{
 			MaxBodySize:    fetch.DefaultMaxBodySize,
