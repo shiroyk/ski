@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ErrInvalidStep invalid step error
 var ErrInvalidStep = errors.New("invalid step")
 
 // Action The Schema Action
