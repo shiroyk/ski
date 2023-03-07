@@ -51,7 +51,5 @@ func TestUseStrict(t *testing.T) {
 	t.Parallel()
 	vm := newVM(true, nil)
 	_, err := vm.RunString(context.Background(), `eval('a = 1');a`)
-	if err != nil {
-		assert.Contains(t, err.Error(), "ReferenceError: a is not defined")
-	}
+	assert.ErrorContains(t, err, "ReferenceError: a is not defined")
 }

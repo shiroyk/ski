@@ -1,6 +1,7 @@
 package js
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"runtime/debug"
@@ -45,7 +46,13 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 	vm.runtime.ClearInterrupt()
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Errorf("vm run error %v %s", r, debug.Stack())
+			stack := vm.runtime.CaptureCallStack(20, nil)
+			buf := new(bytes.Buffer)
+			for _, frame := range stack {
+				frame.Write(buf)
+			}
+			logger.Error(fmt.Sprintf("vm run error %s", r), nil,
+				"stack", string(debug.Stack()), "js stack", buf.String())
 		}
 
 		vm.done <- struct{}{} // End of run

@@ -29,7 +29,8 @@ func GetFormatter() FormatHandler {
 func Analyze(ctx *parser.Context, s *schema.Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyzer error %s", debug.Stack()), r.(error))
+			ctx.Logger().Error(fmt.Sprintf("analyze error %s", r), nil,
+				"stack", string(debug.Stack()))
 		}
 	}()
 

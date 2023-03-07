@@ -20,9 +20,9 @@ type HandleFunc func(w *Response, r *http.Request) error
 func (h HandleFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	res := &Response{w, 200, false}
 	if err := h(res, r); err != nil {
-		logger.Error("request error:", err, "path", r.URL.Path)
+		logger.Error("request error", err, "path", r.URL.Path)
 		if e := res.JSON(http.StatusInternalServerError, Msg{err.Error()}); e != nil {
-			logger.Error("write response error:", e)
+			logger.Error("write response error", e)
 		}
 	}
 	logger.Debug("request", "path", r.URL.Path, "method", r.Method, "status", res.status)
