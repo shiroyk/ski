@@ -1,6 +1,11 @@
 package analyzer
 
 import (
+	_ "github.com/shiroyk/cloudcat/js/modules/cache"
+	_ "github.com/shiroyk/cloudcat/js/modules/cookie"
+	_ "github.com/shiroyk/cloudcat/js/modules/crypto"
+	_ "github.com/shiroyk/cloudcat/js/modules/encoding"
+	_ "github.com/shiroyk/cloudcat/js/modules/http"
 	_ "github.com/shiroyk/cloudcat/parser/parsers/gq"
 	_ "github.com/shiroyk/cloudcat/parser/parsers/js"
 	_ "github.com/shiroyk/cloudcat/parser/parsers/json"

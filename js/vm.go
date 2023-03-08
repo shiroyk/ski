@@ -36,6 +36,7 @@ func newVM(useStrict bool, modulePath []string) VM {
 	vm.SetFieldNameMapper(common.FieldNameMapper{})
 	modules.EnableRequire(vm, modulePath...)
 	modules.InitGlobalModule(vm)
+	EnableConsole(vm)
 
 	return &vmImpl{vm, make(chan struct{}, 1), useStrict}
 }
