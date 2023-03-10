@@ -8,6 +8,7 @@ import (
 	"github.com/shiroyk/cloudcat/cache/memory"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCache(t *testing.T) {
@@ -27,7 +28,5 @@ func TestCache(t *testing.T) {
 			cache.setBytes("cache3", new Uint8Array([50]).buffer);
 			assert.equal(new Uint8Array(cache.getBytes("cache3"))[0], 50);
 		`)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 }

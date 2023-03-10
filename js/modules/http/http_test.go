@@ -12,6 +12,7 @@ import (
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHttp(t *testing.T) {
@@ -32,29 +33,19 @@ func TestHttp(t *testing.T) {
 
 		if isMp {
 			file, _, err := r.FormFile("file")
-			if err != nil {
-				t.Error(err)
-			}
+			assert.NoError(t, err)
 
 			body, err := io.ReadAll(file)
-			if err != nil {
-				t.Error(err)
-			}
+			assert.NoError(t, err)
 
 			_, err = fmt.Fprint(w, string(body))
-			if err != nil {
-				t.Error(err)
-			}
+			assert.NoError(t, err)
 		} else {
 			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				t.Error(err)
-			}
+			assert.NoError(t, err)
 
 			_, err = fmt.Fprint(w, string(body))
-			if err != nil {
-				t.Error(err)
-			}
+			assert.NoError(t, err)
 		}
 	}))
 
@@ -94,9 +85,7 @@ func TestHttp(t *testing.T) {
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
 			_, err := vm.RunString(ctx, s)
-			if err != nil {
-				t.Errorf("Script: %s , %s", s, err)
-			}
+			assert.NoError(t, err)
 		})
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/shiroyk/cloudcat/cache/memory"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCookie(t *testing.T) {
@@ -22,9 +23,7 @@ func TestCookie(t *testing.T) {
 	errScript := []string{`cookie.set('\x0000', "");`, `cookie.get('\x0000');`, `cookie.del('\x0000');`}
 	for _, s := range errScript {
 		_, err = vm.RunString(ctx, s)
-		if err == nil {
-			t.Error("error should not be nil")
-		}
+		assert.ErrorContains(t, err, "net/url: invalid control character in URL")
 	}
 
 	_, err = vm.RunString(ctx, `
@@ -34,7 +33,5 @@ func TestCookie(t *testing.T) {
 		cookie.set("http://localhost", "max-age=3600;");
 		assert.equal(cookie.get("http://localhost"), "max-age=3600;");
 	`)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 }

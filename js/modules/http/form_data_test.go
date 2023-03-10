@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFormData(t *testing.T) {
@@ -40,9 +41,7 @@ func TestFormData(t *testing.T) {
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
 			_, err := vm.RunString(ctx, s)
-			if err != nil {
-				t.Errorf("Script: %s , %s", s, err)
-			}
+			assert.NoError(t, err)
 		})
 	}
 }

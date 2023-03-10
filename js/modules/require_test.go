@@ -62,9 +62,7 @@ func TestRequire(t *testing.T) {
 	for i, testCase := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			_, err := vm.RunString(testCase.script)
-			if err != nil {
-				t.Error(err)
-			}
+			assert.NoError(t, err)
 		})
 	}
 }
