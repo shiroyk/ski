@@ -8,6 +8,10 @@ on:
       - 'v*'
   pull_request:
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   # linter
   lint:
