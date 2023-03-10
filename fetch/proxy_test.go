@@ -149,7 +149,7 @@ func TestTransportProxy(t *testing.T) {
 			h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				proxyCh <- r
 				// Implement an entire CONNECT proxy
-				if r.Method == "CONNECT" {
+				if r.Method == http.MethodConnect {
 					hijacker, ok := w.(http.Hijacker)
 					if !ok {
 						t.Errorf("hijack not allowed")
@@ -226,7 +226,7 @@ func TestTransportProxy(t *testing.T) {
 			proxy2.Close()
 			if httpsSite {
 				// First message should be a CONNECT, asking for a socket to the real server,
-				if got.Method != "CONNECT" {
+				if got.Method != http.MethodConnect {
 					t.Errorf("Wrong method for secure proxying: %q", got.Method)
 				}
 				gotHost := got.URL.Host
@@ -240,14 +240,14 @@ func TestTransportProxy(t *testing.T) {
 
 				// The next message on the channel should be from the site's server.
 				next := <-siteCh
-				if next.Method != "HEAD" {
+				if next.Method != http.MethodHead {
 					t.Errorf("Wrong method at destination: %s", next.Method)
 				}
 				if nextURL := next.URL.String(); nextURL != "/" {
 					t.Errorf("Wrong URL at destination: %s", nextURL)
 				}
 			} else {
-				if got.Method != "HEAD" {
+				if got.Method != http.MethodHead {
 					t.Errorf("Wrong method for destination: %q", got.Method)
 				}
 				gotURL := got.URL.String()

@@ -1,3 +1,4 @@
+// Package cookie the cookie JS implementation
 package cookie
 
 import (

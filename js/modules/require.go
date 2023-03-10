@@ -76,6 +76,7 @@ func (r *require) resolveNative(name string) (*goja.Object, error) {
 	return nil, ErrIllegalModuleName
 }
 
+//nolint:nakedret
 func (r *require) resolveFile(modPath string) (module *goja.Object, err error) {
 	origPath, modPath := modPath, path.Clean(modPath)
 	if modPath == "" {
@@ -92,7 +93,7 @@ func (r *require) resolveFile(modPath string) (module *goja.Object, err error) {
 
 	p := path.Join(start, modPath)
 
-	if strings.HasPrefix(origPath, "./") ||
+	if strings.HasPrefix(origPath, "./") || //nolint:nestif
 		strings.HasPrefix(origPath, "/") ||
 		strings.HasPrefix(origPath, "../") ||
 		origPath == "." || origPath == ".." {

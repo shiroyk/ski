@@ -1,3 +1,4 @@
+// Package js the js parser
 package js
 
 import (

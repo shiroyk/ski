@@ -9,9 +9,6 @@ issues:
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
 
-  # We want to try and improve the comments in the k6 codebase, so individual
-  # non-golint items from the default exclusion list will gradually be addded
-  # to the exclude-rules below
   exclude-use-default: false
 
   exclude-rules:
@@ -24,6 +21,15 @@ issues:
        - gocognit
        - funlen
        - lll
+       - noctx
+       - govet
+       - errcheck
+       - bodyclose
+       - nestif
+       - gosec
+       - gofumpt
+       - paralleltest
+       - tparallel
    - linters:
      - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
      text: "does not use range value in test Run"
@@ -48,6 +54,10 @@ linters-settings:
   funlen:
     lines: 80
     statements: 60
+  revive:
+    severity: warning
+    rules:
+      - name: var-naming
 
 linters:
   enable-all: true
@@ -89,4 +99,7 @@ linters:
   - structcheck
   - wastedassign
   - gochecknoglobals
+  - varcheck # deprecated
+  - ifshort # deprecated
+  - deadcode # deprecated
   fast: false

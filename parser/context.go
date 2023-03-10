@@ -174,7 +174,7 @@ func propagateCancel(parent context.Context, child *Context) {
 	if parent == nil {
 		return
 	}
-	done := parent.Done()
+	done := parent.Done() //nolint:ifshort
 	if done == nil {
 		return // parent is never canceled
 	}

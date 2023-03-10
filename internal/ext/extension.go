@@ -1,3 +1,4 @@
+// Package ext the extension manager
 package ext
 
 import (

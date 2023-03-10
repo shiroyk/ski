@@ -9,6 +9,7 @@ import (
 )
 
 func TestFormat(t *testing.T) {
+	t.Parallel()
 	formatter := new(defaultFormatHandler)
 	testCases := []struct {
 		data any

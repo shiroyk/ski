@@ -1,3 +1,4 @@
+// Package gq the goquery parser
 package gq
 
 import (

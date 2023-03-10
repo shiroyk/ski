@@ -16,6 +16,7 @@ import (
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/lib/consts"
+	"github.com/shiroyk/cloudcat/lib/logger"
 	"github.com/shiroyk/cloudcat/lib/utils"
 	"golang.org/x/exp/slices"
 	"golang.org/x/net/html/charset"
@@ -56,7 +57,7 @@ const (
 
 var (
 	// DefaultRetryHTTPCodes retry fetch.Request error status code
-	DefaultRetryHTTPCodes = []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable,
+	DefaultRetryHTTPCodes = []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, //nolint:lll
 		http.StatusGatewayTimeout, http.StatusRequestTimeout}
 	// DefaultHeaders defaults fetch.Request headers
 	DefaultHeaders = map[string]string{
@@ -90,9 +91,9 @@ func NewFetcher(opt Options) Fetch {
 	fetch.retryTimes = utils.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
 	fetch.retryHTTPCodes = utils.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
-	proxy := opt.ProxyFunc
-	if proxy == nil {
-		proxy = RoundRobinProxy
+	proxy := RoundRobinProxy
+	if opt.ProxyFunc != nil {
+		proxy = opt.ProxyFunc
 	}
 
 	var transport http.RoundTripper = &http.Transport{
@@ -163,7 +164,6 @@ func (f *fetcher) doRequestRetry(req *Request) (*Response, error) {
 		return nil, ErrRequestCancel
 	}
 	res, err := f.doRequest(req)
-
 	// Retry on Error
 	if err != nil {
 		if req.retryCounter < f.retryTimes {
@@ -188,7 +188,9 @@ func (f *fetcher) doRequest(req *Request) (*Response, error) {
 	res, err := f.Do(req.Request)
 	defer func() {
 		if res != nil {
-			res.Body.Close()
+			if err = res.Body.Close(); err != nil {
+				logger.Debugf("close body failed %s", err)
+			}
 		}
 	}()
 	if err != nil {
@@ -205,7 +207,7 @@ func (f *fetcher) doRequest(req *Request) (*Response, error) {
 		}
 	}
 
-	if res.Request.Method != http.MethodHead && res.ContentLength > 0 {
+	if res.Request.Method != http.MethodHead && res.ContentLength > 0 { //nolint:nestif
 		if req.Encoding != "" {
 			if enc, _ := charset.Lookup(req.Encoding); enc != nil {
 				bodyReader = transform.NewReader(bodyReader, enc.NewDecoder())

@@ -1,3 +1,4 @@
+// Package encoding the encoding JS implementation
 package encoding
 
 import (
@@ -56,7 +57,6 @@ func (Base64) Decode(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) 
 	if err != nil {
 		common.Throw(vm, err)
 	}
-	
 	bytes, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(unURI(string(data)))
 	if err != nil {
 		common.Throw(vm, err)

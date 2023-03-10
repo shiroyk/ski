@@ -15,9 +15,7 @@ import (
 
 type proxyURLKey int
 
-var (
-	proxyMap = utils.NewLRUCache[string, roundRobinProxy](128)
-)
+var proxyMap = utils.NewLRUCache[string, roundRobinProxy](128)
 
 type roundRobinProxy struct {
 	proxyURLs []*url.URL

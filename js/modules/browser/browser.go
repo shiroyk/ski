@@ -1,3 +1,4 @@
+// Package browser the JS browser implementations
 package browser
 
 import (

@@ -58,6 +58,8 @@ func analyze(
 
 // analyzeString get string or slice string and convert it to the specified type.
 // If the type is not schema.StringType then convert to the specified type.
+//
+//nolint:nakedret
 func analyzeString(
 	ctx *parser.Context,
 	s *schema.Schema,
@@ -65,7 +67,7 @@ func analyzeString(
 	path string, // the path of properties
 ) (ret any) {
 	var err error
-	if s.Type == schema.ArrayType {
+	if s.Type == schema.ArrayType { //nolint:nestif
 		ret, err = s.Rule.GetStrings(ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
@@ -120,8 +122,8 @@ func analyzeObject(
 		}
 		object := make(map[string]any, len(s.Properties))
 
-		for field, s := range s.Properties {
-			object[field] = analyze(ctx, &s, element[0], path+"."+field)
+		for field, fieldSchema := range s.Properties {
+			object[field] = analyze(ctx, &fieldSchema, element[0], path+"."+field) //nolint:gosec
 		}
 
 		return object
@@ -146,8 +148,8 @@ func analyzeArray(
 		array := make([]any, len(elements))
 
 		for i, item := range elements {
-			s := schema.NewSchema(schema.ObjectType).SetProperty(s.Properties)
-			array[i] = analyzeObject(ctx, s, item, fmt.Sprintf("%s.[%v]", path, i))
+			newSchema := schema.NewSchema(schema.ObjectType).SetProperty(s.Properties)
+			array[i] = analyzeObject(ctx, newSchema, item, fmt.Sprintf("%s.[%v]", path, i))
 		}
 
 		return array

@@ -88,7 +88,8 @@ func TestHttp(t *testing.T) {
 			http.request('PATCH', url, 114514, null);
 		 } catch (e) {
 			assert.true(e.toString().includes("unsupported request body"));
-		 }`}
+		 }`,
+	}
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {

@@ -21,7 +21,7 @@ func TestScheduler(t *testing.T) {
 			script := "1"
 			if i < blockNum {
 				script = `while(true){}`
-				timeout = timeout * 2
+				timeout *= 2
 			}
 
 			ctx, _ := context.WithTimeout(context.Background(), timeout)

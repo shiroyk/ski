@@ -9,6 +9,7 @@ import (
 )
 
 func TestCipherAlgorithm(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		return
 	}

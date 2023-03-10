@@ -30,7 +30,7 @@ const (
 	// Every request and its corresponding response are cached.
 	// When the same request is seen again, the response is returned without transferring anything from the Internet.
 
-	// The Dummy policy is useful for testing spiders faster (without having to wait for downloads every time)
+	// Dummy policy is useful for testing spiders faster (without having to wait for downloads every time)
 	// and for trying your spider offline, when an Internet connection is not available.
 	// The goal is to be able to “replay” a spider run exactly as it ran before.
 	Dummy Policy = "dummy"
@@ -68,9 +68,8 @@ type Transport struct {
 func cacheKey(req *http.Request) string {
 	if req.Method == http.MethodGet {
 		return req.URL.String()
-	} else {
-		return req.Method + " " + req.URL.String()
 	}
+	return req.Method + " " + req.URL.String()
 }
 
 // CachedResponse returns the cached http.Response for req if present, and nil
@@ -155,11 +154,10 @@ func (t *Transport) RoundTripDummy(req *http.Request) (resp *http.Response, err 
 			cachedResp.Header.Set(XFromCache, "1")
 		}
 		return cachedResp, nil
-	} else {
-		resp, err = transport.RoundTrip(req)
-		if err != nil {
-			return nil, err
-		}
+	}
+	resp, err = transport.RoundTrip(req)
+	if err != nil {
+		return nil, err
 	}
 
 	if cacheable {
@@ -180,6 +178,8 @@ func (t *Transport) RoundTripDummy(req *http.Request) (resp *http.Response, err 
 // If there is a stale Response, then any validators it contains will be set on the new request
 // to give the server a chance to respond with NotModified. If this happens, then the cached Response
 // will be returned.
+//
+//nolint:funlen,gocognit,cyclop
 func (t *Transport) RoundTripRFC2616(req *http.Request) (resp *http.Response, err error) {
 	cacheKey := cacheKey(req)
 	cacheable := (req.Method == "GET" || req.Method == "HEAD") && req.Header.Get("range") == ""
@@ -196,7 +196,7 @@ func (t *Transport) RoundTripRFC2616(req *http.Request) (resp *http.Response, er
 		transport = http.DefaultTransport
 	}
 
-	if cacheable && cachedResp != nil && err == nil {
+	if cacheable && cachedResp != nil && err == nil { //nolint:nestif
 		if t.MarkCachedResponses {
 			cachedResp.Header.Set(XFromCache, "1")
 		}
@@ -230,23 +230,26 @@ func (t *Transport) RoundTripRFC2616(req *http.Request) (resp *http.Response, er
 		}
 
 		resp, err = transport.RoundTrip(req)
-		if err == nil && req.Method == "GET" && resp.StatusCode == http.StatusNotModified {
-			// Replace the 304 response with the one from cache, but update with some new headers
+		switch {
+		case err == nil && req.Method == "GET" && resp.StatusCode == http.StatusNotModified:
 			endToEndHeaders := getEndToEndHeaders(resp.Header)
 			for _, header := range endToEndHeaders {
 				cachedResp.Header[header] = resp.Header[header]
 			}
-			resp.Body.Close()
+
+			if err = resp.Body.Close(); err != nil {
+				return nil, err
+			}
 			resp = cachedResp
-		} else if (err != nil || resp.StatusCode >= 500) &&
-			req.Method == "GET" && canStaleOnError(cachedResp.Header, req.Header) {
-			// In case of transport failure and stale-if-error activated, returns cached content
-			// when available
+		case (err != nil || resp.StatusCode >= 500) &&
+			req.Method == "GET" && canStaleOnError(cachedResp.Header, req.Header):
 			if resp != nil && resp.Body != nil {
-				resp.Body.Close()
+				if err = resp.Body.Close(); err != nil {
+					return nil, err
+				}
 			}
 			return cachedResp, nil
-		} else {
+		default:
 			if err != nil || resp.StatusCode != http.StatusOK {
 				t.Cache.Del(cacheKey)
 			}
@@ -276,7 +279,7 @@ func (t *Transport) RoundTripRFC2616(req *http.Request) (resp *http.Response, er
 			}
 		}
 		switch req.Method {
-		case "GET":
+		case http.MethodGet:
 			// Delay caching until EOF is reached.
 			resp.Body = &cachingReadCloser{
 				R: resp.Body,
@@ -360,7 +363,7 @@ func getFreshness(respHeaders, reqHeaders http.Header) (freshness int) {
 
 	// If a response includes both an Expires header and a max-age directive,
 	// the max-age directive overrides the Expires header, even if the Expires header is more restrictive.
-	if maxAge, ok := respCacheControl["max-age"]; ok {
+	if maxAge, ok := respCacheControl["max-age"]; ok { //nolint:nestif
 		lifetime, err = time.ParseDuration(maxAge + "s")
 		if err != nil {
 			lifetime = zeroDuration
@@ -368,7 +371,7 @@ func getFreshness(respHeaders, reqHeaders http.Header) (freshness int) {
 	} else {
 		expiresHeader := respHeaders.Get("Expires")
 		if expiresHeader != "" {
-			expires, err := time.Parse(time.RFC1123, expiresHeader)
+			expires, err := time.Parse(time.RFC1123, expiresHeader) //nolint:govet
 			if err != nil {
 				lifetime = zeroDuration
 			} else {
@@ -388,7 +391,7 @@ func getFreshness(respHeaders, reqHeaders http.Header) (freshness int) {
 		//  the client wants a response that will still be fresh for at least the specified number of seconds.
 		minfreshDuration, err := time.ParseDuration(minfresh + "s")
 		if err == nil {
-			currentAge = currentAge + minfreshDuration
+			currentAge += minfreshDuration
 		}
 	}
 
@@ -406,7 +409,7 @@ func getFreshness(respHeaders, reqHeaders http.Header) (freshness int) {
 		}
 		maxstaleDuration, err := time.ParseDuration(maxstale + "s")
 		if err == nil {
-			currentAge = currentAge - maxstaleDuration
+			currentAge -= maxstaleDuration
 		}
 	}
 
@@ -581,7 +584,7 @@ type cachingReadCloser struct {
 func (r *cachingReadCloser) Read(p []byte) (n int, err error) {
 	n, err = r.R.Read(p)
 	r.buf.Write(p[:n])
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		r.OnEOF(bytes.NewReader(r.buf.Bytes()))
 	}
 	return n, err

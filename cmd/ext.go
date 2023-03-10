@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/shiroyk/cloudcat/internal/ext"
@@ -18,7 +17,7 @@ var extCmd = &cobra.Command{
 			sb.WriteString(e.String())
 			sb.WriteByte('\n')
 		}
-		fmt.Println(sb.String())
+		cmd.Println(sb.String())
 	},
 }
 

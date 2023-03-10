@@ -45,13 +45,16 @@ func TestRequire(t *testing.T) {
 	testCases := []struct {
 		script string
 	}{
-		{`const test = require("cloudcat/test");
+		{
+			`const test = require("cloudcat/test");
 		 assert.equal(test.key, "test")`,
 		},
-		{`const lodash = require("https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js");
+		{
+			`const lodash = require("https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js");
 		 assert.equal(lodash.VERSION, "4.17.21")`,
 		},
-		{`const base64 = require("https://cdn.jsdelivr.net/npm/js-base64@3.7.5/base64.min.js");
+		{
+			`const base64 = require("https://cdn.jsdelivr.net/npm/js-base64@3.7.5/base64.min.js");
 		 assert.equal(base64.version, "3.7.5")`,
 		},
 	}

@@ -1,3 +1,4 @@
+// Package modulestest the module test vm
 package modulestest
 
 import (

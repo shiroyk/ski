@@ -24,8 +24,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestParser(t *testing.T) {
-	_, ok := parser.GetParser(key)
-	if !ok {
+	if _, ok := parser.GetParser(key); !ok {
 		t.Fatal("schema not registered")
 	}
 }

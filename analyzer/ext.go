@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	_ "github.com/shiroyk/cloudcat/js/modules/cache"
+	_ "github.com/shiroyk/cloudcat/js/modules/cache" // init the extensions
 	_ "github.com/shiroyk/cloudcat/js/modules/cookie"
 	_ "github.com/shiroyk/cloudcat/js/modules/crypto"
 	_ "github.com/shiroyk/cloudcat/js/modules/encoding"

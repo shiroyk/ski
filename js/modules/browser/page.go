@@ -368,8 +368,7 @@ func (p *Page) PDF(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 // It's useful if the page never closes or reloads.
 func (p *Page) Release(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 	target := toGoStruct[proto.RuntimeRemoteObject](call.Argument(0), vm)
-	err := p.Page.Release(&target)
-	if err != nil {
+	if err := p.Page.Release(&target); err != nil {
 		common.Throw(vm, err)
 	}
 	return goja.Undefined()

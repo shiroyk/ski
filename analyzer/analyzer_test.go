@@ -44,38 +44,45 @@ func TestAnalyzer(t *testing.T) {
 		schema string
 		want   any
 	}{
-		{`
+		{
+			`
 { gq: '.body ul #a2 a -> href' }
 `, `"https://localhost/home"`,
 		},
-		{`
+		{
+			`
 - gq: foo
 - or
 - gq: title
 `, `"Tests for Analyzer"`,
 		},
-		{`
+		{
+			`
 - gq: script
   js: |
     eval(content + 'url;');
 `, `"https://go.dev"`,
 		},
-		{`
+		{
+			`
 type: integer
 rule: { gq: '#main #n1' }
 `, 1,
 		},
-		{`
+		{
+			`
 type: boolean
 rule: { gq: '#main #n1' }
 `, true,
 		},
-		{`
+		{
+			`
 type: number
 rule: { gq: '#main #n2' }
 `, 2.1,
 		},
-		{`
+		{
+			`
 type: array
 init:
   - gq: '#main div'
@@ -86,7 +93,8 @@ properties:
     - gq: div, li -> attr(id)
 `, `[{"item":"n1"},{"item":"n2"},{"item":"n3"},{"item":"n4"},{"item":"a1"},{"item":"a2"}]`,
 		},
-		{`
+		{
+			`
 type: array
 init: { gq: '#main div' }
 properties:
@@ -96,7 +104,8 @@ properties:
     - gq: div
 `, `[{"item":"1"},{"item":"2.1"},{"item":"[\"3\"]"},{"item":"{\"n4\":\"4.2\"}"}]`,
 		},
-		{`
+		{
+			`
 type: object
 init: { gq: '#main' }
 properties:
@@ -119,13 +128,15 @@ properties:
     rule: { gq: '#n4' }
 `, `{"array":["3"],"boolean":true,"integer":1,"number":2.1,"object":{"n4":"4.2"},"string":"1"}`,
 		},
-		{`
+		{
+			`
 type: object
 format: number
 rule: { gq: '#main #n4' }
 `, `{"n4":4.2}`,
 		},
-		{`
+		{
+			`
 type: array
 init: { gq: '#main div -> slice(0, 2)' }
 properties:
@@ -134,13 +145,15 @@ properties:
     rule: { gq: 'div' }
 `, `[{"n":1},{"n":2.1}]`,
 		},
-		{`
+		{
+			`
 type: array
 format: number
 rule: { gq: '#main div -> slice(0, 2)' }
 `, `[1,2.1]`,
 		},
-		{`
+		{
+			`
 type: array
 format: number
 rule: 

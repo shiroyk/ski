@@ -82,8 +82,11 @@ func TestNewRequest(t *testing.T) {
 		want   string
 	}{
 		{http.MethodGet, nil, nil, "114514"},
-		{http.MethodPost, url.Values{"key": {"holy"}}.Encode(),
-			map[string]string{"Content-Type": "application/x-www-form-url"}, "key=holy"},
+		{
+			http.MethodPost, url.Values{"key": {"holy"}}.Encode(),
+			map[string]string{"Content-Type": "application/x-www-form-url"},
+			"key=holy",
+		},
 		{http.MethodPost, []byte{226, 153, 130, 239, 184, 142}, nil, "♂︎"},
 		{http.MethodPost, strings.NewReader("fa"), nil, "fa"},
 		{http.MethodPost, bytes.NewBuffer(mpBytes), mpwHeader, "♂︎"},

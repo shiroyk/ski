@@ -18,8 +18,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var configArg string
-var configGenArg string
+var (
+	configArg    string
+	configGenArg string
+)
 
 var configCmd = &cobra.Command{
 	Use:   "config",
@@ -48,7 +50,7 @@ func writeDiskConfig() error {
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(file, bytes, 0644)
+		err = os.WriteFile(file, bytes, 0o600)
 		if err != nil {
 			return err
 		}
@@ -68,14 +70,11 @@ func initConfig() {
 	if err != nil {
 		logger.Error("error reading config file", err)
 	}
-	err = initDependencies(cfg)
-	if err != nil {
-		logger.Error("error initializing dependencies", err)
-	}
+	initDependencies(cfg)
 	rootCmd.SetContext(config.NewContext(context.Background(), cfg))
 }
 
-func initDependencies(config config.Config) error {
+func initDependencies(config config.Config) {
 	di.Provide(fetch.NewFetcher(config.Fetch), false)
 	di.Provide(fetch.DefaultTemplateFuncMap(), false)
 
@@ -87,6 +86,4 @@ func initDependencies(config config.Config) error {
 	}, false)
 
 	js.SetScheduler(js.NewScheduler(config.JS))
-
-	return nil
 }

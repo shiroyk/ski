@@ -1,3 +1,4 @@
+// Package cache the cache JS implementation
 package cache
 
 import (

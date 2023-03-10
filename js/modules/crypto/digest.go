@@ -2,9 +2,9 @@ package crypto
 
 import (
 	"crypto/hmac"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
 	"crypto/sha512"
 	"errors"
@@ -13,8 +13,8 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/js/common"
-	"golang.org/x/crypto/md4"
-	"golang.org/x/crypto/ripemd160"
+	"golang.org/x/crypto/md4"       //nolint:staticcheck
+	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
 )
 
 // Copyright grafana/k6, licensed under the AGPL License.
@@ -26,8 +26,7 @@ func RandomBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 		common.Throw(vm, errors.New("invalid size"))
 	}
 	bytes := make([]byte, size)
-	_, err := rand.Read(bytes)
-	if err != nil {
+	if _, err := rand.Read(bytes); err != nil {
 		common.Throw(vm, err)
 	}
 	return vm.ToValue(vm.NewArrayBuffer(bytes))
@@ -80,7 +79,7 @@ func Ripemd160(input any) (any, error) {
 
 // CreateHash returns a Hasher instance that uses the given algorithm.
 func CreateHash(algorithm string) (*Hasher, error) {
-	h := parseHashFunc(algorithm)
+	h := parseHashFunc(algorithm) //nolint:ifshort
 	if h == nil {
 		return nil, fmt.Errorf("invalid algorithm: %s", algorithm)
 	}
@@ -174,8 +173,7 @@ func (hasher *Hasher) Reset() {
 
 // Encrypt returns the Encoder.
 func (hasher *Hasher) Encrypt(input any) (*Encoder, error) {
-	err := hasher.Update(input)
-	if err != nil {
+	if err := hasher.Update(input); err != nil {
 		return nil, err
 	}
 	return hasher.Digest(), nil

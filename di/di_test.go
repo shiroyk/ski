@@ -11,8 +11,7 @@ func TestProvide(t *testing.T) {
 
 	type test1 interface{}
 	Provide(new(test1), false)
-	_, err := Resolve[test1]()
-	if err != nil {
+	if _, err := Resolve[test1](); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -22,7 +21,7 @@ func TestProvideLazy(t *testing.T) {
 
 	type test2 interface{}
 	ProvideLazy(func() (test2, error) {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}, false)
 	assert.Nil(t, MustResolve[test2]())
 	Provide(new(test2), true)
@@ -34,8 +33,7 @@ func TestResolve(t *testing.T) {
 
 	type test3 struct{}
 	Provide(test3{}, false)
-	_, err := Resolve[test3]()
-	if err != nil {
+	if _, err := Resolve[test3](); err != nil {
 		t.Fatal(err)
 	}
 }

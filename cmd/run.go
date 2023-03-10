@@ -54,7 +54,7 @@ func analyzeModel() (err error) {
 	if runModelArg == "-" {
 		bytes, err = io.ReadAll(os.Stdin)
 	} else {
-		bytes, err = os.ReadFile(runModelArg)
+		bytes, err = os.ReadFile(runModelArg) //nolint:gosec
 	}
 	if err != nil {
 		return
@@ -95,7 +95,7 @@ func runScript() (err error) {
 	if runScriptArg == "-" {
 		bytes, err = io.ReadAll(os.Stdin)
 	} else {
-		bytes, err = os.ReadFile(runScriptArg)
+		bytes, err = os.ReadFile(runScriptArg) //nolint:gosec
 	}
 	if err != nil {
 		return
@@ -130,7 +130,7 @@ func outputJSON(data any) (err error) {
 	}
 
 	if runOutputArg == "" {
-		fmt.Println(string(bytes))
+		fmt.Println(string(bytes)) //nolint:forbidigo
 		return
 	}
 
@@ -138,7 +138,7 @@ func outputJSON(data any) (err error) {
 	if ext == "" {
 		runOutputArg += ".json"
 	}
-	err = os.WriteFile(runOutputArg, bytes, 0644)
+	err = os.WriteFile(runOutputArg, bytes, 0o600)
 	if err != nil {
 		return
 	}

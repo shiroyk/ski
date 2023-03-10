@@ -1,10 +1,13 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestReadConfig(t *testing.T) {
+	t.Parallel()
 	_, err := ReadConfig("~/.config/cloudcat/config.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }

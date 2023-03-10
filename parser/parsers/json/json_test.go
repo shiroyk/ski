@@ -78,6 +78,7 @@ func assertStrings(t *testing.T, arg string, expected []string) {
 }
 
 func TestParser(t *testing.T) {
+	t.Parallel()
 	if _, ok := parser.GetParser(key); !ok {
 		t.Fatal("schema not registered")
 	}

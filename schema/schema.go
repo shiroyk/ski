@@ -1,3 +1,4 @@
+// Package schema the data structure definition
 package schema
 
 import (
@@ -77,13 +78,14 @@ type Property map[string]Schema
 // NewSchema returns a new Schema with the given Type.
 // The first argument is the Schema.Type, second is the Schema.Format.
 func NewSchema(types ...Type) *Schema {
-	if len(types) == 0 {
+	switch {
+	case len(types) == 0:
 		panic("schema must have type")
-	} else if len(types) == 1 {
+	case len(types) == 1:
 		return &Schema{
 			Type: types[0],
 		}
-	} else {
+	default:
 		return &Schema{
 			Type:   types[0],
 			Format: types[1],
@@ -192,6 +194,8 @@ func buildStringSchema(node *yaml.Node) (schema Schema, err error) {
 }
 
 // buildTypedSchema builds a specific Type Schema
+//
+//nolint:nakedret
 func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
 	for i := 0; i < len(node.Content); i += 2 {
 		field, value := node.Content[i], node.Content[i+1]

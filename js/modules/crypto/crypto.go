@@ -1,3 +1,4 @@
+// Package crypto the crypto JS implementation
 package crypto
 
 import (

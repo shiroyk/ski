@@ -5,6 +5,7 @@ import (
 )
 
 func TestParseRuleFunction(t *testing.T) {
+	t.Parallel()
 	rules := []string{
 		`-> -> unknown`, `-> text(`, `-> text(")`,
 		`-> text("')`, `-> text('")`, `-> text(' ", ")`,

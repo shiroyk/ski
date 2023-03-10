@@ -51,31 +51,36 @@ func TestActions(t *testing.T) {
 		want          any
 		str           bool
 	}{
-		{`
+		{
+			`
 - act: 1
 - and
 - act: 1
 `, `1`, `11`, true,
 		},
-		{`
+		{
+			`
 - act: 1
 - and
 - act: 1
 `, `1`, []string{`1`, `1`}, false,
 		},
-		{`
+		{
+			`
 - act: 2
 - or
 - act: 1
 `, `1`, `1`, true,
 		},
-		{`
+		{
+			`
 - act: 2
 - or
 - act: 1
 `, `1`, []string{`1`}, false,
 		},
-		{`
+		{
+			`
 - act: 1
 - and
 - act: 2
@@ -83,7 +88,8 @@ func TestActions(t *testing.T) {
 - act: 1
 `, `1`, `11`, true,
 		},
-		{`
+		{
+			`
 - act: 1
 - and
 - act: 2
@@ -91,7 +97,8 @@ func TestActions(t *testing.T) {
 - act: 1
 `, `1`, []string{`1`, `1`}, false,
 		},
-		{`
+		{
+			`
 - - act: 1
     act: 1
 - and
@@ -100,7 +107,8 @@ func TestActions(t *testing.T) {
 - - act: 1
 `, `1`, `11`, true,
 		},
-		{`
+		{
+			`
 - - act: 1
     act: 1
 - and
@@ -136,5 +144,4 @@ func TestActions(t *testing.T) {
 			assert.Equal(t, testCase.want, result)
 		})
 	}
-
 }

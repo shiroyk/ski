@@ -1,3 +1,4 @@
+// Package modules the JS module
 package modules
 
 import (

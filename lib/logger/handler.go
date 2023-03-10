@@ -98,6 +98,8 @@ func (c *ConsoleHandler) WithGroup(name string) slog.Handler {
 // and the value of [Level.String] is output.
 //
 // Each call to Handle results in a single serialized call to io.Writer.Write.
+//
+//nolint:nakedret
 func (c *ConsoleHandler) Handle(_ context.Context, r slog.Record) (err error) {
 	time := ""
 	if !r.Time.IsZero() {
@@ -114,8 +116,8 @@ func (c *ConsoleHandler) Handle(_ context.Context, r slog.Record) (err error) {
 		buf.WriteByte(' ')
 	})
 
-	var levelColor = grey
-	switch r.Level {
+	levelColor := grey
+	switch r.Level { //nolint:exhaustive
 	case slog.LevelDebug:
 		levelColor = blue
 	case slog.LevelWarn:
@@ -129,7 +131,7 @@ func (c *ConsoleHandler) Handle(_ context.Context, r slog.Record) (err error) {
 		return
 	}
 
-	_, err = fmt.Fprintf(c.w, "[%s] \x1b[%dm%s \x1b[0m%s %s\n", time, levelColor, r.Level.String(), r.Message, buf.String())
+	_, err = fmt.Fprintf(c.w, "[%s] \x1b[%dm%s \x1b[0m%s %s\n", time, levelColor, r.Level.String(), r.Message, buf.String()) //nolint:lll
 
 	return
 }

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -99,12 +100,11 @@ func NewRequest(method, u string, body any, headers map[string]string) (*Request
 		return nil, err
 	}
 
-	if headers != nil {
-		// set headers
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+	// set headers
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
+
 	setDefaultHeader(req.Header)
 
 	return &Request{Request: req}, nil
@@ -118,7 +118,7 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 	}
 
 	buf := new(bytes.Buffer)
-	if err := tmp.Execute(buf, arg); err != nil {
+	if err = tmp.Execute(buf, arg); err != nil {
 		return nil, err
 	}
 
@@ -131,7 +131,7 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 	}
 	defer func() {
 		putTextprotoReader(tp)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			err = io.ErrUnexpectedEOF
 		}
 	}()
@@ -154,7 +154,7 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 
 	// Subsequent lines: Key: value.
 	mimeHeader, err := tp.ReadMIMEHeader()
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
 	req.Header = http.Header(mimeHeader)

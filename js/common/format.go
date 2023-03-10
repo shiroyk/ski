@@ -37,7 +37,7 @@ func bufferFormat(vm *goja.Runtime, b *bytes.Buffer, f string, args ...goja.Valu
 	pct := false
 	argNum := 0
 	for _, chr := range f {
-		if pct {
+		if pct { //nolint:nestif
 			if argNum < len(args) {
 				if runeFormat(vm, chr, args[argNum], b) {
 					argNum++

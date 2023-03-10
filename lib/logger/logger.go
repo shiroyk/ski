@@ -1,3 +1,4 @@
+// Package logger the log helpers
 package logger
 
 import (

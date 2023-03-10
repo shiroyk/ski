@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/des"
+	"crypto/des" //nolint:gosec
 	"crypto/rand"
 	"fmt"
 	"strings"
@@ -66,9 +66,9 @@ func CreateCipher(algorithm string, key, iv any) (*Cipher, error) {
 	case "AES":
 		block, err = aes.NewCipher(keyByte)
 	case "DES":
-		block, err = des.NewCipher(keyByte)
+		block, err = des.NewCipher(keyByte) //nolint:gosec
 	case "TripleDES":
-		block, err = des.NewTripleDESCipher(keyByte)
+		block, err = des.NewTripleDESCipher(keyByte) //nolint:gosec
 	default:
 		return nil, fmt.Errorf("invalid algorithm: %s", algorithm)
 	}
@@ -233,7 +233,7 @@ func (PKCS7) UnPadding(data []byte) []byte {
 type PKCS5 struct{}
 
 // Padding the blocks with bytes
-func (PKCS5) Padding(data []byte, blockSize int) []byte {
+func (PKCS5) Padding(data []byte, _ int) []byte {
 	return pkcs7.Padding(data, 8)
 }
 

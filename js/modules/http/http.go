@@ -1,3 +1,4 @@
+// Package http the http JS implementation
 package http
 
 import (
@@ -27,7 +28,7 @@ func init() {
 }
 
 // Http module for fetching resources (including across the network).
-type Http struct { //nolint:var-naming
+type Http struct { //nolint
 	fetch fetch.Fetch
 }
 

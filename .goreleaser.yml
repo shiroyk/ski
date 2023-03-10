@@ -1,0 +1,63 @@
+project_name: cloudcat
+
+env:
+  - GO111MODULE=on
+
+builds:
+  - id: cloudcat
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/shiroyk/cloudcat/lib/consts.Version={{ .Version }}
+      - -X github.com/shiroyk/cloudcat/lib/consts.CommitSHA={{ .ShortCommit }}
+    flags:
+      - -trimpath
+    binary: cloudcat
+    goos:
+      - darwin
+      - freebsd
+      - linux
+      - windows
+    goarch:
+      - "386"
+      - amd64
+      - arm
+      - arm64
+      - mips
+      - mipsle
+      - mips64
+      - mips64le
+    goarm:
+      - "5"
+      - "6"
+      - "7"
+    gomips:
+      - hardfloat
+      - softfloat
+    ignore:
+      - goarch: mips64
+        gomips: softfloat
+      - goarch: mips64le
+        gomips: softfloat
+      - goos: windows
+        goarch: arm
+        goarm: 5
+      - goos: freebsd
+        goarch: arm
+
+archives:
+  - name_template: >-
+      {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{- if eq .Arch "mips" }}_{{ .Mips }}
+      {{- else if eq .Arch "mipsle" }}_{{ .Mips }}{{ end }}_{{ .Version }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+changelog:
+  skip: true

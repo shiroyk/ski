@@ -1,3 +1,4 @@
+// Package v1 the version 1 api
 package v1
 
 import (
@@ -70,7 +71,7 @@ func run(res *Response, req *http.Request) error {
 		if err != nil {
 			return err
 		}
-		result, err := js.RunString(parserCtx, string(body))
+		result, err := js.RunString(parserCtx, string(body)) //nolint:contextcheck
 		if err != nil {
 			return err
 		}
@@ -101,7 +102,7 @@ func run(res *Response, req *http.Request) error {
 		URL:    model.Source.HTTP,
 	})
 	defer parserCtx.Cancel()
-	mRes, err := fetcher.DoRequest(mReq.WithContext(parserCtx))
+	mRes, err := fetcher.DoRequest(mReq.WithContext(parserCtx)) //nolint:contextcheck
 	if err != nil {
 		return err
 	}

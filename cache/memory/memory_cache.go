@@ -1,3 +1,4 @@
+// Package memory the memory key/value store
 package memory
 
 import (

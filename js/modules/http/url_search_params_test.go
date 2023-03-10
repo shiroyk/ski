@@ -33,7 +33,7 @@ func TestURLSearchParams(t *testing.T) {
 		`assert.true(!form.has('name'))`,
 		`form.set('name', 'foobar');
 		 assert.equal(form.values().length, 2)`,
-	} //nolint:gofumpt
+	}
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {

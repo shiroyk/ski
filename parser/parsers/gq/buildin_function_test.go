@@ -5,6 +5,7 @@ import (
 )
 
 func TestBuildInFuncGet(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `-> get`); err == nil {
 		t.Error("Unexpected function error")
 	}
@@ -17,6 +18,7 @@ func TestBuildInFuncGet(t *testing.T) {
 }
 
 func TestBuildInFuncSet(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `-> set`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -31,6 +33,7 @@ func TestBuildInFuncSet(t *testing.T) {
 }
 
 func TestBuildInFuncText(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `#main #n1 -> text -> text`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -41,6 +44,7 @@ func TestBuildInFuncText(t *testing.T) {
 }
 
 func TestBuildInFuncAttr(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `#main #n1 -> text -> attr`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -55,6 +59,7 @@ func TestBuildInFuncAttr(t *testing.T) {
 }
 
 func TestBuildInFuncJoin(t *testing.T) {
+	t.Parallel()
 	assertGetString(t, `#main div -> join(' < ')`, "1 < 2 < 3 < 4 < 5 < 6")
 
 	assertGetString(t, `#main div -> join("")`, "123456")
@@ -63,6 +68,7 @@ func TestBuildInFuncJoin(t *testing.T) {
 }
 
 func TestBuildInFuncHref(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `.body ul #a4 -> text -> href`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -71,6 +77,7 @@ func TestBuildInFuncHref(t *testing.T) {
 }
 
 func TestBuildInFuncHtml(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `-> html(test)`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -82,6 +89,7 @@ func TestBuildInFuncHtml(t *testing.T) {
 }
 
 func TestBuildInFuncPrev(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `#foot #nf3 -> text -> prev`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -92,6 +100,7 @@ func TestBuildInFuncPrev(t *testing.T) {
 }
 
 func TestBuildInFuncNext(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `#foot #nf2 -> text -> next`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -102,6 +111,7 @@ func TestBuildInFuncNext(t *testing.T) {
 }
 
 func TestBuildInFuncSlice(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `-> slice`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -120,6 +130,7 @@ func TestBuildInFuncSlice(t *testing.T) {
 }
 
 func TestBuildInFuncChild(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `.body ul -> text -> child`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -130,6 +141,7 @@ func TestBuildInFuncChild(t *testing.T) {
 }
 
 func TestBuildInFuncParent(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `.body ul -> text -> parent`); err == nil {
 		t.Fatal("Unexpected function error")
 	}
@@ -140,6 +152,7 @@ func TestBuildInFuncParent(t *testing.T) {
 }
 
 func TestBuildInFuncParents(t *testing.T) {
+	t.Parallel()
 	if _, err := gq.GetString(ctx, content, `.body ul -> text -> parents`); err == nil {
 		t.Fatal("Unexpected type")
 	}

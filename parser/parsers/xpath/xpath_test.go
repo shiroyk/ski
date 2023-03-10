@@ -62,8 +62,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestParser(t *testing.T) {
-	_, ok := parser.GetParser(key)
-	if !ok {
+	t.Parallel()
+	if _, ok := parser.GetParser(key); !ok {
 		t.Fatal("schema not registered")
 	}
 
@@ -85,6 +85,7 @@ func TestParser(t *testing.T) {
 }
 
 func TestGetString(t *testing.T) {
+	t.Parallel()
 	if o, _ := xpath.GetStrings(ctx, content, `///`); o != nil {
 		t.Fatal("Unexpected type")
 	}
@@ -109,6 +110,7 @@ func TestGetString(t *testing.T) {
 }
 
 func TestGetStrings(t *testing.T) {
+	t.Parallel()
 	if o, _ := xpath.GetStrings(ctx, content, `//unknown`); o != nil {
 		t.Fatal("Unexpected type")
 	}
@@ -127,6 +129,7 @@ func TestGetStrings(t *testing.T) {
 }
 
 func TestGetElement(t *testing.T) {
+	t.Parallel()
 	if o, _ := xpath.GetElement(ctx, content, `//unknown`); o != "" {
 		t.Fatal("Unexpected type")
 	}
@@ -141,6 +144,7 @@ func TestGetElement(t *testing.T) {
 }
 
 func TestGetElements(t *testing.T) {
+	t.Parallel()
 	if o, _ := xpath.GetElements(ctx, content, `//unknown`); o != nil {
 		t.Fatal("Unexpected type")
 	}
@@ -149,7 +153,9 @@ func TestGetElements(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, []string{"<class>one even row</class>", "<class>two odd row</class>",
+	assert.Equal(t, []string{
+		"<class>one even row</class>", "<class>two odd row</class>",
 		"<class>three even row</class>", "<class>four odd row</class>",
-		"<class>five even row odder</class>", "<class>six odd row</class>"}, objects)
+		"<class>five even row odder</class>", "<class>six odd row</class>",
+	}, objects)
 }

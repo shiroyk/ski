@@ -13,8 +13,8 @@ import (
 
 func TestCookie(t *testing.T) {
 	tempDir := filepath.Join(os.TempDir(), "test_cache")
-	os.MkdirAll(tempDir, os.ModePerm)
-	defer os.RemoveAll(tempDir)
+	assert.NoError(t, os.MkdirAll(tempDir, os.ModePerm))
+	defer assert.NoError(t, os.RemoveAll(tempDir))
 
 	c, err := NewCookie(cache.Options{Path: tempDir})
 	if err != nil {

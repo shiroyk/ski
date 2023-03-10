@@ -1,3 +1,4 @@
+// Package consts the standard constants
 package consts
 
 // Banner the banner

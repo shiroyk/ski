@@ -1,3 +1,4 @@
+// Package regex the regexp parser
 package regex
 
 import (
@@ -88,6 +89,7 @@ var reOptMap = map[string]regexp2.RegexOptions{
 	"u": regexp2.Unicode,
 }
 
+//nolint:gocognit
 func parseRegexp(arg string) (re *regexp2.Regexp, replace string, start, count int, err error) {
 	state := commonState
 	pattern := strings.Builder{}
@@ -137,10 +139,7 @@ func parseRegexp(arg string) (re *regexp2.Regexp, replace string, start, count i
 	}
 
 	if pattern.Len() > 0 {
-		s1, s2, ok := strings.Cut(pattern.String(), ",")
-		if !ok {
-			count = -1
-		}
+		s1, s2, _ := strings.Cut(pattern.String(), ",")
 		start, err = strconv.Atoi(s1)
 		if err != nil {
 			start = -1

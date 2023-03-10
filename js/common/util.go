@@ -10,7 +10,7 @@ import (
 
 // Throw js exception
 func Throw(vm *goja.Runtime, err error) {
-	if e, ok := err.(*goja.Exception); ok {
+	if e, ok := err.(*goja.Exception); ok { //nolint:errorlint
 		panic(e)
 	}
 	panic(vm.ToValue(err))

@@ -26,13 +26,13 @@ var (
 )
 
 func TestParser(t *testing.T) {
-	_, ok := parser.GetParser(key)
-	if !ok {
+	if _, ok := parser.GetParser(key); !ok {
 		t.Fatal("parser not registered")
 	}
 }
 
 func TestGetString(t *testing.T) {
+	t.Parallel()
 	for _, s := range testCase {
 		t.Run(s.re, func(t *testing.T) {
 			str, err := re.GetString(nil, s.str, s.re)
@@ -45,6 +45,7 @@ func TestGetString(t *testing.T) {
 }
 
 func TestGetStrings(t *testing.T) {
+	t.Parallel()
 	for _, s := range testCase {
 		t.Run(s.re, func(t *testing.T) {
 			str, err := re.GetStrings(nil, []string{s.str}, s.re)

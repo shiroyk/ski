@@ -1,7 +1,6 @@
 package bolt
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,8 +12,8 @@ import (
 
 func TestCache(t *testing.T) {
 	tempDir := filepath.Join(os.TempDir(), "test_cache")
-	os.MkdirAll(tempDir, os.ModePerm)
-	defer os.RemoveAll(tempDir)
+	assert.NoError(t, os.MkdirAll(tempDir, os.ModePerm))
+	defer assert.NoError(t, os.RemoveAll(tempDir))
 
 	c, err := NewCache(cache.Options{Path: tempDir})
 	if err != nil {
@@ -41,8 +40,7 @@ func TestCache(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	_, ok := c.Get(key)
-	if ok {
-		t.Fatal(fmt.Sprintf("not expired: %v", key))
+	if _, ok := c.Get(key); ok {
+		t.Fatalf("not expired: %v", key)
 	}
 }

@@ -16,12 +16,15 @@ import (
 )
 
 const (
+	// DefaultMaxTimeToWaitGetVM default retries time
 	DefaultMaxTimeToWaitGetVM = 500 * time.Millisecond
-	DefaultMaxRetriesGetVM    = 3
+	// DefaultMaxRetriesGetVM default retries times
+	DefaultMaxRetriesGetVM = 3
 )
 
 var (
-	defaultScheduler   atomic.Value
+	defaultScheduler atomic.Value
+	// ErrSchedulerClosed the scheduler is closed error
 	ErrSchedulerClosed = errors.New("scheduler is closed")
 )
 

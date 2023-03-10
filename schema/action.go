@@ -19,8 +19,10 @@ type Action struct {
 }
 
 // UnmarshalYAML decodes the Action from yaml
+//
+//nolint:nakedret
 func (a *Actions) UnmarshalYAML(value *yaml.Node) (err error) {
-	switch value.Kind {
+	switch value.Kind { //nolint:exhaustive
 	case yaml.MappingNode:
 		var steps []Step
 		steps, err = buildMapSteps(value)
@@ -41,6 +43,8 @@ func (a *Actions) UnmarshalYAML(value *yaml.Node) (err error) {
 				act, err = toActionOp(node.Value)
 			case yaml.SequenceNode:
 				act, err = buildAction(node)
+			default:
+				continue
 			}
 
 			if err != nil {
@@ -181,6 +185,8 @@ func (a *Actions) GetElements(ctx *parser.Context, content any) ([]string, error
 }
 
 // runActions runs the Actions
+//
+//nolint:nakedret
 func runActions[T string | []string](
 	action Actions,
 	ctx *parser.Context,

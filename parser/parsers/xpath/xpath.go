@@ -1,3 +1,4 @@
+// Package xpath the xpath parser
 package xpath
 
 import (

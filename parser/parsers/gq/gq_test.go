@@ -100,8 +100,8 @@ func assertGetElements(t *testing.T, arg string, expected []string) {
 }
 
 func TestParser(t *testing.T) {
-	_, ok := parser.GetParser(key)
-	if !ok {
+	t.Parallel()
+	if _, ok := parser.GetParser(key); !ok {
 		t.Fatal("schema not registered")
 	}
 
@@ -128,6 +128,7 @@ func TestParser(t *testing.T) {
 }
 
 func TestGetString(t *testing.T) {
+	t.Parallel()
 	assertGetString(t, `#main .row -> text`, "1\n2\n3\n4\n5\n6")
 
 	assertGetString(t, `.body ul a -> parent(li) -> attr(id) -> join(-)`, "a1-a2-a3-a4")
@@ -136,18 +137,21 @@ func TestGetString(t *testing.T) {
 }
 
 func TestGetStrings(t *testing.T) {
+	t.Parallel()
 	assertGetStrings(t, `.body ul li -> child(a) -> attr(title)`, []string{"Google page", "Github page", "Golang page", "Home page"})
 
 	assertGetStrings(t, `.body ul a`, []string{"Google", "Github", "Golang", "Home"})
 }
 
 func TestGetElement(t *testing.T) {
+	t.Parallel()
 	assertGetElement(t, `.body ul a -> parents(li)`, `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>`)
 
 	assertGetElement(t, `.body ul a -> slice(1) -> text`, `Github`)
 }
 
 func TestGetElements(t *testing.T) {
+	t.Parallel()
 	assertGetElements(t, `#foot div -> slice(0, 3)`, []string{
 		`<div id="nf1" class="one even row">f1</div>`,
 		`<div id="nf2" class="two odd row">f2</div>`,

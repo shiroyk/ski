@@ -51,7 +51,9 @@ func TestContext(t *testing.T) {
 }
 
 func TestParentContext(t *testing.T) {
-	key := "parentKey"
+	t.Parallel()
+	type k string
+	key := k("parentKey")
 	value := "foo"
 	valueCtx := context.WithValue(context.Background(), key, value)
 	parent, cancel := context.WithTimeout(valueCtx, time.Minute)

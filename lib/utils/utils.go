@@ -1,3 +1,4 @@
+// Package utils the helpers
 package utils
 
 import (
@@ -35,19 +36,19 @@ func EmptyOr[T any](value, defaultValue []T) []T {
 func ExpandPath(path string) (string, error) {
 	// expand local directory
 	if strings.HasPrefix(path, ".") {
-		if cwd, err := os.Getwd(); err != nil {
+		cwd, err := os.Getwd()
+		if err != nil {
 			return "", err
-		} else {
-			return filepath.Join(cwd, path[1:]), nil
 		}
+		return filepath.Join(cwd, path[1:]), nil
 	}
 	// expand ~ as shortcut for home directory
 	if strings.HasPrefix(path, "~") {
-		if home, err := os.UserHomeDir(); err != nil {
+		home, err := os.UserHomeDir()
+		if err != nil {
 			return "", err
-		} else {
-			return filepath.Join(home, path[1:]), nil
 		}
+		return filepath.Join(home, path[1:]), nil
 	}
 	return path, nil
 }
@@ -55,7 +56,10 @@ func ExpandPath(path string) (string, error) {
 // ReadYaml read the YAML file and convert it to T
 func ReadYaml[T any](path string) (t T, err error) {
 	path, err = ExpandPath(path)
-	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	bytes, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return
 	}

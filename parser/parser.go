@@ -1,3 +1,4 @@
+// Package parser the schema parser
 package parser
 
 import (

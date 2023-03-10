@@ -170,7 +170,7 @@ func (gqBuildInFunc) Href(ctx *parser.Context, content any, _ ...string) (any, e
 // the selection - that is, the HTML including the first element's
 // tag and attributes, or gets the HTML contents of the first element
 // in the set of matched elements. It includes text and comment nodes;
-func (gqBuildInFunc) Html(_ *parser.Context, content any, args ...string) (any, error) {
+func (gqBuildInFunc) Html(_ *parser.Context, content any, args ...string) (any, error) { //nolint
 	var err error
 	var outer bool
 
@@ -293,7 +293,7 @@ func (gqBuildInFunc) Parent(_ *parser.Context, content any, args ...string) (any
 // Parents gets the ancestors of each element in the current Selection.
 // if present the selector will return filtered by a selector.
 func (gqBuildInFunc) Parents(_ *parser.Context, content any, args ...string) (any, error) {
-	if node, ok := content.(*goquery.Selection); ok {
+	if node, ok := content.(*goquery.Selection); ok { //nolint:nestif
 		if len(args) > 0 {
 			if len(args) > 1 {
 				until, err := cast.ToBoolE(args[1])

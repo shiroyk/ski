@@ -3,7 +3,6 @@ package cmd
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/shiroyk/cloudcat/api"
@@ -29,8 +28,8 @@ var rootCmd = &cobra.Command{
 			apiTokenArg = hex.EncodeToString(bytes)
 		}
 
-		fmt.Printf("Secret: %v\n", apiTokenArg)
-		fmt.Printf("Service start http://%s\n", apiAddressArg)
+		cmd.Printf("Secret: %v\n", apiTokenArg)
+		cmd.Printf("Service start http://%s\n", apiAddressArg)
 
 		return api.Server(api.Options{
 			Address: apiAddressArg,

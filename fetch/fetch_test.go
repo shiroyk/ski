@@ -16,6 +16,7 @@ import (
 )
 
 func TestCharsetFromHeaders(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=iso-8859-9")
 		_, _ = fmt.Fprint(w, "G\xfcltekin")
@@ -31,6 +32,7 @@ func TestCharsetFromHeaders(t *testing.T) {
 }
 
 func TestCharsetFromBody(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = fmt.Fprint(w, "G\xfcltekin")
@@ -43,6 +45,7 @@ func TestCharsetFromBody(t *testing.T) {
 }
 
 func TestCharsetProvidedWithRequest(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = fmt.Fprint(w, "G\xfcltekin")
@@ -57,6 +60,7 @@ func TestCharsetProvidedWithRequest(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
+	t.Parallel()
 	var times atomic.Int32
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if times.Load() < DefaultRetryTimes {
@@ -92,6 +96,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
+	t.Parallel()
 	fetch := newFetcherDefault()
 
 	req, err := NewRequest(http.MethodGet, "", nil, nil)
@@ -106,6 +111,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestDecompress(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		encoding := r.Header.Get("Content-Encoding")
 		w.Header().Set("Content-Encoding", encoding)

@@ -1,3 +1,4 @@
+// Package bolt a low-level key/value store in pure Go
 package bolt
 
 import (
@@ -42,11 +43,11 @@ func NewDB(path, name string, interval time.Duration) (*DB, error) {
 	if path == "" {
 		path = cache.DefaultPath
 	}
-	err := os.MkdirAll(path, 0700)
+	err := os.MkdirAll(path, 0o700)
 	if err != nil {
 		return nil, err
 	}
-	db, err := bbolt.Open(filepath.Join(path, name), 0600, &bbolt.Options{
+	db, err := bbolt.Open(filepath.Join(path, name), 0o600, &bbolt.Options{
 		Timeout:         1 * time.Second,
 		InitialMmapSize: 1024,
 	})
@@ -190,7 +191,7 @@ func (db *DB) expire() {
 	defer ticker.Stop()
 
 	exitSign := make(chan os.Signal, 1)
-	signal.Notify(exitSign, os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(exitSign, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	for {
 		select {

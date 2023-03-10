@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"os"
-
-	_ "github.com/shiroyk/cloudcat/analyzer"
 )
 
 // Execute main command
