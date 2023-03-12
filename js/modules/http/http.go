@@ -157,3 +157,8 @@ func (h *Http) Template(tpl string, arg map[string]any) (*Response, error) {
 
 	return NewResponse(res), nil
 }
+
+// SetProxy set the proxy URLs for the specified URL.
+func (h *Http) SetProxy(u string, proxyURL ...string) {
+	fetch.AddRoundRobinProxy(u, proxyURL...)
+}

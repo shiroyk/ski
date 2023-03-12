@@ -80,6 +80,12 @@ func TestHttp(t *testing.T) {
 		 } catch (e) {
 			assert.true(e.toString().includes("unsupported request body"));
 		 }`,
+		`try {
+			http.setProxy(url, 'http://localhost:8080');
+			http.get(url);
+		 } catch (e) {
+			assert.true(e.toString().includes("proxyconnect tcp: dial tcp 127.0.0.1:8080: connect: connection refused"));
+		 }`,
 	}
 
 	for i, s := range testCase {
