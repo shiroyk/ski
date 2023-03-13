@@ -8,7 +8,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/dlclark/regexp2 v1.8.1
 	github.com/dop251/goja v0.0.0-20230226152633-7c93113e17ac
-	github.com/go-rod/rod v0.112.6
+	github.com/go-chi/chi/v5 v5.0.8
 	github.com/ohler55/ojg v1.17.5
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.6.1
@@ -31,8 +31,5 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/ysmood/goob v0.4.0 // indirect
-	github.com/ysmood/gson v0.7.3 // indirect
-	github.com/ysmood/leakless v0.8.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 )

@@ -28,37 +28,16 @@ const (
 	contentType                      = "Content-Type"
 )
 
-// RouteRun the run routes
-func RouteRun(token string) http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("/v1/run", HandleFunc(run))
-	mux.Handle("/", HandleFunc(func(w *Response, r *http.Request) error {
-		if r.URL.Path != "/" {
-			return w.JSON(http.StatusNotFound, Msg{http.StatusText(http.StatusNotFound)})
-		}
-		w.WriteHeader(http.StatusNoContent)
-		return nil
-	}))
-	mux.Handle("/ping", HandleFunc(ping))
-
-	return auth(token, mux)
-}
-
-func ping(res *Response, _ *http.Request) error {
-	res.WriteHeader(http.StatusNoContent)
-	return nil
-}
-
-func run(res *Response, req *http.Request) error {
+func run(w http.ResponseWriter, req *http.Request) error {
 	debug := req.Header.Get(debugHeader) != ""
 
 	resContentType := mimeApplicationJSONCharsetUTF8
 	var log slog.Handler = slog.NewTextHandler(os.Stdout)
 	if debug {
-		log = newResponseHandler(res, slog.LevelDebug)
+		log = newResponseHandler(w, slog.LevelDebug)
 		resContentType = mimeApplicationNDJSONCharsetUTF8
 	}
-	res.Header().Set(contentType, resContentType)
+	w.Header().Set(contentType, resContentType)
 
 	isJs := strings.HasPrefix(req.Header.Get(contentType), mimeApplicationJavaScript)
 	if isJs {
@@ -76,7 +55,7 @@ func run(res *Response, req *http.Request) error {
 			return err
 		}
 
-		return res.JSON(http.StatusOK, result)
+		return JSON(w, http.StatusOK, result)
 	}
 
 	model := new(schema.Model)
@@ -109,23 +88,23 @@ func run(res *Response, req *http.Request) error {
 
 	result := analyzer.Analyze(parserCtx, model.Schema, mRes.String())
 
-	return res.JSON(http.StatusOK, result)
+	return JSON(w, http.StatusOK, result)
 }
 
 // responseHandler is a Handler that writes Records to an echo.Response as
 // line-delimited JSON objects.
 type responseHandler struct {
 	level        slog.Leveler
-	w            *Response
+	w            http.ResponseWriter
 	attrs, group string
 }
 
 // newResponseHandler creates a responseHandler that writes to w,
 // using the default options.
-func newResponseHandler(res *Response, l slog.Leveler) *responseHandler {
+func newResponseHandler(w http.ResponseWriter, l slog.Leveler) *responseHandler {
 	return &responseHandler{
 		level: l,
-		w:     res,
+		w:     w,
 	}
 }
 
@@ -193,6 +172,6 @@ func (c *responseHandler) Handle(_ context.Context, r slog.Record) (err error) {
 	if err != nil {
 		return
 	}
-	c.w.Flush()
+	c.w.(http.Flusher).Flush()
 	return
 }

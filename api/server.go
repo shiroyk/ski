@@ -6,7 +6,6 @@ import (
 	"time"
 
 	v1 "github.com/shiroyk/cloudcat/api/v1"
-	"github.com/shiroyk/cloudcat/lib/utils"
 )
 
 const (
@@ -18,17 +17,17 @@ const (
 
 // Options the api server configuration
 type Options struct {
-	Token   string        `yaml:"token"`
-	Address string        `yaml:"address"`
-	Timeout time.Duration `yaml:"timeout"`
+	Token      string        `yaml:"token"`
+	Address    string        `yaml:"address"`
+	Timeout    time.Duration `yaml:"timeout"`
+	RequestLog bool          `yaml:"request-log"`
 }
 
 // Server the api service
 func Server(opt Options) *http.Server {
 	return &http.Server{
 		Addr:              opt.Address,
-		Handler:           v1.RouteRun(opt.Token),
-		ReadHeaderTimeout: utils.ZeroOr(opt.Timeout, DefaultTimeout),
-		WriteTimeout:      utils.ZeroOr(opt.Timeout, DefaultTimeout),
+		Handler:           v1.Routes(opt.Token, opt.Timeout, opt.RequestLog),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 }

@@ -13,6 +13,7 @@ var (
 	apiAddressArg string
 	apiTokenArg   string
 	apiTimeoutArg time.Duration
+	apiRequestLog bool
 )
 
 var rootCmd = &cobra.Command{
@@ -32,9 +33,10 @@ var rootCmd = &cobra.Command{
 		cmd.Printf("Service start http://%s\n", apiAddressArg)
 
 		return api.Server(api.Options{
-			Address: apiAddressArg,
-			Token:   apiTokenArg,
-			Timeout: runTimeoutArg,
+			Address:    apiAddressArg,
+			Token:      apiTokenArg,
+			Timeout:    runTimeoutArg,
+			RequestLog: apiRequestLog,
 		}).ListenAndServe()
 	},
 }
@@ -44,4 +46,5 @@ func init() {
 	rootCmd.Flags().StringVarP(&apiAddressArg, "address", "a", api.DefaultAddress, "api service address")
 	rootCmd.Flags().StringVarP(&apiTokenArg, "secret", "s", "", "api service secret")
 	rootCmd.Flags().DurationVarP(&apiTimeoutArg, "timeout", "t", api.DefaultTimeout, "api service timeout")
+	rootCmd.Flags().BoolVarP(&apiRequestLog, "request", "r", true, "api service request log output")
 }
