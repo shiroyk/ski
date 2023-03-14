@@ -9,7 +9,7 @@ require (
 	github.com/dlclark/regexp2 v1.8.1
 	github.com/dop251/goja v0.0.0-20230226152633-7c93113e17ac
 	github.com/go-chi/chi/v5 v5.0.8
-	github.com/ohler55/ojg v1.17.5
+	github.com/ohler55/ojg v1.18.1
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
