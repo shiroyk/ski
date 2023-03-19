@@ -2,9 +2,15 @@
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/shiroyk/cloudcat)
 [![Go Report Card](https://goreportcard.com/badge/github.com/shiroyk/cloudcat)](https://goreportcard.com/report/github.com/shiroyk/cloudcat)
 ![GitHub](https://img.shields.io/github/license/shiroyk/cloudcat)<br/>
-**Cloudcat** is a tool for extracting structured data from websites using YAML configuration and the syntax rule is extensible.<br/>
+**Cloudcat** is a tool for extracting structured data from websites using extensible YAML syntax rules.<br/>
+The following syntax rules are built in:
+ - [Goquery](https://github.com/PuerkitoBio/goquery)
+ - [JS](https://github.com/dop251/goja)
+ - [JSONPath](https://github.com/ohler55/ojg)
+ - [Regexp](https://github.com/dlclark/regexp2)
+ - [XPath](https://github.com/antchfx/xpath)
 ## CLI example
-run analyze a model
+run the **Model**
 ```shell
 cat << EOF | cloudcat run -m -
 source:
@@ -38,7 +44,7 @@ schema:
           regex: /[^\d]/
 EOF
 ```
-run a js script
+run the **JavaScript**
 ```shell
 cat << EOF | cloudcat run -s -
 const http = require('cloudcat/http');
