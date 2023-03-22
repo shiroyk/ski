@@ -78,7 +78,7 @@ func run(w http.ResponseWriter, req *http.Request) error {
 	parserCtx := parser.NewContext(parser.Options{
 		Parent: req.Context(),
 		Logger: slog.New(log),
-		URL:    model.Source.HTTP,
+		URL:    mReq.URL.String(),
 	})
 	defer parserCtx.Cancel()
 	mRes, err := fetcher.DoRequest(mReq.WithContext(parserCtx)) //nolint:contextcheck
