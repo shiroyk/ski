@@ -140,21 +140,6 @@ func NewStep(parser string, rule string) Step {
 // Actions slice of Action
 type Actions []Action
 
-// MarshalYAML encodes to yaml
-func (a Actions) MarshalYAML() (ret any, err error) {
-	if len(a) == 1 {
-		return a[0], nil
-	}
-	s := make([]any, len(a))
-	for i, action := range a {
-		s[i], err = action.MarshalYAML()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return s, nil
-}
-
 // GetString run the action returns a string
 func (a *Actions) GetString(ctx *parser.Context, content any) (string, error) {
 	return runActions(*a, ctx, content,
