@@ -8,7 +8,7 @@ import (
 
 // Cache is an implementation of Cache that stores bytes in in-memory.
 type Cache struct {
-	sync.RWMutex
+	sync.Mutex
 	items   map[string][]byte
 	timeout map[string]int64
 }
@@ -32,9 +32,9 @@ func (c *Cache) Get(key string) ([]byte, bool) {
 
 // Set saves []byte to the cache with key
 func (c *Cache) Set(key string, value []byte) {
-	c.RLock()
+	c.Lock()
 	c.items[key] = value
-	c.RUnlock()
+	c.Unlock()
 }
 
 // SetWithTimeout saves []byte to the cache with key
