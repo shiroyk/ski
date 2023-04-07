@@ -232,7 +232,9 @@ func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
 
 // MarshalYAML encodes the Schema
 func (schema Schema) MarshalYAML() (any, error) {
-	if schema.Type == StringType && len(schema.Init) == 0 {
+	if schema.Type == StringType &&
+		len(schema.Init) == 0 &&
+		len(schema.Rule) > 0 {
 		return schema.Rule, nil
 	}
 	s := make(map[string]any, 5)
@@ -254,6 +256,9 @@ func (schema Schema) MarshalYAML() (any, error) {
 
 // MarshalText encodes the receiver into UTF-8-encoded text and returns the result.
 func (schema Schema) MarshalText() ([]byte, error) {
+	if schema.Type == "" {
+		return nil, nil
+	}
 	return yaml.Marshal(schema)
 }
 
