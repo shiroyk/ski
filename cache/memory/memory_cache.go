@@ -15,8 +15,8 @@ type Cache struct {
 
 // Get returns the []byte and true, if not existing returns false.
 func (c *Cache) Get(key string) ([]byte, bool) {
-	c.RLock()
-	defer c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
 	if ddl, exist := c.timeout[key]; exist {
 		if time.Now().Unix() > ddl {
 			delete(c.items, key)
@@ -32,9 +32,9 @@ func (c *Cache) Get(key string) ([]byte, bool) {
 
 // Set saves []byte to the cache with key
 func (c *Cache) Set(key string, value []byte) {
-	c.Lock()
+	c.RLock()
 	c.items[key] = value
-	c.Unlock()
+	c.RUnlock()
 }
 
 // SetWithTimeout saves []byte to the cache with key
