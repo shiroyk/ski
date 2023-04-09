@@ -54,57 +54,57 @@ func (c *Cat) Cancel() {
 }
 
 // GetString gets the string of the content with the given arguments
-func (c *Cat) GetString(key string, value any, arg string) (str string, err error) {
-	content, err := common.ToStrings(value)
+func (c *Cat) GetString(key string, rule string, content any) (ret string, err error) {
+	str, err := common.ToStrings(content)
 	if err != nil {
 		return
 	}
 
 	if p, ok := parser.GetParser(key); ok {
-		return p.GetString(c.ctx, content, arg)
+		return p.GetString(c.ctx, str, rule)
 	}
 
-	return str, fmt.Errorf("parser %s not found", key)
+	return ret, fmt.Errorf("parser %s not found", key)
 }
 
 // GetStrings gets the string of the content with the given arguments
-func (c *Cat) GetStrings(key string, value any, arg string) (str []string, err error) {
-	content, err := common.ToStrings(value)
+func (c *Cat) GetStrings(key string, rule string, content any) (ret []string, err error) {
+	str, err := common.ToStrings(content)
 	if err != nil {
 		return
 	}
 
 	if p, ok := parser.GetParser(key); ok {
-		return p.GetStrings(c.ctx, content, arg)
+		return p.GetStrings(c.ctx, str, rule)
 	}
 
-	return str, fmt.Errorf("parser %s not found", key)
+	return ret, fmt.Errorf("parser %s not found", key)
 }
 
 // GetElement gets the string of the content with the given arguments
-func (c *Cat) GetElement(key string, value any, arg string) (str string, err error) {
-	content, err := common.ToStrings(value)
+func (c *Cat) GetElement(key string, rule string, content any) (ret string, err error) {
+	str, err := common.ToStrings(content)
 	if err != nil {
 		return
 	}
 
 	if p, ok := parser.GetParser(key); ok {
-		return p.GetElement(c.ctx, content, arg)
+		return p.GetElement(c.ctx, str, rule)
 	}
 
-	return str, fmt.Errorf("parser %s not found", key)
+	return ret, fmt.Errorf("parser %s not found", key)
 }
 
 // GetElements gets the string of the content with the given arguments
-func (c *Cat) GetElements(key string, value any, arg string) (str []string, err error) {
-	content, err := common.ToStrings(value)
+func (c *Cat) GetElements(key string, rule string, content any) (ret []string, err error) {
+	str, err := common.ToStrings(content)
 	if err != nil {
 		return
 	}
 
 	if p, ok := parser.GetParser(key); ok {
-		return p.GetElements(c.ctx, content, arg)
+		return p.GetElements(c.ctx, str, rule)
 	}
 
-	return str, fmt.Errorf("parser %s not found", key)
+	return ret, fmt.Errorf("parser %s not found", key)
 }

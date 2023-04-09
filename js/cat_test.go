@@ -49,10 +49,10 @@ func TestCat(t *testing.T) {
 		`if (cat.getVar('v1') !== 114514) throw ("not equal, got" + cat.getVar('v1'));`,
 		`cat.clearVar()
 		 if (cat.getVar('v1')) throw ("variable should be cleared");`,
-		`if (cat.getString('test', 'foo', '1') !== 'foo1') throw ("unexpect result");`,
-		`if (cat.getStrings('test', ['foo'], '2')[1] !== '2') throw ("unexpect result");`,
-		`if (cat.getElement('test', 'foo', '3') !== 'foo3') throw ("unexpect result");`,
-		`if (cat.getElements('test', ['foo'], '4')[1] !== '4') throw ("unexpect result");`,
+		`if (cat.getString('test', '1', 'foo') !== 'foo1') throw ("unexpect result");`,
+		`if (cat.getStrings('test', '2', ['foo'])[1] !== '2') throw ("unexpect result");`,
+		`if (cat.getElement('test', '3', 'foo') !== 'foo3') throw ("unexpect result");`,
+		`if (cat.getElements('test', '4', ['foo'])[1] !== '4') throw ("unexpect result");`,
 	}
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
