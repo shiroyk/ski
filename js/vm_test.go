@@ -53,3 +53,12 @@ func TestUseStrict(t *testing.T) {
 	_, err := vm.RunString(context.Background(), `eval('a = 1');a`)
 	assert.ErrorContains(t, err, "ReferenceError: a is not defined")
 }
+
+func TestVMRunContext(t *testing.T) {
+	vm := newVM(false, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	v, err := vm.RunString(ctx, VMContextKey)
+	assert.NoError(t, err)
+	assert.Equal(t, ctx, v.Export())
+}

@@ -16,6 +16,9 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+// VMContextKey the VM current context
+const VMContextKey = "__ctx__"
+
 // VM the js runtime.
 // An instance of VM can only be used by a single goroutine at a time.
 type VM interface {
@@ -75,10 +78,15 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 	}()
 
 	code := p.Code
-	argKeys := maps.Keys(p.Args)
-	argValues := make([]goja.Value, 0, len(p.Args))
+	args := p.Args
+	if args == nil {
+		args = make(map[string]any, 1)
+	}
+	args[VMContextKey] = ctx
+	argKeys := maps.Keys(args)
+	argValues := make([]goja.Value, 0, len(args))
 
-	for _, v := range maps.Values(p.Args) {
+	for _, v := range maps.Values(args) {
 		argValues = append(argValues, vm.runtime.ToValue(v))
 	}
 
