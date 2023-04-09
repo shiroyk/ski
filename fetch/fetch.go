@@ -26,14 +26,6 @@ import (
 
 // Fetch http client interface
 type Fetch interface {
-	// Get issues a GET to the specified URL string and optional headers.
-	Get(url string, headers map[string]string) (*Response, error)
-	// Post issues a POST to the specified URL string, body and optional headers.
-	Post(url string, body any, headers map[string]string) (*Response, error)
-	// Head issues a HEAD to the specified URL string and optional headers.
-	Head(url string, headers map[string]string) (*Response, error)
-	// Request sends request with specified method, url, body, headers; returns an HTTP response.
-	Request(method, url string, body any, headers map[string]string) (*Response, error)
 	// DoRequest sends a fetch.Request and returns an HTTP response.
 	DoRequest(*Request) (*Response, error)
 }
@@ -148,30 +140,6 @@ func DefaultRoundTripper() http.RoundTripper {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-}
-
-// Get issues a GET to the specified URL string and optional headers.
-func (f *fetcher) Get(url string, headers map[string]string) (*Response, error) {
-	return f.Request(http.MethodGet, url, nil, headers)
-}
-
-// Post issues a POST to the specified URL string, body and optional headers.
-func (f *fetcher) Post(url string, body any, headers map[string]string) (*Response, error) {
-	return f.Request(http.MethodPost, url, body, headers)
-}
-
-// Head issues a HEAD to the specified URL string and optional headers.
-func (f *fetcher) Head(url string, headers map[string]string) (*Response, error) {
-	return f.Request(http.MethodHead, url, nil, headers)
-}
-
-// Request sends request with specified method, url, body, headers; returns an HTTP response.
-func (f *fetcher) Request(method, url string, body any, headers map[string]string) (*Response, error) {
-	request, err := NewRequest(method, url, body, headers)
-	if err != nil {
-		return nil, err
-	}
-	return f.DoRequest(request)
 }
 
 // DoRequest sends a fetch.Request and returns an HTTP response.

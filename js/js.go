@@ -24,13 +24,10 @@ const (
 
 var (
 	defaultScheduler atomic.Value
+	schedulerOnce    sync.Once
 	// ErrSchedulerClosed the scheduler is closed error
 	ErrSchedulerClosed = errors.New("scheduler is closed")
 )
-
-func init() {
-	defaultScheduler.Store(NewScheduler(Options{InitialVMs: 2, MaxVMs: runtime.GOMAXPROCS(0)}))
-}
 
 // SetScheduler makes s the default Scheduler.
 func SetScheduler(s Scheduler) {
@@ -39,6 +36,9 @@ func SetScheduler(s Scheduler) {
 
 // GetScheduler returns the default Scheduler.
 func GetScheduler() Scheduler {
+	schedulerOnce.Do(func() {
+		defaultScheduler.Store(NewScheduler(Options{InitialVMs: 2, MaxVMs: runtime.GOMAXPROCS(0)}))
+	})
 	return defaultScheduler.Load().(Scheduler)
 }
 

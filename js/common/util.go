@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -63,4 +64,15 @@ func Unwrap(value goja.Value) (any, error) {
 			return nil, fmt.Errorf("unexpected promise state: %v", v.State())
 		}
 	}
+}
+
+// VMContext returns the current context of the goja.Runtime
+func VMContext(vm *goja.Runtime) context.Context {
+	ctx := context.Background()
+	if v := vm.Get(VMContextKey).Export(); v != nil {
+		if c, ok := v.(context.Context); ok {
+			ctx = c
+		}
+	}
+	return ctx
 }

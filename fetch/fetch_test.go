@@ -23,7 +23,8 @@ func TestCharsetFromHeaders(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, err := newFetcherDefault().Get(ts.URL, nil)
+	req, _ := NewRequest("GET", ts.URL, nil, nil)
+	res, err := newFetcherDefault().DoRequest(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,8 @@ func TestCharsetFromBody(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, _ := newFetcherDefault().Post(ts.URL, nil, nil)
+	req, _ := NewRequest("POST", ts.URL, nil, nil)
+	res, _ := newFetcherDefault().DoRequest(req)
 
 	assert.Equal(t, "Gültekin", res.String())
 }
@@ -78,14 +80,14 @@ func TestRetry(t *testing.T) {
 	for i, s := range []string{"Status code retry", "Other error retry"} {
 		t.Run(s, func(t *testing.T) {
 			times.Store(0)
-			var res *Response
-			var err error
+			var req *Request
 			if i > 0 {
-				res, err = fetch.Get(ts.URL, map[string]string{"Location": "\x00"})
+				req, _ = NewRequest("GET", ts.URL, nil, map[string]string{"Location": "\x00"})
 			} else {
-				res, err = fetch.Head(ts.URL, nil)
+				req, _ = NewRequest("HEAD", ts.URL, nil, nil)
 			}
 
+			res, err := fetch.DoRequest(req)
 			if err != nil {
 				assert.ErrorContains(t, err, "Location")
 			} else {
@@ -149,9 +151,10 @@ func TestDecompress(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.compress, func(t *testing.T) {
-			res, err := fetch.Post(ts.URL, testCase.want, map[string]string{
+			req, _ := NewRequest(http.MethodGet, ts.URL, testCase.want, map[string]string{
 				"Content-Encoding": testCase.compress,
 			})
+			res, err := fetch.DoRequest(req)
 			if err != nil {
 				t.Error(err)
 			}

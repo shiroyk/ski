@@ -14,22 +14,24 @@ import (
 
 // VM test vm
 type VM struct {
-	vm *goja.Runtime
+	runtime *goja.Runtime
 }
 
 // RunString the js string
-func (vm *VM) RunString(_ context.Context, script string) (goja.Value, error) {
-	return vm.vm.RunString(script)
+func (vm *VM) RunString(ctx context.Context, script string) (goja.Value, error) {
+	_ = vm.runtime.Set(common.VMContextKey, ctx)
+	return vm.runtime.RunString(script)
 }
 
 // Run the js program
-func (vm *VM) Run(_ context.Context, program common.Program) (goja.Value, error) {
-	return vm.vm.RunString(program.Code)
+func (vm *VM) Run(ctx context.Context, program common.Program) (goja.Value, error) {
+	_ = vm.runtime.Set(common.VMContextKey, ctx)
+	return vm.runtime.RunString(program.Code)
 }
 
 // Runtime returns the runtime
 func (vm *VM) Runtime() *goja.Runtime {
-	return vm.vm
+	return vm.runtime
 }
 
 // New returns a test VM instance

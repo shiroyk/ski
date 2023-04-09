@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -25,11 +26,13 @@ import (
 
 // EnableRequire set runtime require module
 func EnableRequire(vm *goja.Runtime, path ...string) {
+	fetcher, _ := di.Resolve[fetch.Fetch]()
 	req := &require{
 		vm:            vm,
 		modules:       make(map[string]*goja.Object),
 		nodeModules:   make(map[string]*goja.Object),
 		globalFolders: path,
+		fetcher:       fetcher,
 	}
 
 	_ = vm.Set("require", req.Require)
@@ -39,6 +42,7 @@ type require struct {
 	vm          *goja.Runtime
 	modules     map[string]*goja.Object
 	nodeModules map[string]*goja.Object
+	fetcher     fetch.Fetch
 
 	globalFolders []string
 }
@@ -121,15 +125,10 @@ func (r *require) resolveFile(modPath string) (module *goja.Object, err error) {
 }
 
 func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
-	fetcher, err := di.Resolve[fetch.Fetch]()
+	res, err := r.fetchFile(name)
 	if err != nil {
 		return nil, err
 	}
-	res, err := fetcher.Get(name, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	if mod, exists := r.modules[name]; exists {
 		if cache.IsFromCache(res.Response) {
 			return mod, nil
@@ -147,6 +146,21 @@ func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
 	}
 
 	return
+}
+
+func (r *require) fetchFile(name string) (*fetch.Response, error) {
+	if r.fetcher == nil {
+		r.fetcher = di.MustResolve[fetch.Fetch]()
+	}
+	req, err := fetch.NewRequest(http.MethodGet, name, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := r.fetcher.DoRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (r *require) loadAsFileOrDirectory(path string) (module *goja.Object, err error) {
@@ -206,11 +220,7 @@ func (r *require) loadAsDirectory(modPath string) (module *goja.Object, err erro
 // loadSource is used loads files from the host's filesystem.
 func (r *require) loadSource(filename string) ([]byte, error) {
 	if isHTTP(filename) {
-		fetcher, err := di.Resolve[fetch.Fetch]()
-		if err != nil {
-			return nil, err
-		}
-		res, err := fetcher.Get(filename, nil)
+		res, err := r.fetchFile(filename)
 		if err != nil {
 			return nil, err
 		}

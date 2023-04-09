@@ -5,11 +5,16 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/fetch"
 	"github.com/shiroyk/cloudcat/js/common"
 	"github.com/stretchr/testify/assert"
 )
+
+type testFetcher struct{}
+
+func (*testFetcher) DoRequest(*fetch.Request) (*fetch.Response, error) {
+	return &fetch.Response{Body: []byte("module.exports = { foo: 'bar' }")}, nil
+}
 
 type testModule struct{}
 
@@ -18,11 +23,15 @@ func (testModule) Exports() any {
 }
 
 func TestRequire(t *testing.T) {
-	di.Provide(fetch.NewFetcher(fetch.Options{}), false)
-
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
-	EnableRequire(vm)
+	req := &require{
+		vm:          vm,
+		modules:     make(map[string]*goja.Object),
+		nodeModules: make(map[string]*goja.Object),
+		fetcher:     &testFetcher{},
+	}
+	_ = vm.Set("require", req.Require)
 	Register("test", &testModule{})
 
 	assertObject := vm.NewObject()
@@ -50,12 +59,8 @@ func TestRequire(t *testing.T) {
 		 assert.equal(test.key, "test")`,
 		},
 		{
-			`const lodash = require("https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js");
-		 assert.equal(lodash.VERSION, "4.17.21")`,
-		},
-		{
-			`const base64 = require("https://cdn.jsdelivr.net/npm/js-base64@3.7.5/base64.min.js");
-		 assert.equal(base64.version, "3.7.5")`,
+			`const foo = require("https://foo.com/foo.min.js");
+		 assert.equal(foo.foo, "bar")`,
 		},
 	}
 

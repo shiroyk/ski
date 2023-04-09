@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// VMContextKey the VM current context
+const VMContextKey = "__ctx__"
+
 // Program The js program
 type Program struct {
 	Code string

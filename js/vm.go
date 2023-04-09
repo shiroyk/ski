@@ -16,9 +16,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// VMContextKey the VM current context
-const VMContextKey = "__ctx__"
-
 // VM the js runtime.
 // An instance of VM can only be used by a single goroutine at a time.
 type VM interface {
@@ -26,6 +23,8 @@ type VM interface {
 	Run(context.Context, common.Program) (goja.Value, error)
 	// RunString the js string
 	RunString(context.Context, string) (goja.Value, error)
+	// Runtime the js runtime
+	Runtime() *goja.Runtime
 }
 
 type vmImpl struct {
@@ -82,7 +81,7 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 	if args == nil {
 		args = make(map[string]any, 1)
 	}
-	args[VMContextKey] = ctx
+	args[common.VMContextKey] = ctx
 	argKeys := maps.Keys(args)
 	argValues := make([]goja.Value, 0, len(args))
 
@@ -122,6 +121,11 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 // RunString the js string
 func (vm *vmImpl) RunString(ctx context.Context, s string) (goja.Value, error) {
 	return vm.Run(ctx, common.Program{Code: s})
+}
+
+// Runtime the js runtime
+func (vm *vmImpl) Runtime() *goja.Runtime {
+	return vm.runtime
 }
 
 // transformCode transforms code into return statement
