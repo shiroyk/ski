@@ -3,16 +3,17 @@ package fetch
 import (
 	"compress/gzip"
 	"compress/zlib"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/andybalholm/brotli"
+	utls "github.com/refraction-networking/utls"
 	"github.com/shiroyk/cloudcat/cache"
 	"github.com/shiroyk/cloudcat/di"
 	"github.com/shiroyk/cloudcat/lib/consts"
@@ -72,13 +73,13 @@ var (
 
 // Options The Fetch instance options
 type Options struct {
-	CharsetDetectDisabled bool                                  `yaml:"charset-detect-disabled"`
-	MaxBodySize           int64                                 `yaml:"max-body-size"`
-	RetryTimes            int                                   `yaml:"retry-times"`
-	RetryHTTPCodes        []int                                 `yaml:"retry-http-codes"`
-	Timeout               time.Duration                         `yaml:"timeout"`
-	CachePolicy           cache.Policy                          `yaml:"cache-policy"`
-	ProxyFunc             func(*http.Request) (*url.URL, error) `yaml:"-"`
+	CharsetDetectDisabled bool              `yaml:"charset-detect-disabled"`
+	MaxBodySize           int64             `yaml:"max-body-size"`
+	RetryTimes            int               `yaml:"retry-times"`
+	RetryHTTPCodes        []int             `yaml:"retry-http-codes"`
+	Timeout               time.Duration     `yaml:"timeout"`
+	CachePolicy           cache.Policy      `yaml:"cache-policy"`
+	RoundTripper          http.RoundTripper `yaml:"-"`
 }
 
 // NewFetcher returns a new Fetch instance
@@ -91,23 +92,9 @@ func NewFetcher(opt Options) Fetch {
 	fetch.retryTimes = utils.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
 	fetch.retryHTTPCodes = utils.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
-	proxy := RoundRobinProxy
-	if opt.ProxyFunc != nil {
-		proxy = opt.ProxyFunc
-	}
-
-	var transport http.RoundTripper = &http.Transport{
-		Proxy: proxy,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          0,
-		MaxIdleConnsPerHost:   1000,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+	transport := opt.RoundTripper
+	if transport == nil {
+		transport = DefaultRoundTripper()
 	}
 
 	ch, _ := di.Resolve[cache.Cache]()
@@ -127,6 +114,40 @@ func NewFetcher(opt Options) Fetch {
 		Jar:       cookie,
 	}
 	return fetch
+}
+
+// DefaultRoundTripper the fetch default RoundTripper
+func DefaultRoundTripper() http.RoundTripper {
+	return &http.Transport{
+		Proxy: RoundRobinProxy,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			tcpConn, err := (new(net.Dialer)).DialContext(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			sni, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			config := utls.Config{ServerName: sni}
+			tlsConn := utls.UClient(tcpConn, &config, utls.HelloRandomizedNoALPN)
+			if err = tlsConn.HandshakeContext(ctx); err != nil {
+				return nil, err
+			}
+
+			return tlsConn, nil
+		},
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          0,
+		MaxIdleConnsPerHost:   1000,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 }
 
 // Get issues a GET to the specified URL string and optional headers.
