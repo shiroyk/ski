@@ -6,7 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/andybalholm/brotli v1.0.5
 	github.com/antchfx/htmlquery v1.3.0
-	github.com/dlclark/regexp2 v1.8.1
+	github.com/dlclark/regexp2 v1.9.0
 	github.com/dop251/goja v0.0.0-20230226152633-7c93113e17ac
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/ohler55/ojg v1.18.3
