@@ -12,7 +12,7 @@ require (
 	github.com/ohler55/ojg v1.18.3
 	github.com/refraction-networking/utls v1.3.2
 	github.com/spf13/cast v1.5.0
-	github.com/spf13/cobra v1.6.1
+	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.2
 	go.etcd.io/bbolt v1.3.7
 	golang.org/x/crypto v0.8.0
