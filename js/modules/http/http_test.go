@@ -16,7 +16,7 @@ import (
 )
 
 func TestHttp(t *testing.T) {
-	di.Provide(fetch.NewFetcher(fetch.Options{}), false)
+	di.Provide(fetch.NewFetcher(fetch.Options{}))
 	ctx := context.Background()
 	vm := modulestest.New(t)
 

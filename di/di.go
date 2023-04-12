@@ -1,4 +1,3 @@
-// Package di a simple dependencies injection
 package di
 
 import (
@@ -8,7 +7,10 @@ import (
 	"sync/atomic"
 )
 
-var services = new(sync.Map)
+// di a simple dependencies injection
+// Inspired by https://github.com/samber/do
+
+var diServices = new(sync.Map)
 
 type lazyService[T any] struct {
 	load     atomic.Bool
@@ -30,23 +32,39 @@ func (s *lazyService[T]) initOrGet() (instance T, err error) {
 }
 
 // Provide save the value and return is it saved
-func Provide[T any](value T, override bool) bool {
-	return ProvideNamed(getName[T](), value, override)
+func Provide[T any](value T) bool {
+	return ProvideNamed(getName[T](), value)
 }
 
 // ProvideLazy save the lazy init value and return is it saved
-func ProvideLazy[T any](initFunc func() (T, error), override bool) bool {
-	return ProvideNamed(getName[T](), &lazyService[T]{initFunc: initFunc}, override)
+func ProvideLazy[T any](initFunc func() (T, error)) bool {
+	return ProvideNamed(getName[T](), &lazyService[T]{initFunc: initFunc})
 }
 
 // ProvideNamed save the value for the name and return is it saved
-func ProvideNamed(name string, value any, override bool) (ok bool) {
-	if !override {
-		_, loaded := services.LoadOrStore(name, value)
-		return !loaded
+func ProvideNamed(name string, value any) (ok bool) {
+	if _, ok = diServices.Load(name); !ok {
+		diServices.Store(name, value)
+		return true
 	}
-	services.Store(name, value)
-	return true
+	return
+}
+
+// Override save the value and return is it override
+func Override[T any](value T) bool {
+	return OverrideNamed(getName[T](), value)
+}
+
+// OverrideLazy save the value for the name and return is it override
+func OverrideLazy[T any](initFunc func() (T, error)) bool {
+	return OverrideNamed(getName[T](), &lazyService[T]{initFunc: initFunc})
+}
+
+// OverrideNamed save the value for the name and return is it override
+func OverrideNamed(name string, value any) (ok bool) {
+	_, ok = diServices.Load(name)
+	diServices.Store(name, value)
+	return
 }
 
 // Resolve get the value, if not exist returns error
@@ -56,7 +74,7 @@ func Resolve[T any]() (T, error) {
 
 // ResolveNamed get the value for the name if not exist returns error
 func ResolveNamed[T any](name string) (value T, err error) {
-	if v, exists := services.Load(name); exists {
+	if v, exists := diServices.Load(name); exists {
 		switch target := v.(type) {
 		case *lazyService[T]:
 			return target.initOrGet()

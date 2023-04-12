@@ -13,7 +13,7 @@ import (
 
 func TestCookie(t *testing.T) {
 	t.Parallel()
-	di.Provide[cache.Cookie](memory.NewCookie(), false)
+	di.Provide[cache.Cookie](memory.NewCookie())
 	ctx := context.Background()
 	vm := modulestest.New(t)
 

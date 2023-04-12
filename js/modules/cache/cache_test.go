@@ -13,7 +13,7 @@ import (
 
 func TestCache(t *testing.T) {
 	t.Parallel()
-	di.Provide[cache.Cache](memory.NewCache(), false)
+	di.Provide[cache.Cache](memory.NewCache())
 	ctx := context.Background()
 	vm := modulestest.New(t)
 

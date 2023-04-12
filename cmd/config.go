@@ -75,15 +75,15 @@ func initConfig() {
 }
 
 func initDependencies(config config.Config) {
-	di.Provide(fetch.NewFetcher(config.Fetch), false)
-	di.Provide(fetch.DefaultTemplateFuncMap(), false)
+	di.Provide(fetch.NewFetcher(config.Fetch))
+	di.Provide(fetch.DefaultTemplateFuncMap())
 
 	di.ProvideLazy(func() (cache.Cache, error) {
 		return bolt.NewCache(config.Cache)
-	}, false)
+	})
 	di.ProvideLazy(func() (cache.Cookie, error) {
 		return bolt.NewCookie(config.Cache)
-	}, false)
+	})
 
 	js.SetScheduler(js.NewScheduler(config.JS))
 }
