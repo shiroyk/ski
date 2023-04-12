@@ -13,7 +13,6 @@ import (
 	"github.com/shiroyk/cloudcat/js/modules"
 	"github.com/shiroyk/cloudcat/lib/logger"
 	"github.com/shiroyk/cloudcat/parser"
-	"golang.org/x/exp/maps"
 )
 
 // VM the js runtime.
@@ -82,11 +81,12 @@ func (vm *vmImpl) Run(ctx context.Context, p common.Program) (goja.Value, error)
 		args = make(map[string]any, 1)
 	}
 	args[common.VMContextKey] = ctx
-	argKeys := maps.Keys(args)
+	argKeys := make([]string, 0, len(args))
 	argValues := make([]goja.Value, 0, len(args))
 
-	for _, v := range maps.Values(args) {
-		argValues = append(argValues, vm.runtime.ToValue(v))
+	for k := range args {
+		argKeys = append(argKeys, k)
+		argValues = append(argValues, vm.runtime.ToValue(args[k]))
 	}
 
 	if ctx, ok := ctx.(*parser.Context); ok {
