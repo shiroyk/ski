@@ -69,8 +69,8 @@ func Unwrap(value goja.Value) (any, error) {
 // VMContext returns the current context of the goja.Runtime
 func VMContext(vm *goja.Runtime) context.Context {
 	ctx := context.Background()
-	if v := vm.Get(VMContextKey).Export(); v != nil {
-		if c, ok := v.(context.Context); ok {
+	if v := vm.Get(VMContextKey); v != nil {
+		if c, ok := v.Export().(context.Context); ok {
 			ctx = c
 		}
 	}
