@@ -16,51 +16,37 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/di"
+	"github.com/shiroyk/cloudcat/core"
 	"golang.org/x/net/http/httpguts"
 )
 
-// Request is a small wrapper around *http.Request
-type Request struct {
-	*http.Request
+type requestConfigKey struct{}
 
-	// Proxy on this Request
+// RequestConfig the *http.Request config
+type RequestConfig struct {
+	// Proxy on this RequestConfig
 	Proxy []string
 
 	// Optional response body encoding. Leave empty for automatic detection.
 	// If you're having issues with auto-detection, set this.
 	Encoding string
 
-	// Set this true to cancel Request. Should be used on middlewares.
-	Cancelled bool
-
 	retryCounter int
 }
 
-// WithContext returns a shallow copy of r with its context changed
-// to ctx. The provided ctx must be non-nil.
-//
-// For outgoing client request, the context controls the entire
-// lifetime of a request and its response: obtaining a connection,
-// sending the request, and reading the response headers and body.
-//
-// To create a new request with a context, use NewRequestWithContext.
-// To change the context of a request, such as an incoming request you
-// want to modify before sending back out, use Request.Clone. Between
-// those two uses, it's rare to need WithContext.
-func (r *Request) WithContext(ctx context.Context) *Request {
-	r.Request = r.Request.WithContext(ctx)
-	return r
+func WithRequestConfig(req *http.Request, c RequestConfig) *http.Request {
+	return req.WithContext(context.WithValue(req.Context(), requestConfigKey{}, c))
 }
 
-// Cancel request.
-func (r *Request) Cancel() {
-	r.Cancelled = true
+func GetRequestConfig(req *http.Request) RequestConfig {
+	if c := req.Context().Value(requestConfigKey{}); c != nil {
+		return c.(RequestConfig)
+	}
+	return RequestConfig{}
 }
 
-// NewRequest returns a new Request given a method, URL, optional body, optional headers.
-func NewRequest(method, u string, body any, headers map[string]string) (*Request, error) {
+// NewRequest returns a new RequestConfig given a method, URL, optional body, optional headers.
+func NewRequest(method, u string, body any, headers map[string]string) (*http.Request, error) {
 	var reqBody io.Reader = http.NoBody
 	if body != nil {
 		// Convert body to io.Reader
@@ -82,11 +68,7 @@ func NewRequest(method, u string, body any, headers map[string]string) (*Request
 				headers["Content-Type"] = "application/json"
 			}
 			reqBody = bytes.NewReader(j)
-		case *bytes.Buffer:
-			reqBody = data
-		case *bytes.Reader:
-			reqBody = data
-		case *strings.Reader:
+		case io.Reader:
 			reqBody = data
 		case string:
 			reqBody = bytes.NewBufferString(data)
@@ -107,11 +89,11 @@ func NewRequest(method, u string, body any, headers map[string]string) (*Request
 
 	setDefaultHeader(req.Header)
 
-	return &Request{Request: req}, nil
+	return req, nil
 }
 
-// NewTemplateRequest returns a new Request given a http template with argument.
-func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, error) {
+// NewTemplateRequest returns a new RequestConfig given a http template with argument.
+func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*http.Request, error) {
 	tmp, err := template.New("url").Funcs(funcs).Parse(tpl)
 	if err != nil {
 		return nil, err
@@ -191,20 +173,20 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*Request, 
 
 	setDefaultHeader(req.Header)
 
-	return &Request{Request: req}, nil
+	return req, nil
 }
 
 // DefaultTemplateFuncMap The default template function map
 func DefaultTemplateFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"get": func(key string) (ret string) {
-			if v, ok := di.MustResolve[cache.Cache]().Get(key); ok {
+			if v, ok := core.MustResolve[core.Cache]().Get(key); ok {
 				return string(v)
 			}
 			return
 		},
 		"set": func(key string, value string) (ret string) {
-			di.MustResolve[cache.Cache]().Set(key, []byte(value))
+			core.MustResolve[core.Cache]().Set(key, []byte(value))
 			return
 		},
 	}

@@ -2,74 +2,7 @@
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/shiroyk/cloudcat)
 [![Go Report Card](https://goreportcard.com/badge/github.com/shiroyk/cloudcat)](https://goreportcard.com/report/github.com/shiroyk/cloudcat)
 ![GitHub](https://img.shields.io/github/license/shiroyk/cloudcat)<br/>
-**Cloudcat** is a tool for extracting structured data from websites using extensible YAML syntax rules.<br/>
-The following syntax rules are built in:
- - [Goquery](https://github.com/PuerkitoBio/goquery)
- - [JS](https://github.com/dop251/goja)
- - [JSONPath](https://github.com/ohler55/ojg)
- - [Regexp](https://github.com/dlclark/regexp2)
- - [XPath](https://github.com/antchfx/xpath)
-## CLI example
-run the **Model**
-```shell
-cat << EOF | cloudcat run -m -
-source:
-  name: HackerNews
-  http: https://news.ycombinator.com/best
-  timeout: 60s
-schema:
-  type: array
-  init:
-    - gq: "#hnmain tbody -> slice(2) -> child('tr:not(.spacer,.morespace,:last-child)')"
-      js: |
-        content?.reduce((acc, v, i, arr) => {
-          if (i % 2 === 0) {
-            acc.push(arr.slice(i, i + 2).join(''));
-          }
-          return acc;
-        }, []);
-  properties:
-    index:
-      type: integer
-      rule:
-        - gq: .rank
-          regex: /[^\d]/
-    title: { gq: .titleline>:first-child }
-    by: { gq: .hnuser }
-    age: { gq: .age }
-    comments:
-      type: integer
-      rule:
-        - gq: .subline>:last-child
-          regex: /[^\d]/
-EOF
-```
-run the **JavaScript**
-```shell
-cat << EOF | cloudcat run -s -
-const http = require('cloudcat/http');
-let res = http.get('https://news.ycombinator.com/best');
-let stories = cat.getElements('gq', res.string(), "#hnmain tbody -> slice(2) -> child('tr:not(.spacer,.morespace,:last-child)')");
-stories?.reduce((acc, v, i, arr) => {
-    if (i % 2 === 0) {
-        let item = arr.slice(i, i + 2).join('');
-        let index = cat.getString('gq', item, '.rank');
-        let title = cat.getString('gq', item, '.titleline>:first-child');
-        let by = cat.getString('gq', item, '.hnuser');
-        let age = cat.getString('gq', item, '.age');
-        let comments = cat.getString('gq', item, '.subline>:last-child');
-        acc.push({
-            index: parseInt(index?.replace(/[^\d]+/g, ''), 10),
-            title: title,
-            by: by,
-            age: age,
-            comments: parseInt(comments?.replace(/[^\d]+/g, ''), 10)
-        });
-    }
-    return acc;
-}, []);
-EOF
-```
+**Cloudcat** is a tool for extracting structured data from websites using extensible YAML syntax rules.
 ## Documentation
 See [Wiki](https://github.com/shiroyk/cloudcat/wiki)
 ## License

@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -14,21 +13,11 @@ import (
 
 	"github.com/andybalholm/brotli"
 	utls "github.com/refraction-networking/utls"
-	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/di"
-	"github.com/shiroyk/cloudcat/lib/consts"
-	"github.com/shiroyk/cloudcat/lib/logger"
-	"github.com/shiroyk/cloudcat/lib/utils"
+	"github.com/shiroyk/cloudcat/core"
 	"golang.org/x/exp/slices"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
 )
-
-// Fetch http client interface
-type Fetch interface {
-	// DoRequest sends a fetch.Request and returns an HTTP response.
-	DoRequest(*Request) (*Response, error)
-}
 
 type fetcher struct {
 	*http.Client
@@ -42,25 +31,23 @@ type fetcher struct {
 const (
 	// DefaultMaxBodySize fetch.Response default max body size
 	DefaultMaxBodySize int64 = 1024 * 1024 * 1024
-	// DefaultRetryTimes fetch.Request retry times
+	// DefaultRetryTimes fetch.RequestConfig retry times
 	DefaultRetryTimes = 3
-	// DefaultTimeout fetch.Request timeout
+	// DefaultTimeout fetch.RequestConfig timeout
 	DefaultTimeout = time.Minute
 )
 
 var (
-	// DefaultRetryHTTPCodes retry fetch.Request error status code
+	// DefaultRetryHTTPCodes retry fetch.RequestConfig error status code
 	DefaultRetryHTTPCodes = []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, //nolint:lll
 		http.StatusGatewayTimeout, http.StatusRequestTimeout}
-	// DefaultHeaders defaults fetch.Request headers
+	// DefaultHeaders defaults fetch.RequestConfig headers
 	DefaultHeaders = map[string]string{
 		"Accept":          "*/*",
 		"Accept-Encoding": "gzip, deflate, br",
 		"Accept-Language": "en-US,en;",
-		"User-Agent":      fmt.Sprintf("cloudcat/%v", consts.Version),
+		"User-Agent":      "cloudcat",
 	}
-	// ErrRequestCancel fetch.Request cancel error
-	ErrRequestCancel = errors.New("request canceled")
 )
 
 // Options The Fetch instance options
@@ -70,36 +57,36 @@ type Options struct {
 	RetryTimes            int               `yaml:"retry-times"`
 	RetryHTTPCodes        []int             `yaml:"retry-http-codes"`
 	Timeout               time.Duration     `yaml:"timeout"`
-	CachePolicy           cache.Policy      `yaml:"cache-policy"`
+	CachePolicy           Policy            `yaml:"cache-policy"`
 	RoundTripper          http.RoundTripper `yaml:"-"`
 }
 
 // NewFetcher returns a new Fetch instance
-func NewFetcher(opt Options) Fetch {
+func NewFetcher(opt Options) core.Fetch {
 	fetch := new(fetcher)
 
 	fetch.charsetDetectDisabled = opt.CharsetDetectDisabled
-	fetch.maxBodySize = utils.ZeroOr(opt.MaxBodySize, DefaultMaxBodySize)
-	fetch.timeout = utils.ZeroOr(opt.Timeout, DefaultTimeout)
-	fetch.retryTimes = utils.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
-	fetch.retryHTTPCodes = utils.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
+	fetch.maxBodySize = core.ZeroOr(opt.MaxBodySize, DefaultMaxBodySize)
+	fetch.timeout = core.ZeroOr(opt.Timeout, DefaultTimeout)
+	fetch.retryTimes = core.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
+	fetch.retryHTTPCodes = core.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
 	transport := opt.RoundTripper
 	if transport == nil {
 		transport = DefaultRoundTripper()
 	}
 
-	ch, _ := di.Resolve[cache.Cache]()
+	ch, _ := core.Resolve[core.Cache]()
 	if ch != nil {
-		transport = &cache.Transport{
+		transport = &CacheTransport{
 			Cache:               ch,
-			Policy:              utils.ZeroOr(opt.CachePolicy, cache.RFC2616),
+			Policy:              core.ZeroOr(opt.CachePolicy, RFC2616),
 			Transport:           transport,
 			MarkCachedResponses: true,
 		}
 	}
 
-	cookie, _ := di.Resolve[cache.Cookie]()
+	cookie, _ := core.Resolve[core.Cookie]()
 	fetch.Client = &http.Client{
 		Transport: transport,
 		Timeout:   fetch.timeout,
@@ -142,46 +129,39 @@ func DefaultRoundTripper() http.RoundTripper {
 	}
 }
 
-// DoRequest sends a fetch.Request and returns an HTTP response.
-func (f *fetcher) DoRequest(req *Request) (*Response, error) {
-	AddRoundRobinProxy(req.URL.String(), req.Proxy...)
-	return f.doRequestRetry(req)
+// Do sends an HTTP request and returns an HTTP response, following
+// policy (such as redirects, cookies, auth) as configured on the
+// client.
+func (f *fetcher) Do(req *http.Request) (*http.Response, error) {
+	config := GetRequestConfig(req)
+	AddRoundRobinProxy(req.URL.String(), config.Proxy...)
+	return f.doRequestRetry(req, &config)
 }
 
-func (f *fetcher) doRequestRetry(req *Request) (*Response, error) {
-	if req.Cancelled {
-		return nil, ErrRequestCancel
-	}
-	res, err := f.doRequest(req)
+func (f *fetcher) doRequestRetry(req *http.Request, config *RequestConfig) (*http.Response, error) {
+	res, err := f.doRequest(req, config)
 	// Retry on Error
 	if err != nil {
-		if req.retryCounter < f.retryTimes {
-			req.retryCounter++
-			return f.doRequestRetry(req)
+		if config.retryCounter < f.retryTimes {
+			config.retryCounter++
+			return f.doRequestRetry(req, config)
 		}
 		return res, err
 	}
 
 	// Retry on http status codes
 	if slices.Contains(f.retryHTTPCodes, res.StatusCode) {
-		if req.retryCounter < f.retryTimes {
-			req.retryCounter++
-			return f.doRequestRetry(req)
+		if config.retryCounter < f.retryTimes {
+			config.retryCounter++
+			return f.doRequestRetry(req, config)
 		}
 	}
 
 	return res, err
 }
 
-func (f *fetcher) doRequest(req *Request) (*Response, error) {
-	res, err := f.Do(req.Request)
-	defer func() {
-		if res != nil {
-			if err = res.Body.Close(); err != nil {
-				logger.Debugf("close body failed %s", err)
-			}
-		}
-	}()
+func (f *fetcher) doRequest(req *http.Request, config *RequestConfig) (*http.Response, error) {
+	res, err := f.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -189,35 +169,34 @@ func (f *fetcher) doRequest(req *Request) (*Response, error) {
 	// Limit response body reading
 	bodyReader := io.LimitReader(res.Body, f.maxBodySize)
 
-	if encoding := res.Header.Get("Content-Encoding"); encoding != "" {
-		bodyReader, err = decompressedBody(encoding, bodyReader)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if res.Request.Method != http.MethodHead && res.ContentLength > 0 { //nolint:nestif
-		if req.Encoding != "" {
-			if enc, _ := charset.Lookup(req.Encoding); enc != nil {
-				bodyReader = transform.NewReader(bodyReader, enc.NewDecoder())
+	if res.Request.Method != http.MethodHead { //nolint:nestif
+		if encoding := res.Header.Get("Content-Encoding"); encoding != "" {
+			bodyReader, err = decompressedBody(encoding, bodyReader)
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			if !f.charsetDetectDisabled {
-				contentType := req.Header.Get("Content-Type")
-				bodyReader, err = charset.NewReader(bodyReader, contentType)
-				if err != nil {
-					return nil, fmt.Errorf("charset detection error on content-type %s: %w", contentType, err)
+			res.Body = io.NopCloser(bodyReader)
+		}
+
+		if res.ContentLength > 0 {
+			if config.Encoding != "" {
+				if enc, _ := charset.Lookup(config.Encoding); enc != nil {
+					bodyReader = transform.NewReader(bodyReader, enc.NewDecoder())
+				}
+			} else {
+				if !f.charsetDetectDisabled {
+					contentType := req.Header.Get("Content-Type")
+					bodyReader, err = charset.NewReader(bodyReader, contentType)
+					if err != nil {
+						return nil, fmt.Errorf("charset detection error on content-type %s: %w", contentType, err)
+					}
 				}
 			}
+			res.Body = io.NopCloser(bodyReader)
 		}
 	}
 
-	body, err := io.ReadAll(bodyReader)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Response{Response: res, Body: body}, nil
+	return res, nil
 }
 
 func decompressedBody(encoding string, reader io.Reader) (bodyReader io.Reader, err error) {

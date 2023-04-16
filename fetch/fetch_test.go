@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/andybalholm/brotli"
-	"github.com/shiroyk/cloudcat/cache"
+	"github.com/shiroyk/cloudcat/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,12 +24,9 @@ func TestCharsetFromHeaders(t *testing.T) {
 	defer ts.Close()
 
 	req, _ := NewRequest("GET", ts.URL, nil, nil)
-	res, err := newFetcherDefault().DoRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
+	res, _ := DoString(newFetcherDefault(), req)
 
-	assert.Equal(t, "Gültekin", res.String())
+	assert.Equal(t, "Gültekin", res)
 }
 
 func TestCharsetFromBody(t *testing.T) {
@@ -41,9 +38,9 @@ func TestCharsetFromBody(t *testing.T) {
 	defer ts.Close()
 
 	req, _ := NewRequest("POST", ts.URL, nil, nil)
-	res, _ := newFetcherDefault().DoRequest(req)
+	res, _ := DoString(newFetcherDefault(), req)
 
-	assert.Equal(t, "Gültekin", res.String())
+	assert.Equal(t, "Gültekin", res)
 }
 
 func TestCharsetProvidedWithRequest(t *testing.T) {
@@ -55,10 +52,9 @@ func TestCharsetProvidedWithRequest(t *testing.T) {
 	defer ts.Close()
 
 	req, _ := NewRequest("GET", ts.URL, nil, nil)
-	req.Encoding = "windows-1254"
-	res, _ := newFetcherDefault().DoRequest(req)
+	res, _ := DoString(newFetcherDefault(), WithRequestConfig(req, RequestConfig{Encoding: "windows-1254"}))
 
-	assert.Equal(t, "Gültekin", res.String())
+	assert.Equal(t, "Gültekin", res)
 }
 
 func TestRetry(t *testing.T) {
@@ -80,14 +76,14 @@ func TestRetry(t *testing.T) {
 	for i, s := range []string{"Status code retry", "Other error retry"} {
 		t.Run(s, func(t *testing.T) {
 			times.Store(0)
-			var req *Request
+			var req *http.Request
 			if i > 0 {
 				req, _ = NewRequest("GET", ts.URL, nil, map[string]string{"Location": "\x00"})
 			} else {
 				req, _ = NewRequest("HEAD", ts.URL, nil, nil)
 			}
 
-			res, err := fetch.DoRequest(req)
+			res, err := fetch.Do(req)
 			if err != nil {
 				assert.ErrorContains(t, err, "Location")
 			} else {
@@ -95,21 +91,6 @@ func TestRetry(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCancel(t *testing.T) {
-	t.Parallel()
-	fetch := newFetcherDefault()
-
-	req, err := NewRequest(http.MethodGet, "", nil, nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	req.Cancel()
-
-	_, err = fetch.DoRequest(req)
-	assert.ErrorIs(t, err, ErrRequestCancel)
 }
 
 func TestDecompress(t *testing.T) {
@@ -154,23 +135,23 @@ func TestDecompress(t *testing.T) {
 			req, _ := NewRequest(http.MethodGet, ts.URL, testCase.want, map[string]string{
 				"Content-Encoding": testCase.compress,
 			})
-			res, err := fetch.DoRequest(req)
+
+			str, err := DoString(fetch, req)
 			if err != nil {
 				t.Error(err)
 			}
-
-			assert.Equal(t, testCase.want, res.String())
+			assert.Equal(t, testCase.want, str)
 		})
 	}
 }
 
 // newFetcherDefault creates new client with default options
-func newFetcherDefault() Fetch {
+func newFetcherDefault() core.Fetch {
 	return NewFetcher(Options{
 		MaxBodySize:    DefaultMaxBodySize,
 		RetryTimes:     DefaultRetryTimes,
 		RetryHTTPCodes: DefaultRetryHTTPCodes,
 		Timeout:        DefaultTimeout,
-		CachePolicy:    cache.RFC2616,
+		CachePolicy:    RFC2616,
 	})
 }

@@ -102,4 +102,5 @@ linters:
   - varcheck # deprecated
   - ifshort # deprecated
   - deadcode # deprecated
+  - gomoddirectives
   fast: false

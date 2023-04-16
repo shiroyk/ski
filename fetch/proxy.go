@@ -9,13 +9,12 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/shiroyk/cloudcat/lib/logger"
-	"github.com/shiroyk/cloudcat/lib/utils"
+	"golang.org/x/exp/slog"
 )
 
 type proxyURLKey int
 
-var proxyMap = utils.NewLRUCache[string, roundRobinProxy](128)
+var proxyMap = NewLRUCache[string, roundRobinProxy](128)
 
 type roundRobinProxy struct {
 	proxyURLs []*url.URL
@@ -52,7 +51,7 @@ func AddRoundRobinProxy(u string, proxyURLs ...string) {
 	for i, pu := range proxyURLs {
 		parsedURL, err := url.Parse(pu)
 		if err != nil {
-			logger.Errorf("proxy url error %s", err)
+			slog.Error("proxy url error %s", err)
 		}
 		parsedProxyURLs[i] = parsedURL
 	}

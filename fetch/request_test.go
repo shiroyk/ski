@@ -12,8 +12,7 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/shiroyk/cloudcat/cache"
-	"github.com/shiroyk/cloudcat/cache/memory"
+	"github.com/shiroyk/cloudcat/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -121,12 +120,12 @@ func TestNewRequest(t *testing.T) {
 					t.Error(err)
 				}
 
-				res, err := fetch.DoRequest(req)
+				res, err := DoString(fetch, req)
 				if err != nil {
 					t.Error(err)
 					continue
 				}
-				assert.Equal(t, r.want, res.String())
+				assert.Equal(t, r.want, res)
 			}
 		})
 	}
@@ -227,12 +226,11 @@ func TestNewTemplateRequest(t *testing.T) {
 					t.Error(err)
 				}
 
-				res, err := fetch.DoRequest(req)
+				res, err := DoString(fetch, req)
 				if err != nil {
 					t.Fatal(err)
 				}
-				assert.Equal(t, tpl.want, res.String())
-				assert.Equal(t, "text/plain", res.ContentType())
+				assert.Equal(t, tpl.want, res)
 			}
 		})
 	}
@@ -280,7 +278,7 @@ Cookie: __utma=1.1978842379.1323102373.1323102373.1323102373.1; EPi:NumberOfVisi
 }
 
 func templateFuncs() template.FuncMap {
-	memCache := memory.NewCache()
+	memCache := core.NewCache()
 	memCache.Set("json", []byte(`{"key":"foo"}`))
 	memCache.Set("form", []byte(`key=foo&value=bar`))
 	memCache.Set("image", []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a})
@@ -331,6 +329,6 @@ func newTestFetcher() *fetcher {
 		RetryTimes:     DefaultRetryTimes,
 		RetryHTTPCodes: DefaultRetryHTTPCodes,
 		Timeout:        DefaultTimeout,
-		CachePolicy:    cache.RFC2616,
+		CachePolicy:    RFC2616,
 	}).(*fetcher)
 }

@@ -18,8 +18,10 @@ logs
 coverage.out
 coverage.html
 
+*.so
 /data
 /dist
+/ctl/dist
 node_modules
 package.json
 package-lock.json
