@@ -140,7 +140,7 @@ func (s *schedulerImpl) Get() (VM, error) {
 				return newVM(s.useStrict, s.modulePath), nil
 			}
 			s.unInitVMs.Add(1)
-			slog.Warn("could not get VM in %v", time.Duration(i)*s.maxTimeToWaitGetVM)
+			slog.Warn(fmt.Sprintf("could not get VM in %v", time.Duration(i)*s.maxTimeToWaitGetVM))
 			timer.Reset(s.maxTimeToWaitGetVM)
 		}
 	}

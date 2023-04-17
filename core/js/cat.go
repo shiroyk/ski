@@ -6,7 +6,10 @@ import (
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
+	"golang.org/x/exp/slog"
 )
+
+var attr = slog.String("type", "js")
 
 // Cat an analyzer context
 type Cat struct {
@@ -22,7 +25,7 @@ func NewCat(ctx *plugin.Context) *Cat {
 
 // Log print the msg to logger
 func (c *Cat) Log(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	c.ctx.Logger().Info(Format(call, vm).String())
+	c.ctx.Logger().Info(Format(call, vm).String(), attr)
 	return goja.Undefined()
 }
 

@@ -51,7 +51,7 @@ func AddRoundRobinProxy(u string, proxyURLs ...string) {
 	for i, pu := range proxyURLs {
 		parsedURL, err := url.Parse(pu)
 		if err != nil {
-			slog.Error("proxy url error %s", err)
+			slog.Error("proxy url error %s", "error", err)
 		}
 		parsedProxyURLs[i] = parsedURL
 	}

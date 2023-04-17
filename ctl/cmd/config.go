@@ -69,7 +69,7 @@ func init() {
 func initConfig() {
 	cfg, err := config.ReadConfig(configArg)
 	if err != nil {
-		slog.Error("error reading config file", "err", err)
+		slog.Error("error reading config file", "error", err)
 	}
 	initDependencies(cfg)
 	rootCmd.SetContext(config.NewContext(context.Background(), cfg))
@@ -82,7 +82,7 @@ func initDependencies(config config.Config) {
 	if config.Plugin.Path != "" {
 		errs := plugin.LoadPlugin(config.Plugin.Path)
 		if len(errs) > 0 {
-			slog.Error("error load external plugin", "err", fmt.Sprintf("%v", errs))
+			slog.Error("error load external plugin", "error", fmt.Sprintf("%v", errs))
 		}
 	}
 

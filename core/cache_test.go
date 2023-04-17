@@ -1,8 +1,6 @@
-package cache
+package core
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -10,14 +8,8 @@ import (
 )
 
 func TestCache(t *testing.T) {
-	tempDir := filepath.Join(os.TempDir(), "test_cache")
-	assert.NoError(t, os.MkdirAll(tempDir, os.ModePerm))
-	defer assert.NoError(t, os.RemoveAll(tempDir))
-
-	c, err := NewCache(Options{Path: tempDir})
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Parallel()
+	c := NewCache()
 
 	key, value := "testCacheKey", "testCacheValue"
 	if _, ok := c.Get(key); ok {

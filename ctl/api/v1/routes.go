@@ -24,7 +24,7 @@ func (h handleFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := h(w, r); err != nil {
 		slog.Error("request error", "path", r.URL.Path)
 		if e := JSON(w, http.StatusInternalServerError, msg{err.Error()}); e != nil {
-			slog.Error("write response error", e)
+			slog.Error("write response error", "error", e)
 		}
 	}
 }
@@ -49,13 +49,14 @@ func Routes(secret string, timeout time.Duration, requestLog bool) http.Handler 
 	root.Use(auth(secret), middleware.Timeout(timeout))
 	root.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		if err := JSON(w, http.StatusNotFound, msg{http.StatusText(http.StatusNotFound)}); err != nil {
-			slog.Error("write response error", err)
+			slog.Error("write response error", "error", err)
 		}
 	})
 	root.HandleFunc("/ping", ping)
 	root.HandleFunc("/", ping)
 	root.Route("/v1", func(api chi.Router) {
-		api.Method(http.MethodPost, "/run", run())
+		api.Method(http.MethodPost, "/run", modelRun())
+		api.Method(http.MethodPost, "/debug", modelDebug())
 	})
 	return root
 }

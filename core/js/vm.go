@@ -51,7 +51,7 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (goja.Value, error) {
 			for _, frame := range stack {
 				frame.Write(buf)
 			}
-			slog.Error(fmt.Sprintf("vm run error %s", r), nil,
+			slog.Error(fmt.Sprintf("vm run error %s", r),
 				"stack", string(debug.Stack()), "js stack", buf.String())
 		}
 

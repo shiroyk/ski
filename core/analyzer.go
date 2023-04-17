@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync/atomic"
 
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/spf13/cast"
+	"golang.org/x/exp/slog"
 )
+
+var attr = slog.String("type", "analyze")
 
 var formatter atomic.Value
 
@@ -30,8 +34,8 @@ func GetFormatter() FormatHandler {
 func Analyze(ctx *plugin.Context, s *Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyze error %s", r), nil,
-				"stack", string(debug.Stack()))
+			ctx.Logger().Error(fmt.Sprintf("analyze error %s", r),
+				"stack", string(debug.Stack()), attr)
 		}
 	}()
 
@@ -71,26 +75,26 @@ func analyzeString(
 	if s.Type == ArrayType { //nolint:nestif
 		ret, err = s.Rule.GetStrings(ctx, content)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
+			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
 			return
 		}
-		ctx.Logger().Debug("parse", "path", path, "result", ret)
+		ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
 	} else {
 		ret, err = s.Rule.GetString(ctx, content)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), err)
+			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
 			return
 		}
-		ctx.Logger().Debug("parse", "path", path, "result", ret)
+		ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
 
 		if s.Type != StringType {
 			ret, err = GetFormatter().Format(ret, s.Type)
 			if err != nil {
 				ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
-					path, ret, s.Format), err)
+					path, ret, s.Format), "error", err, attr)
 				return
 			}
-			ctx.Logger().Debug("format", "path", path, "result", ret)
+			ctx.Logger().Debug("format", "path", path, "result", ret, attr)
 		}
 	}
 
@@ -98,10 +102,10 @@ func analyzeString(
 		ret, err = GetFormatter().Format(ret, s.Format)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
-				path, ret, s.Format), err)
+				path, ret, s.Format), "error", err, attr)
 			return
 		}
-		ctx.Logger().Debug("format", "path", path, "result", ret)
+		ctx.Logger().Debug("format", "path", path, "result", ret, attr)
 	}
 
 	return
@@ -176,7 +180,7 @@ func analyzeInit(
 			return []string{data}
 		default:
 			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path),
-				fmt.Errorf("unexpected content type %T", content))
+				"error", fmt.Errorf("unexpected content type %T", content), attr)
 			return
 		}
 	}
@@ -184,19 +188,19 @@ func analyzeInit(
 	if s.Type == ArrayType {
 		elements, err := s.Init.GetElements(ctx, content)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), err)
+			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
 			return
 		}
-		ctx.Logger().Debug("init", "path", path, "result", len(elements))
+		ctx.Logger().Debug("init", "path", path, "result", strings.Join(elements, "\n"), attr)
 		return elements
 	}
 
 	element, err := s.Init.GetElement(ctx, content)
 	if err != nil {
-		ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), err)
+		ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
 		return
 	}
-	ctx.Logger().Debug("init", "path", path, "result", 1)
+	ctx.Logger().Debug("init", "path", path, "result", element)
 	return []string{element}
 }
 
