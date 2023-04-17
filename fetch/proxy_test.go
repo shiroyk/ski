@@ -102,8 +102,11 @@ func TestSOCKS5Proxy(t *testing.T) {
 			go proxy(t)
 			c := ts.Client()
 			c.Transport.(*http.Transport).Proxy = RoundRobinProxy
-			AddRoundRobinProxy(ts.URL, "socks5://"+l.Addr().String())
-			r, err := c.Head(ts.URL)
+			request, err := http.NewRequest(http.MethodHead, ts.URL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r, err := c.Do(WithRequestProxy(request, "socks5://"+l.Addr().String()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -209,9 +212,12 @@ func TestTransportProxy(t *testing.T) {
 				c = ts.Client()
 			}
 			c.Transport.(*http.Transport).Proxy = RoundRobinProxy
-			AddRoundRobinProxy(ts.URL, proxy1.URL, proxy2.URL)
-
-			if _, err := c.Head(ts.URL); err != nil {
+			request, err := http.NewRequest(http.MethodHead, ts.URL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = c.Do(WithRequestProxy(request, proxy1.URL, proxy2.URL))
+			if err != nil {
 				t.Error(err)
 			}
 			var got *http.Request

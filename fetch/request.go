@@ -31,11 +31,26 @@ type RequestConfig struct {
 	// If you're having issues with auto-detection, set this.
 	Encoding string
 
+	roundRobinProxy *roundRobinProxy
+
 	retryCounter int
 }
 
+// WithRequestConfig returns a shallow copy of req with its context changed
+// to ctx with RequestConfig.
 func WithRequestConfig(req *http.Request, c RequestConfig) *http.Request {
+	c.roundRobinProxy = newRoundRobinProxy(c.Proxy...)
 	return req.WithContext(context.WithValue(req.Context(), requestConfigKey{}, c))
+}
+
+// WithRequestProxy returns a shallow copy of req with its context changed
+// to ctx with proxy.
+func WithRequestProxy(req *http.Request, proxy ...string) *http.Request {
+	if len(proxy) == 0 {
+		return req
+	}
+	config := RequestConfig{roundRobinProxy: newRoundRobinProxy(proxy...)}
+	return req.WithContext(context.WithValue(req.Context(), requestConfigKey{}, config))
 }
 
 func GetRequestConfig(req *http.Request) RequestConfig {

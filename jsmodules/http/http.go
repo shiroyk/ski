@@ -135,11 +135,6 @@ func (h *Http) Template(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Valu
 	return NewResponse(vm, res)
 }
 
-// SetProxy set the proxy URLs for the specified URL.
-func (h *Http) SetProxy(u string, proxyURL ...string) {
-	fetch.AddRoundRobinProxy(u, proxyURL...)
-}
-
 func (h *Http) doRequest(
 	method, u string,
 	reqBody goja.Value,

@@ -134,7 +134,6 @@ func DefaultRoundTripper() http.RoundTripper {
 // client.
 func (f *fetcher) Do(req *http.Request) (*http.Response, error) {
 	config := GetRequestConfig(req)
-	AddRoundRobinProxy(req.URL.String(), config.Proxy...)
 	return f.doRequestRetry(req, &config)
 }
 

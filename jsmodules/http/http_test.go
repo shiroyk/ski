@@ -80,13 +80,6 @@ func TestHttp(t *testing.T) {
 		 } catch (e) {
 			assert.true(e.toString().includes("unsupported request body"));
 		 }`,
-		`try {
-			http.setProxy(url, 'http://1');
-			http.get(url);
-		 } catch (e) {
-			console.log(e);
-			assert.true(e != null);
-		 }`,
 	}
 
 	for i, s := range testCase {
