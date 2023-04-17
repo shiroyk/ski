@@ -1,7 +1,37 @@
 version: 2
 updates:
   - package-ecosystem: "gomod"
-    directory: "/"
+    directory: "/core"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore: "
+  - package-ecosystem: "gomod"
+    directory: "/ctl"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore: "
+  - package-ecosystem: "gomod"
+    directory: "/fetch"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore: "
+  - package-ecosystem: "gomod"
+    directory: "/jsmodules"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore: "
+  - package-ecosystem: "gomod"
+    directory: "/parsers"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore: "
+  - package-ecosystem: "gomod"
+    directory: "/plugin"
     schedule:
       interval: "weekly"
     commit-message:
