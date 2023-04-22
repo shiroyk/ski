@@ -283,3 +283,17 @@ func TestActions(t *testing.T) {
 		})
 	}
 }
+
+func TestAliasRecursive(t *testing.T) {
+	c := `
+type: object
+properties:
+  comment: &c
+    type: array
+    properties:
+      content: {}
+      replies: *c`
+	s := new(Schema)
+	err := yaml.Unmarshal([]byte(c), s)
+	assert.ErrorIs(t, err, ErrAliasRecursive)
+}

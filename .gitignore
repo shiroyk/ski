@@ -19,9 +19,8 @@ coverage.out
 coverage.html
 
 *.so
+dist
 /data
-/dist
-/ctl/dist
 /ctl/data
 node_modules
 package.json

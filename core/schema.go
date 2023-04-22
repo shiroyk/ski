@@ -14,6 +14,9 @@ import (
 // ErrInvalidSchema invalid schema error
 var ErrInvalidSchema = errors.New("invalid schema")
 
+// ErrAliasRecursive invalid alias error
+var ErrAliasRecursive = errors.New("alias can't be recursive")
+
 // ErrInvalidStep invalid step error
 var ErrInvalidStep = errors.New("invalid step")
 
@@ -182,6 +185,11 @@ func buildSchema(node *yaml.Node) (schema Schema, err error) {
 			return buildTypedSchema(node)
 		}
 		return buildStringSchema(node)
+	case yaml.AliasNode:
+		if node.Value == node.Alias.Anchor {
+			return schema, ErrAliasRecursive
+		}
+		return buildSchema(node.Alias)
 	default:
 		err = ErrInvalidSchema
 	}
