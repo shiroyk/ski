@@ -16,6 +16,8 @@ type Module interface {
 }
 
 // Global is it a global module
+// When the module implements the interface it will be loaded into the global
+// when the js.VM is initialized.
 type Global interface {
 	Module
 	Global() // is it a global module
