@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/shiroyk/cloudcat/core"
 	"github.com/shiroyk/cloudcat/core/js"
@@ -77,7 +78,6 @@ func initConfig() {
 
 func initDependencies(config config.Config) {
 	core.Provide(fetch.NewFetcher(config.Fetch))
-	core.Provide(fetch.DefaultTemplateFuncMap())
 
 	if config.Plugin.Path != "" {
 		errs := plugin.LoadPlugin(config.Plugin.Path)
@@ -86,6 +86,9 @@ func initDependencies(config config.Config) {
 		}
 	}
 
+	core.ProvideLazy(func() (template.FuncMap, error) {
+		return fetch.DefaultTemplateFuncMap(), nil
+	})
 	core.ProvideLazy(func() (core.Cache, error) {
 		return cache.NewCache(config.Cache)
 	})

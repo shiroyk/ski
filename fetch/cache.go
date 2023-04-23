@@ -39,8 +39,7 @@ const (
 	stale = iota
 	fresh
 	transparent
-	// DefaultPath the default cache path
-	DefaultPath = "cache"
+	prefix = "FETCH "
 )
 
 // CacheTransport is an implementation of http.RoundTripper that will return values from a cache
@@ -59,9 +58,9 @@ type CacheTransport struct {
 // cacheKey returns the cache key for req.
 func cacheKey(req *http.Request) string {
 	if req.Method == http.MethodGet {
-		return req.URL.String()
+		return prefix + req.URL.String()
 	}
-	return req.Method + " " + req.URL.String()
+	return prefix + req.Method + " " + req.URL.String()
 }
 
 // CachedResponse returns the cached http.Response for req if present, and nil
