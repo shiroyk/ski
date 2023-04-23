@@ -206,13 +206,13 @@ func analyzeInit(
 
 // FormatHandler schema property formatter
 type FormatHandler interface {
-	// Format the data to the given schema.SchemaType
+	// Format the data to the given Type
 	Format(data any, format Type) (any, error)
 }
 
 type defaultFormatHandler struct{}
 
-// Format the data to the given schema.SchemaType
+// Format the data to the given Type
 func (f defaultFormatHandler) Format(data any, format Type) (any, error) {
 	switch data := data.(type) {
 	case string:
