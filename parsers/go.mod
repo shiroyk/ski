@@ -6,7 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/dlclark/regexp2 v1.9.0
-	github.com/ohler55/ojg v1.18.4
+	github.com/ohler55/ojg v1.18.5
 	github.com/shiroyk/cloudcat/core v0.1.0-beta
 	github.com/shiroyk/cloudcat/plugin v0.1.0-beta
 	github.com/spf13/cast v1.5.0
