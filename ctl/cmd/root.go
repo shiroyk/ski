@@ -3,6 +3,11 @@ package cmd
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/shiroyk/cloudcat/ctl/api"
@@ -29,15 +34,32 @@ var rootCmd = &cobra.Command{
 			apiTokenArg = hex.EncodeToString(bytes)
 		}
 
-		cmd.Printf("Secret: %v\n", apiTokenArg)
-		cmd.Printf("Service start http://%s\n", apiAddressArg)
-
-		return api.Server(api.Options{
+		server := api.Server(api.Options{
 			Address:    apiAddressArg,
 			Token:      apiTokenArg,
 			Timeout:    runTimeoutArg,
 			RequestLog: apiRequestLog,
-		}).ListenAndServe()
+		})
+
+		signals := make(chan os.Signal)
+		signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-signals
+			if err := server.Close(); err != nil {
+				fmt.Println(err.Error())
+			}
+			os.Exit(1)
+		}()
+
+		cmd.Printf("Secret: %v\n", apiTokenArg)
+		cmd.Printf("Service start http://%s\n", apiAddressArg)
+
+		err := server.ListenAndServe()
+		if err == http.ErrServerClosed {
+			cmd.Println("Service closed")
+			return nil
+		}
+		return err
 	},
 }
 
