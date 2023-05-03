@@ -42,8 +42,8 @@ func CookieToString(cookies []*http.Cookie) string {
 	var b strings.Builder
 	b.WriteString(cookies[0].String())
 	for _, cookie := range cookies[1:] {
-		b.WriteString(cookie.String())
 		b.WriteString("; ")
+		b.WriteString(cookie.String())
 	}
 	return b.String()
 }

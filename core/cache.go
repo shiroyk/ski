@@ -56,6 +56,7 @@ func (c *memoryCache) SetWithTimeout(key string, value []byte, timeout time.Dura
 func (c *memoryCache) Del(key string) {
 	c.Lock()
 	delete(c.items, key)
+	delete(c.timeout, key)
 	c.Unlock()
 }
 

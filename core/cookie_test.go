@@ -28,4 +28,10 @@ func TestCookie(t *testing.T) {
 		c.SetCookieString(u, maxAge)
 		assert.Equal(t, "MaxAge=7200;", c.CookieString(u))
 	}
+
+	{
+		maxAge := "ID=1; MaxAge=7200"
+		c.SetCookies(u, ParseCookie(maxAge))
+		assert.Equal(t, maxAge, c.CookieString(u))
+	}
 }
