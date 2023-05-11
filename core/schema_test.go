@@ -20,66 +20,61 @@ func TestSchemaYaml(t *testing.T) {
 	}{
 		{
 			`
-{ gq: foo }`, NewSchema(StringType).
-				AddRule(NewStep("gq", "foo")),
+{ p: foo }`, NewSchema(StringType).
+				SetRule(NewSteps("p", "foo")),
 		},
 		{
 			`
-- gq: foo
-- gq: bar
-- gq: title`, NewSchema(StringType).
-				AddRule(NewStep("gq", "foo")).
-				AddRule(NewStep("gq", "bar")).
-				AddRule(NewStep("gq", "title")),
+- p: foo
+- p: bar
+- p: title`, NewSchema(StringType).
+				SetRule(NewSteps("p", "foo", "p", "bar", "p", "title")),
 		},
 		{
 			`
-- gq: foo
+- p: foo
 - or
-- gq: title`, NewSchema(StringType).
-				AddRule(NewStep("gq", "foo")).
-				AddRuleOp(OperatorOr).
-				AddRule(NewStep("gq", "title")),
+- p: title`, NewSchema(StringType).
+				SetRule(NewOr(NewSteps("p", "foo"), NewSteps("p", "title"))),
 		},
 		{
 			`
-- gq: foo
+- p: foo
 - and
+- p: bar
 - or
-- gq: body`, NewSchema(StringType).
-				AddRule(NewStep("gq", "foo")).
-				AddRuleOp(OperatorAnd).
-				AddRuleOp(OperatorOr).
-				AddRule(NewStep("gq", "body")),
+- p: body`, NewSchema(StringType).
+				SetRule(NewOr(
+					NewAnd(NewSteps("p", "foo"), NewSteps("p", "bar")),
+					NewSteps("p", "body"),
+				)),
 		},
 		{
 			`
-- - gq: foo
-  - gq: bar
+- - p: foo
+  - p: bar
 - or
-- - gq: title
-  - gq: body`, NewSchema(StringType).
-				AddRule(NewStep("gq", "foo"), NewStep("gq", "bar")).
-				AddRuleOp(OperatorOr).
-				AddRule(NewStep("gq", "title"), NewStep("gq", "body")),
+- - p: title
+  - p: body`, NewSchema(StringType).
+				SetRule(NewOr(NewSteps("p", "foo", "p", "bar"), NewSteps("p", "title", "p", "body"))),
 		},
 		{
 			`
 type: integer
-rule: { gq: foo }`, NewSchema(IntegerType).
-				AddRule(NewStep("gq", "foo")),
+rule: { p: foo }`, NewSchema(IntegerType).
+				SetRule(NewSteps("p", "foo")),
 		},
 		{
 			`
 type: number
-rule: { gq: foo }`, NewSchema(NumberType).
-				AddRule(NewStep("gq", "foo")),
+rule: { p: foo }`, NewSchema(NumberType).
+				SetRule(NewSteps("p", "foo")),
 		},
 		{
 			`
 type: boolean
-rule: { gq: foo }`, NewSchema(BooleanType).
-				AddRule(NewStep("gq", "foo")),
+rule: { p: foo }`, NewSchema(BooleanType).
+				SetRule(NewSteps("p", "foo")),
 		},
 		{
 			`
@@ -88,51 +83,127 @@ properties:
   context:
     type: string
     format: boolean
-    rule: { gq: foo }`, NewSchema(ObjectType).
+    rule: { p: foo }`, NewSchema(ObjectType).
 				AddProperty("context", *NewSchema(StringType, BooleanType).
-					AddRule(NewStep("gq", "foo"))),
-		},
-		{
-			`
-type: array
-init: { gq: foo }
-properties:
-  context:
-    type: string
-    format: integer
-    rule: { gq: foo }`, NewSchema(ArrayType).
-				AddInit(NewStep("gq", "foo")).
-				AddProperty("context", *NewSchema(StringType, IntegerType).
-					AddRule(NewStep("gq", "foo"))),
+					SetRule(NewSteps("p", "foo"))),
 		},
 		{
 			`
 type: object
-init: { gq: foo }
+properties:
+  context: !string/boolean { p: foo }`, NewSchema(ObjectType).
+				AddProperty("context", *NewSchema(StringType, BooleanType).
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: array
+init: { p: foo }
+properties:
+  context:
+    type: string
+    format: integer
+    rule: { p: foo }`, NewSchema(ArrayType).
+				SetInit(NewSteps("p", "foo")).
+				AddProperty("context", *NewSchema(StringType, IntegerType).
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+init: { p: foo }
 properties:
   context:
     type: number
-    rule: { gq: foo }`, NewSchema(ObjectType).
-				AddInit(NewStep("gq", "foo")).
+    rule: { p: foo }`, NewSchema(ObjectType).
+				SetInit(NewSteps("p", "foo")).
 				AddProperty("context", *NewSchema(NumberType).
-					AddRule(NewStep("gq", "foo"))),
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+init: { p: foo }
+properties:
+  context: !number { p: foo }`, NewSchema(ObjectType).
+				SetInit(NewSteps("p", "foo")).
+				AddProperty("context", *NewSchema(NumberType).
+					SetRule(NewSteps("p", "foo"))),
 		},
 		{
 			`
 type: object
 init:
-  - gq: foo
+  - p: foo
   - or
-  - gq: bar
+  - p: bar
 properties:
   context:
     type: number
-    rule: { gq: foo }`, NewSchema(ObjectType).
-				AddInit(NewStep("gq", "foo")).
-				AddInitOp(OperatorOr).
-				AddInit(NewStep("gq", "bar")).
+    rule: { p: foo }`, NewSchema(ObjectType).
+				SetInit(NewOr(NewSteps("p", "foo"), NewSteps("p", "bar"))).
 				AddProperty("context", *NewSchema(NumberType).
-					AddRule(NewStep("gq", "foo"))),
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+init:
+  - p: foo
+  - or
+  - p: bar
+properties:
+  a: !number { p: foo }
+  b:
+   type: boolean
+   rule: { p: foo }`, NewSchema(ObjectType).
+				SetInit(NewOr(NewSteps("p", "foo"), NewSteps("p", "bar"))).
+				AddProperty("a", *NewSchema(NumberType).
+					SetRule(NewSteps("p", "foo"))).
+				AddProperty("b", *NewSchema(BooleanType).
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+properties:
+  a: !boolean { p: &p foo }
+  b: { p: *p }`, NewSchema(ObjectType).
+				AddProperty("a", *NewSchema(BooleanType).
+					SetRule(NewSteps("p", "foo"))).
+				AddProperty("b", *NewSchema(StringType).
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+properties:
+  a: &a
+   type: boolean
+   rule: { p: foo }
+  b: *a`, NewSchema(ObjectType).
+				AddProperty("a", *NewSchema(BooleanType).
+					SetRule(NewSteps("p", "foo"))).
+				AddProperty("b", *NewSchema(BooleanType).
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+properties:
+  a:
+   type: array
+   rule: &a
+     - { p: foo }
+     - and
+     - { p: foo }
+  b:
+   type: array
+   rule: *a`, NewSchema(ObjectType).
+				AddProperty("a", *NewSchema(ArrayType).
+					SetRule(NewAnd(NewSteps("p", "foo"), NewSteps("p", "foo")))).
+				AddProperty("b", *NewSchema(ArrayType).
+					SetRule(NewAnd(NewSteps("p", "foo"), NewSteps("p", "foo")))),
 		},
 	}
 
@@ -176,12 +247,17 @@ func (t *testParser) GetElements(ctx *plugin.Context, content any, arg string) (
 	return t.GetStrings(ctx, content, arg)
 }
 
+type unknown struct{ act Action }
+
+func (u *unknown) UnmarshalYAML(value *yaml.Node) (err error) {
+	u.act, err = actionDecode(value)
+	return
+}
+
 func TestActions(t *testing.T) {
 	t.Parallel()
 
-	if _, ok := parser.GetParser("act"); !ok {
-		parser.Register("act", new(testParser))
-	}
+	parser.Register("act", new(testParser))
 	ctx := plugin.NewContext(plugin.Options{Timeout: time.Second})
 
 	testCases := []struct {
@@ -201,10 +277,28 @@ func TestActions(t *testing.T) {
 - act: 1
 - and
 - act: 1
+- and
+- act: 1
+`, `1`, `111`, true,
+		},
+		{
+			`
+- act: 1
+- and
+- act: 1
 `, `1`, []string{`1`, `1`}, false,
 		},
 		{
 			`
+- act: 2
+- or
+- act: 1
+`, `1`, `1`, true,
+		},
+		{
+			`
+- act: 2
+- or
 - act: 2
 - or
 - act: 1
@@ -220,9 +314,9 @@ func TestActions(t *testing.T) {
 		{
 			`
 - act: 1
-- and
-- act: 2
 - or
+- act: 2
+- and
 - act: 1
 `, `1`, `11`, true,
 		},
@@ -233,67 +327,89 @@ func TestActions(t *testing.T) {
 - act: 2
 - or
 - act: 1
-`, `1`, []string{`1`, `1`}, false,
+`, `1`, `1`, true,
 		},
 		{
 			`
-- - act: 1
-    act: 1
+- act: 1
 - and
-- - act: 2
+- act: 2
 - or
-- - act: 1
-`, `1`, `11`, true,
-		},
-		{
-			`
-- - act: 1
-    act: 1
-- and
-- - act: 2
-- or
-- - act: 1
+- act: 1
 `, `1`, []string{`1`}, false,
 		},
-	}
-	if _, ok := parser.GetParser("act"); !ok {
-		parser.Register("act", new(testParser))
+		{
+			`
+- - act: 1
+  - and
+  - act: 1
+- and
+- act: 2
+- or
+- - act: 2
+  - or
+  - act: 1
+`, `1`, `11`, true,
+		},
+		{
+			`
+- - act: 2
+  - or
+  - act: 1
+- and
+- act: 1
+- or
+- - act: 2
+  - and
+  - act: 1
+`, `1`, `11`, true,
+		},
+		{
+			`
+- - act: 2
+  - or
+  - act: 1
+- or
+- - act: 1
+  - and
+  - act: 1
+`, `1`, `1`, true,
+		},
+		{
+			`
+- - act: 1
+  - and
+  - act: 1
+- and
+- act: 1
+- and
+- - act: 1
+  - and
+  - act: 1
+`, `1`, `11111`, true,
+		},
 	}
 
 	for i, testCase := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			var act Actions
-			err := yaml.Unmarshal([]byte(testCase.acts), &act)
+			u := new(unknown)
+			err := yaml.Unmarshal([]byte(testCase.acts), u)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 			var result any
 			if testCase.str {
-				result, err = act.GetString(ctx, testCase.content)
+				result, err = GetString(u.act, ctx, testCase.content)
 				if err != nil {
 					t.Error(err)
 				}
 			} else {
-				result, err = act.GetStrings(ctx, testCase.content)
+				result, err = GetStrings(u.act, ctx, testCase.content)
 				if err != nil {
 					t.Error(err)
 				}
 			}
-			assert.Equal(t, testCase.want, result)
+			assert.Equal(t, testCase.want, result, testCase.acts)
 		})
 	}
-}
-
-func TestAliasRecursive(t *testing.T) {
-	c := `
-type: object
-properties:
-  comment: &c
-    type: array
-    properties:
-      content: {}
-      replies: *c`
-	s := new(Schema)
-	err := yaml.Unmarshal([]byte(c), s)
-	assert.ErrorIs(t, err, ErrAliasRecursive)
 }

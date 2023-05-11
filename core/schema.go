@@ -11,14 +11,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ErrInvalidSchema invalid schema error
-var ErrInvalidSchema = errors.New("invalid schema")
-
-// ErrAliasRecursive invalid alias error
-var ErrAliasRecursive = errors.New("alias can't be recursive")
-
-// ErrInvalidStep invalid step error
-var ErrInvalidStep = errors.New("invalid step")
+var (
+	// ErrInvalidSchema invalid schema error
+	ErrInvalidSchema = errors.New("invalid schema")
+	// ErrAliasRecursive invalid alias error
+	ErrAliasRecursive = errors.New("alias can't be recursive")
+	// ErrInvalidAction invalid action error
+	ErrInvalidAction = errors.New("invalid action")
+	// ErrInvalidStep invalid step error
+	ErrInvalidStep = errors.New("invalid step")
+)
 
 // Type The property type.
 type Type string
@@ -61,8 +63,6 @@ func ToType(s any) (Type, error) {
 type Operator string
 
 const (
-	// OperatorNil The Operator of nil.
-	OperatorNil Operator = ""
 	// OperatorAnd The Operator of and.
 	// Action result A, B; Join the A + B.
 	OperatorAnd Operator = "and"
@@ -75,8 +75,8 @@ const (
 type Schema struct {
 	Type       Type     `yaml:"type"`
 	Format     Type     `yaml:"format,omitempty"`
-	Init       Actions  `yaml:"init,omitempty"`
-	Rule       Actions  `yaml:"rule,omitempty"`
+	Init       Action   `yaml:"init,omitempty"`
+	Rule       Action   `yaml:"rule,omitempty"`
 	Properties Property `yaml:"properties,omitempty"`
 }
 
@@ -120,38 +120,14 @@ func (schema *Schema) AddProperty(field string, s Schema) *Schema {
 }
 
 // SetInit set the Init Action to Schema.Init.
-func (schema *Schema) SetInit(action []Action) *Schema {
+func (schema *Schema) SetInit(action Action) *Schema {
 	schema.Init = action
 	return schema
 }
 
-// AddInit append Step to Schema.Init.
-func (schema *Schema) AddInit(step ...Step) *Schema {
-	schema.Init = append(schema.Init, NewAction(step...))
-	return schema
-}
-
-// AddInitOp append Operator to Schema.Init.
-func (schema *Schema) AddInitOp(op Operator) *Schema {
-	schema.Init = append(schema.Init, NewActionOp(op))
-	return schema
-}
-
 // SetRule set the Init Action to Schema.Rule.
-func (schema *Schema) SetRule(action []Action) *Schema {
+func (schema *Schema) SetRule(action Action) *Schema {
 	schema.Rule = action
-	return schema
-}
-
-// AddRule append Step to Schema.Init.
-func (schema *Schema) AddRule(step ...Step) *Schema {
-	schema.Rule = append(schema.Rule, NewAction(step...))
-	return schema
-}
-
-// AddRuleOp append Operator to Schema.Rule.
-func (schema *Schema) AddRuleOp(op Operator) *Schema {
-	schema.Rule = append(schema.Rule, NewActionOp(op))
 	return schema
 }
 
@@ -186,9 +162,6 @@ func buildSchema(node *yaml.Node) (schema Schema, err error) {
 		}
 		return buildStringSchema(node)
 	case yaml.AliasNode:
-		if node.Value == node.Alias.Anchor {
-			return schema, ErrAliasRecursive
-		}
 		return buildSchema(node.Alias)
 	default:
 		err = ErrInvalidSchema
@@ -198,10 +171,20 @@ func buildSchema(node *yaml.Node) (schema Schema, err error) {
 
 // buildStringSchema builds a StringType Schema
 func buildStringSchema(node *yaml.Node) (schema Schema, err error) {
-	var acts Actions
-	if err = node.Decode(&acts); err == nil {
-		schema.Type = StringType
-		schema.Rule = acts
+	schema.Type = StringType
+	schema.Rule, err = actionDecode(node)
+	if err != nil {
+		return
+	}
+	if len(node.Tag) > 2 && node.Tag[0] == '!' && node.Tag[1] != '!' {
+		tags := strings.Split(node.Tag[1:], "/")
+		schema.Type, err = ToType(tags[0])
+		if len(tags) > 1 {
+			schema.Format, err = ToType(tags[1])
+		}
+		if err != nil {
+			return schema, fmt.Errorf("invalid tag %s", node.Tag)
+		}
 	}
 	return
 }
@@ -218,13 +201,9 @@ func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
 		case "format":
 			schema.Format, err = ToType(value.Value)
 		case "init":
-			var acts Actions
-			err = value.Decode(&acts)
-			schema.Init = acts
+			schema.Init, err = actionDecode(value)
 		case "rule":
-			var acts Actions
-			err = value.Decode(&acts)
-			schema.Rule = acts
+			schema.Rule, err = actionDecode(value)
 		case "properties":
 			schema.Properties = make(Property, len(value.Content)/2)
 			for j := 0; j < len(value.Content); j += 2 {
@@ -246,8 +225,7 @@ func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
 // MarshalYAML encodes the Schema
 func (schema Schema) MarshalYAML() (any, error) {
 	if schema.Type == StringType &&
-		len(schema.Init) == 0 &&
-		len(schema.Rule) > 0 {
+		schema.Init == nil {
 		return schema.Rule, nil
 	}
 	s := make(map[string]any, 5)
@@ -255,10 +233,10 @@ func (schema Schema) MarshalYAML() (any, error) {
 	if schema.Format != "" {
 		s["format"] = schema.Format
 	}
-	if len(schema.Init) > 0 {
+	if schema.Init != nil {
 		s["init"] = schema.Init
 	}
-	if len(schema.Rule) > 0 {
+	if schema.Rule != nil {
 		s["rule"] = schema.Rule
 	}
 	if len(schema.Properties) > 0 {
@@ -281,136 +259,173 @@ func (schema *Schema) UnmarshalText(text []byte) error {
 }
 
 // Action The Schema Action
-type Action struct {
-	operator Operator
-	step     []Step
-}
-
-// UnmarshalYAML decodes the Action from yaml
-//
-//nolint:nakedret
-func (a *Actions) UnmarshalYAML(value *yaml.Node) (err error) {
-	switch value.Kind { //nolint:exhaustive
-	case yaml.MappingNode:
-		var steps []Step
-		steps, err = buildMapSteps(value)
-		if err != nil {
-			return
-		}
-		*a = []Action{NewAction(steps...)}
-	case yaml.SequenceNode:
-		*a = make(Actions, 0, len(value.Content))
-		var act Action
-		for _, node := range value.Content {
-			switch node.Kind {
-			case yaml.MappingNode:
-				var steps []Step
-				steps, err = buildMapSteps(node)
-				act = NewAction(steps...)
-			case yaml.ScalarNode:
-				act, err = toActionOp(node.Value)
-			case yaml.SequenceNode:
-				act, err = buildAction(node)
-			default:
-				continue
-			}
-
-			if err != nil {
-				return
-			}
-
-			*a = append(*a, act)
-		}
-	}
-	return
-}
-
-// buildMapSteps builds a slice of Step from map
-func buildMapSteps(node *yaml.Node) (steps []Step, err error) {
-	steps = make([]Step, 0, len(node.Content)/2)
-	for i := 0; i < len(node.Content); i += 2 {
-		k, v := node.Content[i], node.Content[i+1]
-		if k.Kind == yaml.ScalarNode && v.Kind == yaml.ScalarNode {
-			steps = append(steps, NewStep(k.Value, v.Value))
-		} else {
-			return nil, ErrInvalidStep
-		}
-	}
-	return
-}
-
-// buildAction builds an Action for the slice Step
-func buildAction(node *yaml.Node) (act Action, err error) {
-	actSteps := make([]Step, 0, len(node.Content))
-	for _, stepsNode := range node.Content {
-		var steps []Step
-		steps, err = buildMapSteps(stepsNode)
-		if err != nil {
-			return act, err
-		}
-		actSteps = append(actSteps, steps...)
-	}
-	return NewAction(actSteps...), nil
-}
-
-// MarshalYAML encodes the action to yaml
-func (a Action) MarshalYAML() (any, error) {
-	if a.operator != OperatorNil {
-		return a.operator, nil
-	}
-	if len(a.step) == 1 {
-		return a.step[0], nil
-	}
-	return a.step, nil
-}
-
-// NewAction returns a new Action with the given Step
-func NewAction(step ...Step) Action {
-	return Action{step: step}
-}
-
-// NewActionOp returns a new Action with the given Operator
-func NewActionOp(op Operator) Action {
-	return Action{operator: op}
-}
-
-// toActionOp parser the Operator string returns an operator Action
-func toActionOp(op string) (ret Action, err error) {
-	if op == string(OperatorAnd) || op == strings.ToUpper(string(OperatorAnd)) {
-		return NewActionOp(OperatorAnd), nil
-	}
-	if op == string(OperatorOr) || op == strings.ToUpper(string(OperatorOr)) {
-		return NewActionOp(OperatorOr), nil
-	}
-
-	return ret, fmt.Errorf("invalid operation %v", op)
+type Action interface {
+	// Left returns the left Action
+	Left() Action
+	// Right returns the right Action
+	Right() Action
 }
 
 // Step The Action of step
-type Step struct {
-	parser string
-	rule   string
-}
+type Step struct{ K, V string }
 
 // MarshalYAML encodes to yaml
 func (s Step) MarshalYAML() (any, error) {
-	return map[string]string{s.parser: s.rule}, nil
+	return map[string]string{s.K: s.V}, nil
 }
 
-// NewStep returns a new Step with the given params
-func NewStep(parser string, rule string) Step {
-	return Step{
-		parser: parser,
-		rule:   rule,
+// Steps slice of Step
+type Steps []Step
+
+// NewSteps return new Steps
+func NewSteps(str ...string) *Steps {
+	if len(str)%2 != 0 {
+		panic(ErrInvalidStep)
+	}
+	steps := make(Steps, 0, len(str)/2)
+	for i := 0; i < len(str); i += 2 {
+		steps = append(steps, Step{str[i], str[i+1]})
+	}
+	return &steps
+}
+
+// Left returns the left Action
+func (s *Steps) Left() Action { return nil }
+
+// Right returns the right Action
+func (s *Steps) Right() Action { return nil }
+
+func (s *Steps) UnmarshalYAML(value *yaml.Node) error {
+	add := func(k, v *yaml.Node) error {
+		if v.Kind == yaml.AliasNode {
+			v = v.Alias
+		}
+		if k.Kind != yaml.ScalarNode && v.Kind != yaml.ScalarNode {
+			return ErrInvalidStep
+		}
+		*s = append(*s, Step{k.Value, v.Value})
+		return nil
+	}
+	switch value.Kind {
+	case yaml.MappingNode:
+		*s = make(Steps, 0, len(value.Content)/2)
+		for i := 0; i < len(value.Content); i += 2 {
+			if err := add(value.Content[i], value.Content[i+1]); err != nil {
+				return err
+			}
+		}
+	case yaml.SequenceNode:
+		*s = make(Steps, 0, len(value.Content))
+		for _, node := range value.Content {
+			if node.Kind != yaml.MappingNode || len(node.Content) != 2 {
+				return ErrInvalidStep
+			}
+			if err := add(node.Content[0], node.Content[1]); err != nil {
+				return err
+			}
+		}
+	default:
+		return ErrInvalidStep
+	}
+	return nil
+}
+
+func (s Steps) MarshalYAML() (any, error) {
+	if len(s) == 1 {
+		return s[0], nil
+	}
+	return s, nil
+}
+
+// And Action node of Operator and
+type And struct{ l, r Action }
+
+// NewAnd create new And action with left and right Action
+func NewAnd(left, right Action) *And    { return &And{left, right} }
+func (a And) Left() Action              { return a.l }
+func (a And) Right() Action             { return a.r }
+func (a And) String() string            { return string(OperatorAnd) }
+func (a And) MarshalYAML() (any, error) { return [...]any{a.l, a.String(), a.r}, nil }
+
+// Or Action node of Operator or
+type Or struct{ l, r Action }
+
+// NewOr create new Or action with left and right Action
+func NewOr(left, right Action) *Or     { return &Or{left, right} }
+func (a Or) Left() Action              { return a.l }
+func (a Or) Right() Action             { return a.r }
+func (a Or) String() string            { return string(OperatorOr) }
+func (a Or) MarshalYAML() (any, error) { return [...]any{a.l, a.String(), a.r}, nil }
+
+// actionDecode decodes the Action from yaml.node
+func actionDecode(value *yaml.Node) (ret Action, err error) {
+	if value.Kind == yaml.DocumentNode {
+		return nil, ErrInvalidAction
+	}
+	if value.Kind == yaml.AliasNode {
+		value = value.Alias
+	}
+	multiStep := value.Kind == yaml.SequenceNode &&
+		!slices.ContainsFunc(value.Content, func(e *yaml.Node) bool {
+			return e.Kind == yaml.ScalarNode
+		})
+	if value.Kind == yaml.MappingNode || multiStep {
+		steps := new(Steps)
+		if err = value.Decode(steps); err != nil {
+			return
+		}
+		return steps, nil
+	}
+
+	var op string
+	var left Action
+	for _, node := range value.Content {
+		switch node.Kind {
+		case yaml.MappingNode, yaml.SequenceNode:
+			var leaf Action
+			leaf, err = actionDecode(node)
+			if err != nil {
+				return
+			}
+			if left == nil {
+				left = leaf
+				continue
+			}
+			ret, err = toActionOp(op, left, leaf)
+			left = nil
+		case yaml.ScalarNode:
+			op = node.Value
+		default:
+			continue
+		}
+
+		if err != nil {
+			return
+		}
+	}
+
+	if left != nil {
+		return toActionOp(op, ret, left)
+	}
+
+	return
+}
+
+// toActionOp parser the Operator string returns an operator Action
+func toActionOp(op string, left, right Action) (Action, error) {
+	switch Operator(strings.ToLower(op)) {
+	case OperatorAnd:
+		return NewAnd(left, right), nil
+	case OperatorOr:
+		return NewOr(left, right), nil
+	default:
+		return nil, fmt.Errorf("invalid operator %v", op)
 	}
 }
 
-// Actions slice of Action
-type Actions []Action
-
 // GetString run the action returns a string
-func (a *Actions) GetString(ctx *plugin.Context, content any) (string, error) {
-	return runActions(*a, ctx, content,
+func GetString(act Action, ctx *plugin.Context, content any) (string, error) {
+	return runAction(act, ctx, content,
 		func(p parser.Parser) func(*plugin.Context, any, string) (string, error) {
 			return p.GetString
 		},
@@ -420,8 +435,8 @@ func (a *Actions) GetString(ctx *plugin.Context, content any) (string, error) {
 }
 
 // GetStrings run the action returns a slice of string
-func (a *Actions) GetStrings(ctx *plugin.Context, content any) ([]string, error) {
-	return runActions(*a, ctx, content,
+func GetStrings(act Action, ctx *plugin.Context, content any) ([]string, error) {
+	return runAction(act, ctx, content,
 		func(p parser.Parser) func(*plugin.Context, any, string) ([]string, error) {
 			return p.GetStrings
 		},
@@ -431,8 +446,8 @@ func (a *Actions) GetStrings(ctx *plugin.Context, content any) ([]string, error)
 }
 
 // GetElement run the action returns an element string
-func (a *Actions) GetElement(ctx *plugin.Context, content any) (string, error) {
-	return runActions(*a, ctx, content,
+func GetElement(act Action, ctx *plugin.Context, content any) (string, error) {
+	return runAction(act, ctx, content,
 		func(p parser.Parser) func(*plugin.Context, any, string) (string, error) {
 			return p.GetElement
 		},
@@ -442,8 +457,8 @@ func (a *Actions) GetElement(ctx *plugin.Context, content any) (string, error) {
 }
 
 // GetElements run the action returns a slice of element string
-func (a *Actions) GetElements(ctx *plugin.Context, content any) ([]string, error) {
-	return runActions(*a, ctx, content,
+func GetElements(act Action, ctx *plugin.Context, content any) ([]string, error) {
+	return runAction(act, ctx, content,
 		func(p parser.Parser) func(*plugin.Context, any, string) ([]string, error) {
 			return p.GetElements
 		},
@@ -452,40 +467,58 @@ func (a *Actions) GetElements(ctx *plugin.Context, content any) ([]string, error
 		})
 }
 
-// runActions runs the Actions
+// runAction runs the Action
 //
 //nolint:nakedret
-func runActions[T string | []string](
-	action Actions,
+func runAction[T string | []string](
+	root Action,
 	ctx *plugin.Context,
 	content any,
 	runFn func(parser.Parser) func(*plugin.Context, any, string) (T, error),
 	andFn func(T, T) T,
 ) (ret T, err error) {
-	var op Operator
-	for _, act := range action {
-		if act.operator != OperatorNil {
-			op = act.operator
-			continue
-		}
-		stepResult := content
-		for _, step := range act.step {
-			p, ok := parser.GetParser(step.parser)
+	runSteps := func(steps *Steps, data any) (t T, err error) {
+		for _, step := range *steps {
+			p, ok := parser.GetParser(step.K)
 			if !ok {
-				return ret, fmt.Errorf("parser %s not found", step.parser)
+				return t, fmt.Errorf("parser %s not found", step.K)
 			}
-			stepResult, err = runFn(p)(ctx, stepResult, step.rule)
+			data, err = runFn(p)(ctx, data, step.V)
 			if err != nil {
 				return
 			}
 		}
-		if sr, ok := stepResult.(T); ok {
-			if op == OperatorOr && len(sr) == 0 {
-				break
-			}
-			ret = andFn(ret, sr)
-		}
+		return data.(T), nil
 	}
 
+	var stack []Action
+	var result T
+
+	for len(stack) > 0 || root != nil {
+		for root != nil {
+			stack = append(stack, root)
+			root = root.Left()
+		}
+
+		root = stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		switch a := root.(type) {
+		case *Or:
+			if len(result) > 0 || len(ret) > 0 {
+				// if left subtree result is not empty, discard right subtree
+				root = nil
+				continue
+			}
+		case *Steps:
+			result, err = runSteps(a, content)
+			if err != nil {
+				return
+			}
+			ret = andFn(ret, result)
+		}
+
+		root = root.Right()
+	}
 	return
 }

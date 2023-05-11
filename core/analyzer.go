@@ -73,14 +73,14 @@ func analyzeString(
 ) (ret any) {
 	var err error
 	if s.Type == ArrayType { //nolint:nestif
-		ret, err = s.Rule.GetStrings(ctx, content)
+		ret, err = GetStrings(s.Rule, ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
 			return
 		}
 		ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
 	} else {
-		ret, err = s.Rule.GetString(ctx, content)
+		ret, err = GetString(s.Rule, ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
 			return
@@ -165,14 +165,14 @@ func analyzeArray(
 	return nil
 }
 
-// analyzeInit get type of object or array elements
+// analyzeInit get elements
 func analyzeInit(
 	ctx *plugin.Context,
 	s *Schema,
 	content any,
 	path string, // the path of properties
 ) (ret []string) {
-	if len(s.Init) == 0 {
+	if s.Init == nil {
 		switch data := content.(type) {
 		case []string:
 			return data
@@ -186,7 +186,7 @@ func analyzeInit(
 	}
 
 	if s.Type == ArrayType {
-		elements, err := s.Init.GetElements(ctx, content)
+		elements, err := GetElements(s.Init, ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
 			return
@@ -195,7 +195,7 @@ func analyzeInit(
 		return elements
 	}
 
-	element, err := s.Init.GetElement(ctx, content)
+	element, err := GetElement(s.Init, ctx, content)
 	if err != nil {
 		ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
 		return

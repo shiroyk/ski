@@ -3,12 +3,13 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"testing"
+
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
-	"strconv"
-	"testing"
 )
 
 type analyzerParser struct{}
@@ -38,10 +39,40 @@ func TestAnalyzer(t *testing.T) {
 	}{
 		{
 			`
+{ ap: foo }
+`, `"foo"`,
+		},
+		{
+			`
 - ap:
 - or
 - ap: foo
 `, `"foo"`,
+		},
+		{
+			`
+- ap:
+- or
+- ap:
+- or
+- ap: foo
+`, `"foo"`,
+		},
+		{
+			`
+- ap: foo
+- and
+- ap: bar
+`, `"foobar"`,
+		},
+		{
+			`
+- ap: foo
+- and
+- ap: bar
+- and
+- ap: aaa
+`, `"foobaraaa"`,
 		},
 		{
 			`
@@ -75,22 +106,11 @@ rule:
 type: object
 properties:
  string: { ap: 'str' }
- integer:
-   type: integer
-   rule: { ap: '1' }
- number:
-   type: number
-   rule: { ap: '1.1' }
- boolean:
-   type: boolean
-   rule: { ap: '1' }
- array:
-   type: string
-   format: array
-   rule: { ap: "[\"i1\", \"i2\"]" }
- object:
-   type: object
-   rule: { ap: "{\"foo\":\"bar\"}" }
+ integer: !integer { ap: '1' }
+ number: !number { ap: '1.1' }
+ boolean: !boolean { ap: '1' }
+ array: !string/array { ap: "[\"i1\", \"i2\"]" }
+ object: !object { ap: "{\"foo\":\"bar\"}" }
 `, `{"array":["i1","i2"],"boolean":true,"integer":1,"number":1.1,"object":{"foo":"bar"},"string":"str"}`,
 		},
 		{
@@ -104,9 +124,7 @@ rule: { ap: "{\"foo\":1.1}" }
 			`
 type: array
 properties:
- n:
-   type: number
-   rule: { ap: '1' }
+ n: !number { ap: '1' }
 `, `[{"n":1}]`,
 		},
 		{
