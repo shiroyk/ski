@@ -296,33 +296,30 @@ func (s *Steps) Left() Action { return nil }
 func (s *Steps) Right() Action { return nil }
 
 func (s *Steps) UnmarshalYAML(value *yaml.Node) error {
-	add := func(k, v *yaml.Node) error {
-		if v.Kind == yaml.AliasNode {
-			v = v.Alias
-		}
-		if k.Kind != yaml.ScalarNode && v.Kind != yaml.ScalarNode {
-			return ErrInvalidStep
-		}
-		*s = append(*s, Step{k.Value, v.Value})
-		return nil
-	}
 	switch value.Kind {
 	case yaml.MappingNode:
 		*s = make(Steps, 0, len(value.Content)/2)
 		for i := 0; i < len(value.Content); i += 2 {
-			if err := add(value.Content[i], value.Content[i+1]); err != nil {
-				return err
+			k, v := value.Content[i], value.Content[i+1]
+			if v.Kind == yaml.AliasNode {
+				v = v.Alias
 			}
+			if k.Kind != yaml.ScalarNode && v.Kind != yaml.ScalarNode {
+				return ErrInvalidStep
+			}
+			*s = append(*s, Step{k.Value, v.Value})
 		}
 	case yaml.SequenceNode:
 		*s = make(Steps, 0, len(value.Content))
 		for _, node := range value.Content {
-			if node.Kind != yaml.MappingNode || len(node.Content) != 2 {
+			if node.Kind != yaml.MappingNode {
 				return ErrInvalidStep
 			}
-			if err := add(node.Content[0], node.Content[1]); err != nil {
+			steps := new(Steps)
+			if err := node.Decode(steps); err != nil {
 				return err
 			}
+			*s = append(*s, *steps...)
 		}
 	default:
 		return ErrInvalidStep

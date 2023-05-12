@@ -26,6 +26,12 @@ func TestSchemaYaml(t *testing.T) {
 		{
 			`
 - p: foo
+  p: bar`, NewSchema(StringType).
+				SetRule(NewSteps("p", "foo", "p", "bar")),
+		},
+		{
+			`
+- p: foo
 - p: bar
 - p: title`, NewSchema(StringType).
 				SetRule(NewSteps("p", "foo", "p", "bar", "p", "title")),
