@@ -31,7 +31,7 @@ require (
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
-	github.com/ohler55/ojg v1.18.4 // indirect
+	github.com/ohler55/ojg v1.18.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/refraction-networking/utls v1.3.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect

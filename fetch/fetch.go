@@ -62,31 +62,31 @@ type Options struct {
 }
 
 // NewFetcher returns a new Fetch instance
-func NewFetcher(opt Options) core.Fetch {
+func NewFetcher(opt Options) cloudcat.Fetch {
 	fetch := new(fetcher)
 
 	fetch.charsetDetectDisabled = opt.CharsetDetectDisabled
-	fetch.maxBodySize = core.ZeroOr(opt.MaxBodySize, DefaultMaxBodySize)
-	fetch.timeout = core.ZeroOr(opt.Timeout, DefaultTimeout)
-	fetch.retryTimes = core.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
-	fetch.retryHTTPCodes = core.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
+	fetch.maxBodySize = cloudcat.ZeroOr(opt.MaxBodySize, DefaultMaxBodySize)
+	fetch.timeout = cloudcat.ZeroOr(opt.Timeout, DefaultTimeout)
+	fetch.retryTimes = cloudcat.ZeroOr(opt.RetryTimes, DefaultRetryTimes)
+	fetch.retryHTTPCodes = cloudcat.EmptyOr(opt.RetryHTTPCodes, DefaultRetryHTTPCodes)
 
 	transport := opt.RoundTripper
 	if transport == nil {
 		transport = DefaultRoundTripper()
 	}
 
-	ch, _ := core.Resolve[core.Cache]()
+	ch, _ := cloudcat.Resolve[cloudcat.Cache]()
 	if ch != nil {
 		transport = &CacheTransport{
 			Cache:               ch,
-			Policy:              core.ZeroOr(opt.CachePolicy, RFC2616),
+			Policy:              cloudcat.ZeroOr(opt.CachePolicy, RFC2616),
 			Transport:           transport,
 			MarkCachedResponses: true,
 		}
 	}
 
-	cookie, _ := core.Resolve[core.Cookie]()
+	cookie, _ := cloudcat.Resolve[cloudcat.Cookie]()
 	fetch.Client = &http.Client{
 		Transport: transport,
 		Timeout:   fetch.timeout,

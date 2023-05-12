@@ -28,7 +28,7 @@ func TestCookie(t *testing.T) {
 
 	{
 		maxAge := "MaxAge=3600;"
-		c.SetCookies(u, core.ParseCookie(maxAge))
+		c.SetCookies(u, cloudcat.ParseCookie(maxAge))
 		assert.Equal(t, "MaxAge=3600", c.CookieString(u))
 	}
 

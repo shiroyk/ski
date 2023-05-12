@@ -50,7 +50,7 @@ type CacheTransport struct {
 	// The RoundTripper interface actually used to make requests
 	// If nil, http.DefaultTransport is used
 	Transport http.RoundTripper
-	Cache     core.Cache
+	Cache     cloudcat.Cache
 	// If true, responses returned from the cache will be given an extra header, X-From-Cache
 	MarkCachedResponses bool
 }
@@ -65,7 +65,7 @@ func cacheKey(req *http.Request) string {
 
 // CachedResponse returns the cached http.Response for req if present, and nil
 // otherwise.
-func CachedResponse(c core.Cache, req *http.Request) (resp *http.Response, err error) {
+func CachedResponse(c cloudcat.Cache, req *http.Request) (resp *http.Response, err error) {
 	cachedVal, ok := c.Get(cacheKey(req))
 	if !ok {
 		return
@@ -77,7 +77,7 @@ func CachedResponse(c core.Cache, req *http.Request) (resp *http.Response, err e
 
 // NewTransport returns new CacheTransport with the
 // provided Cache implementation and MarkCachedResponses set to true
-func NewTransport(c core.Cache) *CacheTransport {
+func NewTransport(c cloudcat.Cache) *CacheTransport {
 	return &CacheTransport{
 		Policy:              RFC2616,
 		Cache:               c,
@@ -142,7 +142,7 @@ func (t *CacheTransport) RoundTripDummy(req *http.Request) (resp *http.Response,
 
 	if cacheable && cachedResp != nil && err == nil {
 		if t.MarkCachedResponses {
-			cachedResp.Header.Set(core.XFromCache, "1")
+			cachedResp.Header.Set(cloudcat.XFromCache, "1")
 		}
 		return cachedResp, nil
 	}
@@ -189,7 +189,7 @@ func (t *CacheTransport) RoundTripRFC2616(req *http.Request) (resp *http.Respons
 
 	if cacheable && cachedResp != nil && err == nil { //nolint:nestif
 		if t.MarkCachedResponses {
-			cachedResp.Header.Set(core.XFromCache, "1")
+			cachedResp.Header.Set(cloudcat.XFromCache, "1")
 		}
 
 		if varyMatches(cachedResp, req) {

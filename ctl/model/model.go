@@ -16,6 +16,6 @@ type Source struct {
 
 // Model the model
 type Model struct {
-	Source *Source      `yaml:"source"`
-	Schema *core.Schema `yaml:"schema"`
+	Source *Source          `yaml:"source"`
+	Schema *cloudcat.Schema `yaml:"schema"`
 }

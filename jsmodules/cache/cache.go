@@ -15,7 +15,7 @@ type Module struct{}
 
 // Exports returns the module instance
 func (*Module) Exports() any {
-	return &Cache{core.MustResolve[core.Cache]()}
+	return &Cache{cloudcat.MustResolve[cloudcat.Cache]()}
 }
 
 func init() {
@@ -24,7 +24,7 @@ func init() {
 
 // Cache interface is used to store string or bytes.
 type Cache struct {
-	cache core.Cache
+	cache cloudcat.Cache
 }
 
 // Get returns string.

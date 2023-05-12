@@ -16,7 +16,7 @@ import (
 )
 
 func TestHttp(t *testing.T) {
-	core.Provide(fetch.NewFetcher(fetch.Options{}))
+	cloudcat.Provide(fetch.NewFetcher(fetch.Options{}))
 	ctx := context.Background()
 	vm := modulestest.New(t)
 

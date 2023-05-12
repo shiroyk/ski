@@ -47,8 +47,8 @@ func (c *Cache) Del(key string) {
 }
 
 // NewCache returns a new Cache that will store items in bolt.DB.
-func NewCache(opt Options) (core.Cache, error) {
-	db, err := NewDB(opt.Path, "cache.db", core.ZeroOr(opt.ExpireCleanInterval, defaultInterval))
+func NewCache(opt Options) (cloudcat.Cache, error) {
+	db, err := NewDB(opt.Path, "cache.db", cloudcat.ZeroOr(opt.ExpireCleanInterval, defaultInterval))
 	if err != nil {
 		return nil, err
 	}

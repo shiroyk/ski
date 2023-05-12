@@ -193,7 +193,7 @@ func NewTemplateRequest(funcs template.FuncMap, tpl string, arg any) (*http.Requ
 
 // DefaultTemplateFuncMap The default template function map
 func DefaultTemplateFuncMap() template.FuncMap {
-	cache := core.MustResolve[core.Cache]()
+	cache := cloudcat.MustResolve[cloudcat.Cache]()
 	return template.FuncMap{
 		"get": func(key string) (ret string) {
 			if v, ok := cache.Get(key); ok {

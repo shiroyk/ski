@@ -22,7 +22,7 @@ type Module struct{}
 
 // Exports returns module instance
 func (*Module) Exports() any {
-	return &Http{core.MustResolve[core.Fetch]()}
+	return &Http{cloudcat.MustResolve[cloudcat.Fetch]()}
 }
 
 func init() {
@@ -33,7 +33,7 @@ func init() {
 
 // Http module for fetching resources (including across the network).
 type Http struct { //nolint
-	fetch core.Fetch
+	fetch cloudcat.Fetch
 }
 
 // handleBody process the send request body and set the content-type
@@ -118,7 +118,7 @@ func (h *Http) Request(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value
 
 // Template Make a request with an HTTP template, template argument.
 func (h *Http) Template(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	funcs, _ := core.Resolve[template.FuncMap]()
+	funcs, _ := cloudcat.Resolve[template.FuncMap]()
 	tpl := call.Argument(0).String()
 	arg := cast.ToStringMap(call.Argument(1).Export())
 

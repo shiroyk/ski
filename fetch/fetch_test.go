@@ -146,7 +146,7 @@ func TestDecompress(t *testing.T) {
 }
 
 // newFetcherDefault creates new client with default options
-func newFetcherDefault() core.Fetch {
+func newFetcherDefault() cloudcat.Fetch {
 	return NewFetcher(Options{
 		MaxBodySize:    DefaultMaxBodySize,
 		RetryTimes:     DefaultRetryTimes,

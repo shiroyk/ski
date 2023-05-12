@@ -8,7 +8,7 @@ import (
 )
 
 // DoString do request and read response body as string.
-func DoString(fetch core.Fetch, req *http.Request) (string, error) {
+func DoString(fetch cloudcat.Fetch, req *http.Request) (string, error) {
 	body, err := DoByte(fetch, req)
 	if err != nil {
 		return "", err
@@ -17,7 +17,7 @@ func DoString(fetch core.Fetch, req *http.Request) (string, error) {
 }
 
 // DoByte do request and read response body.
-func DoByte(fetch core.Fetch, req *http.Request) ([]byte, error) {
+func DoByte(fetch cloudcat.Fetch, req *http.Request) ([]byte, error) {
 	res, err := fetch.Do(req)
 	if err != nil {
 		return nil, err

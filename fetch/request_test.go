@@ -278,7 +278,7 @@ Cookie: __utma=1.1978842379.1323102373.1323102373.1323102373.1; EPi:NumberOfVisi
 }
 
 func templateFuncs() template.FuncMap {
-	memCache := core.NewCache()
+	memCache := cloudcat.NewCache()
 	memCache.Set("json", []byte(`{"key":"foo"}`))
 	memCache.Set("form", []byte(`key=foo&value=bar`))
 	memCache.Set("image", []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a})

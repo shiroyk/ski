@@ -106,10 +106,10 @@ func NewScheduler(opt Options) Scheduler {
 		useStrict:          opt.UseStrict,
 		closed:             new(atomic.Bool),
 		unInitVMs:          new(atomic.Int64),
-		maxVMs:             core.ZeroOr(opt.MaxVMs, 1),
-		initVMs:            core.ZeroOr(opt.InitialVMs, 1),
-		maxRetriesGetVM:    core.ZeroOr(opt.MaxRetriesGetVM, DefaultMaxRetriesGetVM),
-		maxTimeToWaitGetVM: core.ZeroOr(opt.MaxTimeToWaitGetVM, DefaultMaxTimeToWaitGetVM),
+		maxVMs:             cloudcat.ZeroOr(opt.MaxVMs, 1),
+		initVMs:            cloudcat.ZeroOr(opt.InitialVMs, 1),
+		maxRetriesGetVM:    cloudcat.ZeroOr(opt.MaxRetriesGetVM, DefaultMaxRetriesGetVM),
+		maxTimeToWaitGetVM: cloudcat.ZeroOr(opt.MaxTimeToWaitGetVM, DefaultMaxTimeToWaitGetVM),
 		modulePath:         opt.ModulePath,
 	}
 	scheduler.vms = make(chan VM, scheduler.maxVMs)

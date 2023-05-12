@@ -16,7 +16,7 @@ type Cookie struct {
 
 // SetCookieString handles the receipt of the cookies string in a reply for the given URL.
 func (c *Cookie) SetCookieString(u *url.URL, cookies string) {
-	c.SetCookies(u, core.ParseCookie(cookies))
+	c.SetCookies(u, cloudcat.ParseCookie(cookies))
 }
 
 // CookieString returns the cookies string for the given URL.
@@ -37,18 +37,18 @@ func (c *Cookie) DeleteCookie(u *url.URL) {
 
 // SetCookies handles the receipt of the cookies in a reply for the given URL.
 func (c *Cookie) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	if err := c.db.Put([]byte(u.Host), []byte(core.CookieToString(cookies))); err != nil {
+	if err := c.db.Put([]byte(u.Host), []byte(cloudcat.CookieToString(cookies))); err != nil {
 		slog.Error(fmt.Sprintf("failed to set cookie %s %s", u.Host, err))
 	}
 }
 
 // Cookies returns the cookies to send in a request for the given URL.
 func (c *Cookie) Cookies(u *url.URL) []*http.Cookie {
-	return core.ParseCookie(c.CookieString(u))
+	return cloudcat.ParseCookie(c.CookieString(u))
 }
 
 // NewCookie returns a new Cookie that will store cookies in bolt.DB.
-func NewCookie(opt Options) (core.Cookie, error) {
+func NewCookie(opt Options) (cloudcat.Cookie, error) {
 	db, err := NewDB(opt.Path, "cookie.db", 0)
 	if err != nil {
 		return nil, err

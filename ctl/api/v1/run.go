@@ -28,8 +28,8 @@ const (
 )
 
 func modelRun() handleFunc {
-	fetcher := core.MustResolve[core.Fetch]()
-	tplFunc, _ := core.Resolve[template.FuncMap]()
+	fetcher := cloudcat.MustResolve[cloudcat.Fetch]()
+	tplFunc, _ := cloudcat.Resolve[template.FuncMap]()
 	handler := slog.NewTextHandler(os.Stdout)
 	return func(w http.ResponseWriter, req *http.Request) error {
 		w.Header().Set(contentType, mimeApplicationJSONCharsetUTF8)
@@ -77,7 +77,7 @@ func modelRun() handleFunc {
 			return err
 		}
 
-		result := core.Analyze(parserCtx, model.Schema, mRes)
+		result := cloudcat.Analyze(parserCtx, model.Schema, mRes)
 
 		return JSON(w, http.StatusOK, result)
 	}
@@ -86,8 +86,8 @@ func modelRun() handleFunc {
 func modelDebug() handleFunc {
 	reqAttr := slog.String("type", "request")
 	resAttr := slog.String("type", "response")
-	fetcher := core.MustResolve[core.Fetch]()
-	tplFunc, _ := core.Resolve[template.FuncMap]()
+	fetcher := cloudcat.MustResolve[cloudcat.Fetch]()
+	tplFunc, _ := cloudcat.Resolve[template.FuncMap]()
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set(contentType, mimeApplicationNDJSONCharsetUTF8)
 		logger := slog.New(newResponseHandler(w, slog.LevelDebug))
@@ -147,7 +147,7 @@ func modelDebug() handleFunc {
 			return err
 		}
 
-		return JSON(w, http.StatusOK, core.Analyze(parserCtx, model.Schema, string(body)))
+		return JSON(w, http.StatusOK, cloudcat.Analyze(parserCtx, model.Schema, string(body)))
 	}
 }
 

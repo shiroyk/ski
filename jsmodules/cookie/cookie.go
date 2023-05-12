@@ -13,7 +13,7 @@ type Module struct{}
 
 // Exports returns module instance
 func (*Module) Exports() any {
-	return &Cookie{core.MustResolve[core.Cookie]()}
+	return &Cookie{cloudcat.MustResolve[cloudcat.Cookie]()}
 }
 
 func init() {
@@ -22,7 +22,7 @@ func init() {
 
 // Cookie manages storage and use of cookies in HTTP requests.
 type Cookie struct {
-	cookie core.Cookie
+	cookie cloudcat.Cookie
 }
 
 // Get returns the cookies string for the given URL.

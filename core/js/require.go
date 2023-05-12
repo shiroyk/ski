@@ -35,7 +35,7 @@ var (
 
 // EnableRequire set runtime require module
 func EnableRequire(vm *goja.Runtime, path ...string) {
-	fetcher, _ := core.Resolve[core.Fetch]()
+	fetcher, _ := cloudcat.Resolve[cloudcat.Fetch]()
 	req := &require{
 		vm:            vm,
 		modules:       make(map[string]*goja.Object),
@@ -51,7 +51,7 @@ type require struct {
 	vm          *goja.Runtime
 	modules     map[string]*goja.Object
 	nodeModules map[string]*goja.Object
-	fetcher     core.Fetch
+	fetcher     cloudcat.Fetch
 
 	globalFolders []string
 }
@@ -157,7 +157,7 @@ func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
 
 func (r *require) fetchFile(name string) ([]byte, bool, error) {
 	if r.fetcher == nil {
-		r.fetcher = core.MustResolve[core.Fetch]()
+		r.fetcher = cloudcat.MustResolve[cloudcat.Fetch]()
 	}
 	req, err := http.NewRequest(http.MethodGet, name, nil)
 	if err != nil {
@@ -168,7 +168,7 @@ func (r *require) fetchFile(name string) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	body, err := io.ReadAll(res.Body)
-	return body, core.IsFromCache(res), err
+	return body, cloudcat.IsFromCache(res), err
 }
 
 func (r *require) loadAsFileOrDirectory(path string) (module *goja.Object, err error) {

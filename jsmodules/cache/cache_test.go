@@ -11,7 +11,7 @@ import (
 
 func TestCache(t *testing.T) {
 	t.Parallel()
-	core.Provide[core.Cache](core.NewCache())
+	cloudcat.Provide[cloudcat.Cache](cloudcat.NewCache())
 	ctx := context.Background()
 	vm := modulestest.New(t)
 

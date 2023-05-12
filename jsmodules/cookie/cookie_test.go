@@ -11,7 +11,7 @@ import (
 
 func TestCookie(t *testing.T) {
 	t.Parallel()
-	core.Provide[core.Cookie](core.NewCookie())
+	cloudcat.Provide[cloudcat.Cookie](cloudcat.NewCookie())
 	ctx := context.Background()
 	vm := modulestest.New(t)
 

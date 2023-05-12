@@ -77,7 +77,7 @@ func initConfig() {
 }
 
 func initDependencies(config config.Config) {
-	core.Provide(fetch.NewFetcher(config.Fetch))
+	cloudcat.Provide(fetch.NewFetcher(config.Fetch))
 
 	if config.Plugin.Path != "" {
 		errs := plugin.LoadPlugin(config.Plugin.Path)
@@ -86,13 +86,13 @@ func initDependencies(config config.Config) {
 		}
 	}
 
-	core.ProvideLazy(func() (template.FuncMap, error) {
+	cloudcat.ProvideLazy(func() (template.FuncMap, error) {
 		return fetch.DefaultTemplateFuncMap(), nil
 	})
-	core.ProvideLazy(func() (core.Cache, error) {
+	cloudcat.ProvideLazy(func() (cloudcat.Cache, error) {
 		return cache.NewCache(config.Cache)
 	})
-	core.ProvideLazy(func() (core.Cookie, error) {
+	cloudcat.ProvideLazy(func() (cloudcat.Cookie, error) {
 		return cache.NewCookie(config.Cache)
 	})
 

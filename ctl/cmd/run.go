@@ -66,7 +66,7 @@ func analyzeModel() (err error) {
 		return ErrInvalidModel
 	}
 
-	fetcher := core.MustResolve[core.Fetch]()
+	fetcher := cloudcat.MustResolve[cloudcat.Fetch]()
 	req, err := fetch.NewTemplateRequest(fetch.DefaultTemplateFuncMap(), model.Source.HTTP, nil)
 	req = fetch.WithRequestConfig(req, fetch.RequestConfig{Proxy: model.Source.Proxy})
 	if err != nil {
@@ -74,7 +74,7 @@ func analyzeModel() (err error) {
 	}
 
 	ctx := plugin.NewContext(plugin.Options{
-		Timeout: core.ZeroOr(model.Source.Timeout, runTimeoutArg),
+		Timeout: cloudcat.ZeroOr(model.Source.Timeout, runTimeoutArg),
 		Logger:  slog.New(loggerHandler()),
 		URL:     model.Source.HTTP,
 	})
@@ -85,7 +85,7 @@ func analyzeModel() (err error) {
 		return err
 	}
 
-	return outputJSON(core.Analyze(ctx, model.Schema, res))
+	return outputJSON(cloudcat.Analyze(ctx, model.Schema, res))
 }
 
 func runScript() (err error) {
