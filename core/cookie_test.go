@@ -19,19 +19,19 @@ func TestCookie(t *testing.T) {
 
 	{
 		maxAge := "MaxAge=3600;"
-		c.SetCookies(u, ParseCookie(maxAge))
-		assert.Equal(t, "MaxAge=3600", c.CookieString(u))
+		cookie := ParseCookie(maxAge)
+		c.SetCookies(u, cookie)
+		assert.EqualValues(t, cookie, c.Cookies(u))
+		c.DeleteCookie(u)
+		assert.Nil(t, c.Cookies(u))
 	}
 
 	{
-		maxAge := "MaxAge=7200;"
-		c.SetCookieString(u, maxAge)
-		assert.Equal(t, "MaxAge=7200;", c.CookieString(u))
-	}
-
-	{
-		maxAge := "ID=1; MaxAge=7200"
-		c.SetCookies(u, ParseCookie(maxAge))
-		assert.Equal(t, maxAge, c.CookieString(u))
+		maxAge := "Name=test; MaxAge=7200"
+		cookie := ParseCookie(maxAge)
+		c.SetCookies(u, cookie)
+		assert.EqualValues(t, cookie, c.Cookies(u))
+		c.DeleteCookie(u)
+		assert.Nil(t, c.Cookies(u))
 	}
 }

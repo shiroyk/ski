@@ -29,7 +29,7 @@ func TestCookie(t *testing.T) {
 		cookie.del("https://github.com");
 		assert.true(!cookie.get("https://github.com"), "cookie should be deleted");
 		cookie.set("http://localhost", "max-age=3600;");
-		assert.equal(cookie.get("http://localhost"), "max-age=3600;");
+		assert.equal(cookie.get("http://localhost"), "max-age=3600");
 	`)
 	assert.NoError(t, err)
 }

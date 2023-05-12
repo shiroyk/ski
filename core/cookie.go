@@ -2,8 +2,8 @@ package core
 
 import (
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
-	"sync"
 )
 
 // Cookie manages storage and use of cookies in HTTP requests.
@@ -22,41 +22,35 @@ type Cookie interface {
 
 // memoryCookie is an implementation of Cookie that stores http.Cookie in in-memory.
 type memoryCookie struct {
-	entries *sync.Map
+	*cookiejar.Jar
 }
 
 // SetCookieString handles the receipt of the cookies string in a reply for the given URL.
 func (c *memoryCookie) SetCookieString(u *url.URL, cookies string) {
-	c.entries.Store(u.Host, cookies)
+	c.SetCookies(u, ParseCookie(cookies))
 }
 
 // CookieString returns the cookies string for the given URL.
 func (c *memoryCookie) CookieString(u *url.URL) string {
-	if cookies, ok := c.entries.Load(u.Host); ok {
-		return cookies.(string)
-	}
-	return ""
+	return CookieToString(c.Cookies(u))
 }
 
 // DeleteCookie delete the cookies for the given URL.
 func (c *memoryCookie) DeleteCookie(u *url.URL) {
-	c.entries.Delete(u.Host)
-}
-
-// SetCookies handles the receipt of the cookies in a reply for the given URL.
-func (c *memoryCookie) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	c.entries.Store(u.Host, CookieToString(cookies))
-}
-
-// Cookies returns the cookies to send in a request for the given URL.
-func (c *memoryCookie) Cookies(u *url.URL) []*http.Cookie {
-	if cookies, ok := c.entries.Load(u.Host); ok {
-		return ParseCookie(cookies.(string))
+	exists := c.Cookies(u)
+	cookie := make([]*http.Cookie, 0, len(exists))
+	for _, e := range exists {
+		e.MaxAge = -1
+		cookie = append(cookie, e)
 	}
-	return nil
+	c.SetCookies(u, cookie)
 }
 
 // NewCookie returns a new Cookie that will store cookies in in-memory.
 func NewCookie() Cookie {
-	return &memoryCookie{entries: new(sync.Map)}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		panic(err)
+	}
+	return &memoryCookie{jar}
 }
