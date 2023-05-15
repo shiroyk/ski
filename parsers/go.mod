@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/antchfx/htmlquery v1.3.0
-	github.com/dlclark/regexp2 v1.9.0
+	github.com/dlclark/regexp2 v1.10.0
 	github.com/ohler55/ojg v1.18.5
 	github.com/shiroyk/cloudcat/core v0.2.0
 	github.com/shiroyk/cloudcat/plugin v0.2.0
