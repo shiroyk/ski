@@ -9,7 +9,7 @@ require (
 	github.com/ohler55/ojg v1.18.5
 	github.com/shiroyk/cloudcat/core v0.2.0
 	github.com/shiroyk/cloudcat/plugin v0.2.0
-	github.com/spf13/cast v1.5.0
+	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/net v0.9.0
 )
