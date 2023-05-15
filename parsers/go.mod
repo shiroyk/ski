@@ -11,7 +11,7 @@ require (
 	github.com/shiroyk/cloudcat/plugin v0.2.0
 	github.com/spf13/cast v1.5.0
 	github.com/stretchr/testify v1.8.2
-	golang.org/x/net v0.9.0
+	golang.org/x/net v0.10.0
 )
 
 require (
