@@ -56,15 +56,18 @@ func getString(ctx *plugin.Context, content any, script string) (ret string, err
 		return ret, err
 	}
 
-	if maps, ok := value.(map[string]any); ok {
-		bytes, err := json.Marshal(maps)
+	switch value.(type) {
+	case map[string]any, []any:
+		bytes, err := json.Marshal(value)
 		if err != nil {
 			return ret, err
 		}
 		return string(bytes), nil
+	case nil:
+		return ret, nil
+	default:
+		return cast.ToStringE(value)
 	}
-
-	return cast.ToStringE(value)
 }
 
 func getStrings(ctx *plugin.Context, content any, script string) (ret []string, err error) {
@@ -78,6 +81,9 @@ func getStrings(ctx *plugin.Context, content any, script string) (ret []string, 
 	value, err := js.Unwrap(result)
 	if err != nil {
 		return nil, err
+	}
+	if value == nil {
+		return nil, nil
 	}
 
 	slice, ok := value.([]any)
