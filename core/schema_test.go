@@ -383,6 +383,17 @@ func TestActions(t *testing.T) {
 		},
 		{
 			`
+- - act: 2
+  - and
+  - act: 2
+- or
+- - act: 2
+  - or
+  - act: 1
+`, `1`, `1`, true,
+		},
+		{
+			`
 - - act: 1
   - and
   - act: 1
@@ -393,6 +404,19 @@ func TestActions(t *testing.T) {
   - and
   - act: 1
 `, `1`, `11111`, true,
+		},
+		{
+			`
+- - act: 1
+  - and
+  - act: 1
+- and
+- act: 1
+- and
+- - act: 1
+  - and
+  - act: 1
+`, `1`, []string{`1`, `1`, `1`, `1`, `1`}, false,
 		},
 	}
 

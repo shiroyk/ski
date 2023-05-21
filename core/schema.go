@@ -474,22 +474,7 @@ func runAction[T string | []string](
 	runFn func(parser.Parser) func(*plugin.Context, any, string) (T, error),
 	andFn func(T, T) T,
 ) (ret T, err error) {
-	runSteps := func(steps *Steps, data any) (t T, err error) {
-		for _, step := range *steps {
-			p, ok := parser.GetParser(step.K)
-			if !ok {
-				return t, fmt.Errorf("parser %s not found", step.K)
-			}
-			data, err = runFn(p)(ctx, data, step.V)
-			if err != nil {
-				return
-			}
-		}
-		return data.(T), nil
-	}
-
 	var stack []Action
-	var result T
 
 	for len(stack) > 0 || root != nil {
 		for root != nil {
@@ -500,19 +485,26 @@ func runAction[T string | []string](
 		root = stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 
-		switch a := root.(type) {
+		switch root.(type) {
 		case *Or:
-			if len(result) > 0 || len(ret) > 0 {
+			if len(ret) > 0 {
 				// if left subtree result is not empty, discard right subtree
 				root = nil
 				continue
 			}
 		case *Steps:
-			result, err = runSteps(a, content)
-			if err != nil {
-				return
+			result := content
+			for _, step := range *root.(*Steps) {
+				p, ok := parser.GetParser(step.K)
+				if !ok {
+					return ret, fmt.Errorf("parser %s not found", step.K)
+				}
+				result, err = runFn(p)(ctx, result, step.V)
+				if err != nil {
+					return
+				}
 			}
-			ret = andFn(ret, result)
+			ret = andFn(ret, result.(T))
 		}
 
 		root = root.Right()
