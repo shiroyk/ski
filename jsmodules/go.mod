@@ -8,7 +8,7 @@ require (
 	github.com/shiroyk/cloudcat/fetch v0.2.0
 	github.com/shiroyk/cloudcat/plugin v0.2.0
 	github.com/spf13/cast v1.5.1
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	golang.org/x/crypto v0.9.0
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 )
