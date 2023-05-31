@@ -22,6 +22,7 @@ import (
 
 var (
 	configArg    string
+	pluginArg    string
 	configGenArg string
 )
 
@@ -64,6 +65,7 @@ func writeDiskConfig() error {
 func init() {
 	configCmd.Flags().StringVarP(&configGenArg, "gen", "g", "", "generate default configuration file")
 	rootCmd.PersistentFlags().StringVar(&configArg, "config", "~/.config/cloudcat/config.yml", "config file path")
+	rootCmd.PersistentFlags().StringVar(&pluginArg, "plugin", "~/.config/cloudcat/plugin", "plugin path")
 	rootCmd.AddCommand(configCmd)
 }
 
@@ -79,8 +81,9 @@ func initConfig() {
 func initDependencies(config config.Config) {
 	cloudcat.Provide(fetch.NewFetcher(config.Fetch))
 
-	if config.Plugin.Path != "" {
-		errs := plugin.LoadPlugin(config.Plugin.Path)
+	pluginPath := cloudcat.ZeroOr(pluginArg, config.Plugin.Path)
+	if pluginPath != "" {
+		errs := plugin.LoadPlugin(pluginPath)
 		if len(errs) > 0 {
 			slog.Error("error load external plugin", "error", fmt.Sprintf("%v", errs))
 		}
