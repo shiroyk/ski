@@ -53,6 +53,9 @@ func ToStrings(data any) (s any, err error) {
 
 // Unwrap the goja.Value to the raw value
 func Unwrap(value goja.Value) (any, error) {
+	if value == nil {
+		return nil, nil
+	}
 	switch v := value.Export().(type) {
 	default:
 		return v, nil
