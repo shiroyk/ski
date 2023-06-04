@@ -65,7 +65,7 @@ func writeDiskConfig() error {
 func init() {
 	configCmd.Flags().StringVarP(&configGenArg, "gen", "g", "", "generate default configuration file")
 	rootCmd.PersistentFlags().StringVar(&configArg, "config", "~/.config/cloudcat/config.yml", "config file path")
-	rootCmd.PersistentFlags().StringVar(&pluginArg, "plugin", "~/.config/cloudcat/plugin", "plugin path")
+	rootCmd.PersistentFlags().StringVar(&pluginArg, "plugin", "", "plugin path")
 	rootCmd.AddCommand(configCmd)
 }
 
