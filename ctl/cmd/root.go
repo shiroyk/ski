@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"golang.org/x/exp/slog"
 	"net/http"
 	"os"
@@ -51,8 +52,8 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}()
 
-		slog.Info("Secret: %v\n", apiTokenArg)
-		slog.Info("Service start http://%s\n", apiAddressArg)
+		slog.Info(fmt.Sprintf("Secret: %v\n", apiTokenArg))
+		slog.Info(fmt.Sprintf("Service start http://%s\n", apiAddressArg))
 
 		err := server.ListenAndServe()
 		if err == http.ErrServerClosed {
