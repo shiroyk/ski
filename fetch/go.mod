@@ -6,7 +6,7 @@ require (
 	github.com/andybalholm/brotli v1.0.5
 	github.com/refraction-networking/utls v1.3.2
 	github.com/shiroyk/cloudcat/core v0.2.0
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 	golang.org/x/net v0.10.0
 	golang.org/x/text v0.9.0
