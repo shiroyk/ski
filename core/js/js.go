@@ -23,22 +23,21 @@ const (
 
 var (
 	defaultScheduler Scheduler
+	defaultOptions   = Options{InitialVMs: 2, MaxVMs: runtime.GOMAXPROCS(0)}
 	schedulerOnce    sync.Once
 	// ErrSchedulerClosed the scheduler is closed error
 	ErrSchedulerClosed = errors.New("scheduler is closed")
 )
 
-// SetScheduler makes s the default Scheduler.
-func SetScheduler(s Scheduler) {
-	defaultScheduler = s
+// SetOptions set the default js Options.
+func SetOptions(opt Options) {
+	defaultOptions = opt
 }
 
 // GetScheduler returns the default Scheduler.
 func GetScheduler() Scheduler {
 	schedulerOnce.Do(func() {
-		if defaultScheduler == nil {
-			defaultScheduler = NewScheduler(Options{InitialVMs: 2, MaxVMs: runtime.GOMAXPROCS(0)})
-		}
+		defaultScheduler = NewScheduler(defaultOptions)
 	})
 	return defaultScheduler
 }

@@ -78,17 +78,8 @@ func initConfig() {
 	rootCmd.SetContext(config.NewContext(context.Background(), cfg))
 }
 
+// initDependencies initial the dependencies.
 func initDependencies(config config.Config) {
-	cloudcat.Provide(fetch.NewFetcher(config.Fetch))
-
-	pluginPath := cloudcat.ZeroOr(pluginArg, config.Plugin.Path)
-	if pluginPath != "" {
-		errs := plugin.LoadPlugin(pluginPath)
-		if len(errs) > 0 {
-			slog.Error("error load external plugin", "error", fmt.Sprintf("%v", errs))
-		}
-	}
-
 	cloudcat.ProvideLazy(func() (template.FuncMap, error) {
 		return fetch.DefaultTemplateFuncMap(), nil
 	})
@@ -98,6 +89,17 @@ func initDependencies(config config.Config) {
 	cloudcat.ProvideLazy(func() (cloudcat.Cookie, error) {
 		return cache.NewCookie(config.Cache)
 	})
+	cloudcat.ProvideLazy(func() (cloudcat.Fetch, error) {
+		return fetch.NewFetcher(config.Fetch), nil
+	})
 
-	js.SetScheduler(js.NewScheduler(config.JS))
+	js.SetOptions(config.JS)
+
+	pluginPath := cloudcat.ZeroOr(pluginArg, config.Plugin.Path)
+	if pluginPath != "" {
+		errs := plugin.LoadPlugin(pluginPath)
+		if len(errs) > 0 {
+			slog.Error("error load external plugin", "error", fmt.Sprintf("%v", errs))
+		}
+	}
 }
