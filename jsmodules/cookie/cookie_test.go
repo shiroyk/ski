@@ -25,11 +25,11 @@ func TestCookie(t *testing.T) {
 	}
 
 	_, err = vm.RunString(ctx, `
-		cookie.set("https://github.com", "max-age=3600;");
+		cookie.set("https://github.com", "path=/; secure; HttpOnly;");
 		cookie.del("https://github.com");
 		assert.true(!cookie.get("https://github.com"), "cookie should be deleted");
-		cookie.set("http://localhost", "max-age=3600;");
-		assert.equal(cookie.get("http://localhost"), "max-age=3600");
+		cookie.set("https://github.com", "has_recent_activity=1; path=/; secure; HttpOnly; SameSite=Lax");
+		assert.equal("has_recent_activity=1", cookie.get("https://github.com"));
 	`)
 	assert.NoError(t, err)
 }

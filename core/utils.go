@@ -25,8 +25,8 @@ func EmptyOr[T any](value, defaultValue []T) []T {
 // ParseCookie parses the given cookie string and return a slice http.Cookie.
 func ParseCookie(cookies string) []*http.Cookie {
 	header := http.Header{}
-	header.Add("Cookie", cookies)
-	req := http.Request{Header: header}
+	header.Add("Set-Cookie", cookies)
+	req := http.Response{Header: header}
 	return req.Cookies()
 }
 
