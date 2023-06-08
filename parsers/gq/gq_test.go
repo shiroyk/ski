@@ -2,12 +2,14 @@ package gq
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/slog"
 )
 
 var (
@@ -60,6 +62,7 @@ func TestMain(m *testing.M) {
 	ctx = plugin.NewContext(plugin.Options{
 		URL: "https://localhost",
 	})
+	gq = Parser{parseFuncs: builtins()}
 	code := m.Run()
 	os.Exit(code)
 }
@@ -102,7 +105,7 @@ func assertGetElements(t *testing.T, arg string, expected []string) {
 
 func TestParser(t *testing.T) {
 	t.Parallel()
-	if _, ok := parser.GetParser(key); !ok {
+	if _, ok := parser.GetParser(Key); !ok {
 		t.Fatal("schema not registered")
 	}
 
@@ -160,4 +163,16 @@ func TestGetElements(t *testing.T) {
 	})
 
 	assertGetElements(t, `#foot div -> slice(0, 3) -> text`, []string{"f1", "f2", "f3"})
+}
+
+func TestExternalFunc(t *testing.T) {
+	fun := func(logger *slog.Logger) GFunc {
+		return func(_ *plugin.Context, content any, args ...string) (any, error) {
+			logger.Info(fmt.Sprintf("result type was %T", content))
+			return content, nil
+		}
+	}
+	p := NewGoQueryParser(FuncMap{"logger": fun(slog.Default())})
+	_, err := p.GetString(ctx, content, ".body ul a -> logger -> text")
+	assert.NoError(t, err)
 }

@@ -75,10 +75,6 @@ func Register(name string, typ ExtensionType, mod any) {
 		panic(fmt.Sprintf("unsupported extension type: %T", typ))
 	}
 
-	if _, ok := exts[name]; ok {
-		panic(fmt.Sprintf("extension already registered: %s", name))
-	}
-
 	path, version := extractModuleInfo(mod)
 
 	exts[name] = &Extension{

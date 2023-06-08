@@ -11,26 +11,39 @@ import (
 	"github.com/spf13/cast"
 )
 
+// Key the gq parser register key.
+const Key string = "gq"
+
 // Parser the goquery parser
-type Parser struct{}
+type Parser struct {
+	parseFuncs FuncMap
+}
 
-const key string = "gq"
+// NewGoQueryParser creates a new goquery Parser with the given FuncMap.
+func NewGoQueryParser(funcs FuncMap) parser.Parser {
+	p := &Parser{parseFuncs: builtins()}
+	for k, v := range funcs {
+		p.parseFuncs[k] = v
+	}
+	return p
+}
 
+// init register the goquery Parser with default builtins funcs.
 func init() {
-	parser.Register(key, new(Parser))
+	parser.Register(Key, &Parser{parseFuncs: builtins()})
 }
 
 // GetString gets the string of the content with the given arguments.
 //
 // content := `<ul><li>1</li><li>2</li></ul>`
 // GetString(ctx, content, "ul li") returns "1\n2"
-func (p Parser) GetString(ctx *plugin.Context, content any, arg string) (ret string, err error) {
+func (p *Parser) GetString(ctx *plugin.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
 	}
 
-	rule, funcs, err := parseRuleFunctions(arg)
+	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
 	if err != nil {
 		return
 	}
@@ -38,12 +51,12 @@ func (p Parser) GetString(ctx *plugin.Context, content any, arg string) (ret str
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
 			return ret, err
 		}
 	}
 
-	join, err := buildInFunc.Join(ctx, node, "\n")
+	join, err := p.parseFuncs["join"](ctx, node, "\n")
 	if err != nil {
 		return
 	}
@@ -55,13 +68,13 @@ func (p Parser) GetString(ctx *plugin.Context, content any, arg string) (ret str
 //
 // content := `<ul><li>1</li><li>2</li></ul>`
 // GetStrings(ctx, content, "ul li") returns []string{"1", "2"}
-func (p Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret []string, err error) {
+func (p *Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
 	}
 
-	rule, funcs, err := parseRuleFunctions(arg)
+	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
 	if err != nil {
 		return
 	}
@@ -69,7 +82,7 @@ func (p Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret []
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
 			return nil, err
 		}
 	}
@@ -93,13 +106,13 @@ func (p Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret []
 //
 // content := `<ul><li>1</li><li>2</li></ul>`
 // GetElement(ctx, content, "ul li") returns "<li>1</li>\n<li>2</li>"
-func (p Parser) GetElement(ctx *plugin.Context, content any, arg string) (ret string, err error) {
+func (p *Parser) GetElement(ctx *plugin.Context, content any, arg string) (ret string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
 	}
 
-	rule, funcs, err := parseRuleFunctions(arg)
+	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
 	if err != nil {
 		return
 	}
@@ -107,7 +120,7 @@ func (p Parser) GetElement(ctx *plugin.Context, content any, arg string) (ret st
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
 			return ret, err
 		}
 	}
@@ -123,13 +136,13 @@ func (p Parser) GetElement(ctx *plugin.Context, content any, arg string) (ret st
 //
 // content := `<ul><li>1</li><li>2</li></ul>`
 // GetElements(ctx, content, "ul li") returns []string{"<li>1</li>", "<li>2</li>"}
-func (p Parser) GetElements(ctx *plugin.Context, content any, arg string) (ret []string, err error) {
+func (p *Parser) GetElements(ctx *plugin.Context, content any, arg string) (ret []string, err error) {
 	nodes, err := getSelection(content)
 	if err != nil {
 		return
 	}
 
-	rule, funcs, err := parseRuleFunctions(arg)
+	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
 	if err != nil {
 		return
 	}
@@ -137,7 +150,7 @@ func (p Parser) GetElements(ctx *plugin.Context, content any, arg string) (ret [
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = funcMap[fun.name](ctx, node, fun.args...); err != nil {
+		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
 			return nil, err
 		}
 	}

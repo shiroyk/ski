@@ -18,7 +18,7 @@ type ruleFunc struct {
 	args []string
 }
 
-func parseRuleFunctions(ruleStr string) (rule string, funcs []ruleFunc, err error) {
+func parseRuleFunctions(funcMap FuncMap, ruleStr string) (rule string, funcs []ruleFunc, err error) {
 	ruleFuncs := strings.Split(ruleStr, "->")
 	if len(ruleFuncs) == 1 {
 		return ruleFuncs[0], funcs, nil
@@ -34,7 +34,7 @@ func parseRuleFunctions(ruleStr string) (rule string, funcs []ruleFunc, err erro
 		if err != nil {
 			return "", nil, err
 		}
-		if funcMap[fn.name] == nil {
+		if _, ok := funcMap[fn.name]; !ok {
 			return "", nil, fmt.Errorf("function %s not exists", fn.name)
 		}
 		funcs = append(funcs, fn)

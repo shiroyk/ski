@@ -165,3 +165,19 @@ func TestBuildInFuncParents(t *testing.T) {
 
 	assertGetString(t, `.body ul .selected -> parents -> slice(0) -> attr(id)`, "url")
 }
+
+func TestBuildInFuncPrefix(t *testing.T) {
+	t.Parallel()
+
+	assertGetString(t, `#main #n1 -> text -> prefix(A)`, "A1")
+
+	assertGetString(t, `#main #n1 -> prefix(B)`, "B1")
+}
+
+func TestBuildInFuncSuffix(t *testing.T) {
+	t.Parallel()
+
+	assertGetString(t, `#main #n1 -> text -> suffix(A)`, "1A")
+
+	assertGetString(t, `#main #n1 -> suffix(B)`, "1B")
+}

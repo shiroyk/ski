@@ -11,9 +11,9 @@ func TestParseRuleFunction(t *testing.T) {
 		`-> text("')`, `-> text('")`, `-> text(' ", ")`,
 		`-> text("\")`, `-> text('\')`, `-> text(" ", ')`,
 	}
-
+	funcs := builtins()
 	for _, rule := range rules {
-		if _, _, err := parseRuleFunctions(rule); err == nil {
+		if _, _, err := parseRuleFunctions(funcs, rule); err == nil {
 			t.Fatalf("Unexpected function and argument parse %s", rule)
 		}
 	}
