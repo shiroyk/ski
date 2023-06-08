@@ -240,14 +240,22 @@ func (f defaultFormatHandler) Format(data any, format Type) (any, error) {
 		}
 	case []string:
 		slice := make([]any, len(data))
+		var err error
 		for i, o := range data {
-			slice[i], _ = f.Format(o, format)
+			slice[i], err = f.Format(o, format)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return slice, nil
 	case map[string]any:
 		maps := make(map[string]any, len(data))
+		var err error
 		for k, v := range data {
-			maps[k], _ = f.Format(v, format)
+			maps[k], err = f.Format(v, format)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return maps, nil
 	}

@@ -117,7 +117,7 @@ properties:
 			`
 type: object
 format: number
-rule: { ap: "{\"foo\":1.1}" }
+rule: { ap: "{\"foo\":\"1.1\"}" }
 `, `{"foo":1.1}`,
 		},
 		{
@@ -175,9 +175,7 @@ func TestFormat(t *testing.T) {
 	for i, testCase := range testCases {
 		t.Run(fmt.Sprintf("%v", i), func(t *testing.T) {
 			got, err := formatter.Format(testCase.data, testCase.typ)
-			if err != nil {
-				t.Error(err)
-			}
+			assert.NoError(t, err)
 			assert.Equal(t, testCase.want, got)
 		})
 	}
