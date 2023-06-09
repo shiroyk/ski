@@ -2,6 +2,8 @@ package gq
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBuildInFuncGet(t *testing.T) {
@@ -74,6 +76,9 @@ func TestBuildInFuncHref(t *testing.T) {
 	}
 
 	assertGetString(t, `.body ul #a4 a -> href`, "https://localhost/home")
+
+	_, err := gq.GetString(ctx, content, `#main #n1 -> href`)
+	assert.Error(t, err)
 }
 
 func TestBuildInFuncHtml(t *testing.T) {

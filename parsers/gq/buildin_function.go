@@ -1,6 +1,7 @@
 package gq
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -153,7 +154,11 @@ func Attr(_ *plugin.Context, content any, args ...string) (any, error) {
 // Href gets the href attribute's value, if URL is not absolute returns the absolute URL.
 func Href(ctx *plugin.Context, content any, _ ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
-		hrefURL, err := url.Parse(node.AttrOr("href", ""))
+		href, exists := node.Attr("href")
+		if !exists {
+			return nil, errors.New("href attribute's value is not exist")
+		}
+		hrefURL, err := url.Parse(href)
 		if err != nil {
 			return nil, err
 		}
