@@ -213,34 +213,31 @@ type FormatHandler interface {
 type defaultFormatHandler struct{}
 
 // Format the data to the given Type
-func (f defaultFormatHandler) Format(data any, format Type) (any, error) {
+func (f defaultFormatHandler) Format(data any, format Type) (ret any, err error) {
 	switch data := data.(type) {
 	case string:
 		switch format {
 		case StringType:
 			return data, nil
 		case IntegerType:
-			return cast.ToIntE(data)
+			ret, err = cast.ToIntE(data)
 		case NumberType:
-			return cast.ToFloat64E(data)
+			ret, err = cast.ToFloat64E(data)
 		case BooleanType:
-			return cast.ToBoolE(data)
+			ret, err = cast.ToBoolE(data)
 		case ArrayType:
-			slice := make([]any, 0)
-			if err := json.Unmarshal([]byte(data), &slice); err != nil {
-				return nil, err
-			}
-			return slice, nil
+			ret = make([]any, 0)
+			err = json.Unmarshal([]byte(data), &ret)
 		case ObjectType:
-			object := make(map[string]any, 0)
-			if err := json.Unmarshal([]byte(data), &object); err != nil {
-				return nil, err
-			}
-			return object, nil
+			ret = make(map[string]any, 0)
+			err = json.Unmarshal([]byte(data), &ret)
 		}
+		if err != nil {
+			return nil, err
+		}
+		return
 	case []string:
 		slice := make([]any, len(data))
-		var err error
 		for i, o := range data {
 			slice[i], err = f.Format(o, format)
 			if err != nil {
@@ -250,7 +247,6 @@ func (f defaultFormatHandler) Format(data any, format Type) (any, error) {
 		return slice, nil
 	case map[string]any:
 		maps := make(map[string]any, len(data))
-		var err error
 		for k, v := range data {
 			maps[k], err = f.Format(v, format)
 			if err != nil {
@@ -259,5 +255,5 @@ func (f defaultFormatHandler) Format(data any, format Type) (any, error) {
 		}
 		return maps, nil
 	}
-	return data, fmt.Errorf("unexpected type %T", data)
+	return nil, fmt.Errorf("unable format type %T to %s", data, format)
 }

@@ -173,9 +173,29 @@ func TestFormat(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		t.Run(fmt.Sprintf("%v", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Cases %v", i), func(t *testing.T) {
 			got, err := formatter.Format(testCase.data, testCase.typ)
 			assert.NoError(t, err)
+			assert.Equal(t, testCase.want, got)
+		})
+	}
+
+	errCases := []struct {
+		data any
+		typ  Type
+		want any
+	}{
+		{"", NumberType, nil},
+		{"9-", IntegerType, nil},
+		{"114", BooleanType, nil},
+		{[]string{"1", "?"}, IntegerType, nil},
+		{map[string]any{"k": "!"}, NumberType, nil},
+	}
+
+	for i, testCase := range errCases {
+		t.Run(fmt.Sprintf("Err cases %v", i), func(t *testing.T) {
+			got, err := formatter.Format(testCase.data, testCase.typ)
+			assert.Error(t, err)
 			assert.Equal(t, testCase.want, got)
 		})
 	}
