@@ -317,7 +317,7 @@ func Parents(_ *plugin.Context, content any, args ...string) (any, error) {
 
 func Prefix(_ *plugin.Context, content any, args ...string) (ret any, err error) {
 	if len(args) == 0 {
-		return "", nil
+		return content, nil
 	}
 	if s, ok := content.(string); ok {
 		return args[0] + s, nil
@@ -329,7 +329,7 @@ func Prefix(_ *plugin.Context, content any, args ...string) (ret any, err error)
 
 func Suffix(_ *plugin.Context, content any, args ...string) (ret any, err error) {
 	if len(args) == 0 {
-		return "", nil
+		return content, nil
 	}
 	if s, ok := content.(string); ok {
 		return s + args[0], nil
