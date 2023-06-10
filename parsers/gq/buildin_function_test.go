@@ -177,6 +177,8 @@ func TestBuildInFuncPrefix(t *testing.T) {
 	assertGetString(t, `#main #n1 -> text -> prefix(A)`, "A1")
 
 	assertGetString(t, `#main #n1 -> prefix(B)`, "B1")
+
+	assertGetStrings(t, `#main div -> slice(0, 2) -> text -> prefix(-)`, []string{"-1", "-2"})
 }
 
 func TestBuildInFuncSuffix(t *testing.T) {
@@ -185,4 +187,6 @@ func TestBuildInFuncSuffix(t *testing.T) {
 	assertGetString(t, `#main #n1 -> text -> suffix(A)`, "1A")
 
 	assertGetString(t, `#main #n1 -> suffix(B)`, "1B")
+
+	assertGetStrings(t, `.body a -> slice(0, 2) -> text -> suffix(.com)`, []string{"Google.com", "Github.com"})
 }

@@ -324,22 +324,36 @@ func Prefix(_ *plugin.Context, content any, args ...string) (ret any, err error)
 	if len(args) == 0 {
 		return content, nil
 	}
-	if s, ok := content.(string); ok {
-		return args[0] + s, nil
-	} else if node, ok := content.(*goquery.Selection); ok {
-		return args[0] + node.Text(), nil
+	switch src := content.(type) {
+	case string:
+		return args[0] + src, nil
+	case []string:
+		for i := range src {
+			src[i] = args[0] + src[i]
+		}
+		return src, nil
+	case *goquery.Selection:
+		return args[0] + src.Text(), nil
+	default:
+		return content, nil
 	}
-	return
 }
 
 func Suffix(_ *plugin.Context, content any, args ...string) (ret any, err error) {
 	if len(args) == 0 {
 		return content, nil
 	}
-	if s, ok := content.(string); ok {
-		return s + args[0], nil
-	} else if node, ok := content.(*goquery.Selection); ok {
-		return node.Text() + args[0], nil
+	switch src := content.(type) {
+	case string:
+		return src + args[0], nil
+	case []string:
+		for i := range src {
+			src[i] = src[i] + args[0]
+		}
+		return src, nil
+	case *goquery.Selection:
+		return src.Text() + args[0], nil
+	default:
+		return content, nil
 	}
-	return
 }
