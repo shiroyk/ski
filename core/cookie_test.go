@@ -18,8 +18,8 @@ func TestCookie(t *testing.T) {
 	}
 
 	raw := "has_recent_activity=1; path=/; secure; HttpOnly; SameSite=Lax"
-	c.SetCookieString(u, raw)
-	assert.Equal(t, "has_recent_activity=1", c.CookieString(u))
+	c.SetCookies(u, ParseSetCookie(raw))
+	assert.Equal(t, []string{"has_recent_activity=1"}, c.CookieString(u))
 	c.DeleteCookie(u)
 	assert.Nil(t, c.Cookies(u))
 }

@@ -17,6 +17,11 @@ func TestEmptyOr(t *testing.T) {
 }
 
 func TestParseCookie(t *testing.T) {
+	maxAge := "name=Test;id=123"
+	assert.Equal(t, []string{"name=Test", "id=123"}, CookieToString(ParseCookie(maxAge)))
+}
+
+func TestParseSetCookie(t *testing.T) {
 	var parseCookiesTests = []struct {
 		String  string
 		Cookies []*http.Cookie
@@ -52,6 +57,6 @@ func TestParseCookie(t *testing.T) {
 		},
 	}
 	for _, tt := range parseCookiesTests {
-		assert.Equal(t, tt.Cookies, ParseCookie(tt.String))
+		assert.Equal(t, tt.Cookies, ParseSetCookie(tt.String))
 	}
 }

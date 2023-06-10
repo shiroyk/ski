@@ -12,10 +12,8 @@ import (
 type Cookie interface {
 	http.CookieJar
 
-	// SetCookieString handles the receipt of the cookies string in a reply for the given URL.
-	SetCookieString(u *url.URL, cookies string)
 	// CookieString returns the cookies string for the given URL.
-	CookieString(u *url.URL) string
+	CookieString(u *url.URL) []string
 	// DeleteCookie delete the cookies for the given URL.
 	DeleteCookie(u *url.URL)
 }
@@ -25,13 +23,8 @@ type memoryCookie struct {
 	*cookiejar.Jar
 }
 
-// SetCookieString handles the receipt of the cookies string in a reply for the given URL.
-func (c *memoryCookie) SetCookieString(u *url.URL, cookies string) {
-	c.SetCookies(u, ParseCookie(cookies))
-}
-
 // CookieString returns the cookies string for the given URL.
-func (c *memoryCookie) CookieString(u *url.URL) string {
+func (c *memoryCookie) CookieString(u *url.URL) []string {
 	return CookieToString(c.Cookies(u))
 }
 

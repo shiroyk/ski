@@ -2,7 +2,6 @@ package cloudcat
 
 import (
 	"net/http"
-	"strings"
 )
 
 // ZeroOr if value is zero value returns the defaultValue
@@ -22,28 +21,36 @@ func EmptyOr[T any](value, defaultValue []T) []T {
 	return value
 }
 
-// ParseCookie parses the given cookie string and return a slice http.Cookie.
+// ParseCookie parses the cookie string and return a slice http.Cookie.
 func ParseCookie(cookies string) []*http.Cookie {
 	header := http.Header{}
-	header.Add("Set-Cookie", cookies)
-	req := http.Response{Header: header}
+	header.Add("Cookie", cookies)
+	req := http.Request{Header: header}
 	return req.Cookies()
 }
 
-// CookieToString returns the serialization string of the slice http.Cookie.
-func CookieToString(cookies []*http.Cookie) string {
+// ParseSetCookie parses the set-cookie strings and return a slice http.Cookie.
+func ParseSetCookie(cookies ...string) []*http.Cookie {
+	header := http.Header{}
+	for _, cookie := range cookies {
+		header.Add("Set-Cookie", cookie)
+	}
+	res := http.Response{Header: header}
+	return res.Cookies()
+}
+
+// CookieToString returns the slice string of the slice http.Cookie.
+func CookieToString(cookies []*http.Cookie) []string {
 	switch len(cookies) {
 	case 0:
-		return ""
+		return nil
 	case 1:
-		return cookies[0].String()
+		return []string{cookies[0].String()}
 	}
 
-	var b strings.Builder
-	b.WriteString(cookies[0].String())
-	for _, cookie := range cookies[1:] {
-		b.WriteString("; ")
-		b.WriteString(cookie.String())
+	ret := make([]string, 0, len(cookies))
+	for _, cookie := range cookies {
+		ret = append(ret, cookie.String())
 	}
-	return b.String()
+	return ret
 }
