@@ -76,14 +76,14 @@ func analyzeString(
 		ret, err = GetStrings(s.Rule, ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
-			return
+			return nil
 		}
 		ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
 	} else {
 		ret, err = GetString(s.Rule, ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
-			return
+			return nil
 		}
 		ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
 
