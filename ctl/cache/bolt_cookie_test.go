@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/core"
+	cloudcat "github.com/shiroyk/cloudcat/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,21 +20,15 @@ func TestCookie(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	u, _ := url.Parse("http://localhost")
+	u, _ := url.Parse("https://github.com")
 
 	if len(c.Cookies(u)) > 0 {
 		t.Fatal("retrieved cookie before adding it")
 	}
 
-	{
-		maxAge := "MaxAge=3600;"
-		c.SetCookies(u, cloudcat.ParseCookie(maxAge))
-		assert.Equal(t, "MaxAge=3600", c.CookieString(u))
-	}
-
-	{
-		maxAge := "MaxAge=7200;"
-		c.SetCookieString(u, maxAge)
-		assert.Equal(t, "MaxAge=7200", c.CookieString(u))
-	}
+	raw := "has_recent_activity=1; path=/; secure; HttpOnly; SameSite=Lax"
+	c.SetCookies(u, cloudcat.ParseSetCookie(raw))
+	assert.Equal(t, []string{"has_recent_activity=1; Path=/; HttpOnly; Secure; SameSite=Lax"}, c.CookieString(u))
+	c.DeleteCookie(u)
+	assert.Empty(t, c.Cookies(u))
 }

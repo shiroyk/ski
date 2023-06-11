@@ -30,7 +30,7 @@ const (
 func modelRun() handleFunc {
 	fetcher := cloudcat.MustResolve[cloudcat.Fetch]()
 	tplFunc, _ := cloudcat.Resolve[template.FuncMap]()
-	handler := slog.NewTextHandler(os.Stdout)
+	handler := slog.NewTextHandler(os.Stdout, nil)
 	return func(w http.ResponseWriter, req *http.Request) error {
 		w.Header().Set(contentType, mimeApplicationJSONCharsetUTF8)
 
@@ -216,8 +216,9 @@ func (c *responseHandler) Handle(_ context.Context, r slog.Record) (err error) {
 		data["time"] = r.Time.Format("15:04:05.000")
 	}
 
-	r.Attrs(func(a slog.Attr) {
+	r.Attrs(func(a slog.Attr) bool {
 		data[a.Key] = a.Value.String()
+		return true
 	})
 
 	var bytes []byte

@@ -114,7 +114,7 @@ func runScript() (err error) {
 }
 
 func loggerHandler() slog.Handler {
-	var log slog.Handler = slog.NewTextHandler(os.Stdout)
+	var log slog.Handler = slog.NewTextHandler(os.Stdout, nil)
 	if runDebugArg {
 		log = utils.NewConsoleHandler(slog.LevelDebug)
 	}

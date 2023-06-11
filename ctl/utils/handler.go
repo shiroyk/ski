@@ -109,11 +109,12 @@ func (c *ConsoleHandler) Handle(_ context.Context, r slog.Record) (err error) {
 	buf := bufPool.Get().(*bytes.Buffer)
 	defer freeBuffer(buf)
 
-	r.Attrs(func(a slog.Attr) {
+	r.Attrs(func(a slog.Attr) bool {
 		buf.WriteString(a.Key)
 		buf.WriteString(": ")
 		buf.WriteString(a.Value.String())
 		buf.WriteByte(' ')
+		return true
 	})
 
 	levelColor := grey
