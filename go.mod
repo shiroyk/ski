@@ -3,8 +3,8 @@ module github.com/shiroyk/cloudcat
 go 1.20
 
 require (
-	github.com/shiroyk/cloudcat/core v0.2.0
-	github.com/shiroyk/cloudcat/plugin v0.2.0
+	github.com/shiroyk/cloudcat/core v0.3.0
+	github.com/shiroyk/cloudcat/plugin v0.3.0
 )
 
 require (

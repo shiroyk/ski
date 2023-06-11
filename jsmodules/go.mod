@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/dop251/goja v0.0.0-20230605162241-28ee0ee714f3
-	github.com/shiroyk/cloudcat/core v0.2.0
-	github.com/shiroyk/cloudcat/fetch v0.2.0
-	github.com/shiroyk/cloudcat/plugin v0.2.0
+	github.com/shiroyk/cloudcat/core v0.3.0
+	github.com/shiroyk/cloudcat/fetch v0.3.0
+	github.com/shiroyk/cloudcat/plugin v0.3.0
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.9.0

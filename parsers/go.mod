@@ -7,8 +7,8 @@ require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/ohler55/ojg v1.18.7
-	github.com/shiroyk/cloudcat/core v0.2.0
-	github.com/shiroyk/cloudcat/plugin v0.2.0
+	github.com/shiroyk/cloudcat/core v0.3.0
+	github.com/shiroyk/cloudcat/plugin v0.3.0
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/net v0.10.0
