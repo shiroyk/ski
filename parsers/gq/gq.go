@@ -56,7 +56,7 @@ func (p *Parser) GetString(ctx *plugin.Context, content any, arg string) (ret st
 		}
 	}
 
-	join, err := p.parseFuncs["join"](ctx, node, "\n")
+	join, err := Join(ctx, node, "\n")
 	if err != nil {
 		return
 	}
@@ -89,14 +89,10 @@ func (p *Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret [
 
 	if sel, ok := node.(*goquery.Selection); ok {
 		str := make([]string, sel.Length())
-		var err error
 		sel.EachWithBreak(func(i int, sel *goquery.Selection) bool {
 			str[i] = strings.TrimSpace(sel.Text())
 			return true
 		})
-		if err != nil {
-			return ret, err
-		}
 		return str, nil
 	}
 	return cast.ToStringSliceE(node)
