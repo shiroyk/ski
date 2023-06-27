@@ -40,9 +40,6 @@ type Parser interface {
 
 // Register registers the Parser with the given key Parser
 func Register(key string, parser Parser) {
-	if key == "and" || key == "or" {
-		panic("register key not supported")
-	}
 	ext.Register(key, ext.ParserExtension, parser)
 }
 
