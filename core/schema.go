@@ -67,8 +67,11 @@ const (
 	// Action result A, B; Join the A + B.
 	OperatorAnd Operator = "and"
 	// OperatorOr The Operator of or.
-	// Action result A, B; if result A is nil return B.
+	// Action result A, B; if result A is nil return B else return A.
 	OperatorOr Operator = "or"
+	// OperatorNot The Operator of not.
+	// Action result A, B; if result A is not nil return B else return nil.
+	OperatorNot Operator = "not"
 )
 
 // Schema The schema.
@@ -354,6 +357,16 @@ func (a Or) Right() Action             { return a.r }
 func (a Or) String() string            { return string(OperatorOr) }
 func (a Or) MarshalYAML() (any, error) { return [...]any{a.l, a.String(), a.r}, nil }
 
+// Not Action node of Operator not
+type Not struct{ l, r Action }
+
+// NewNot create new Not action with left and right Action
+func NewNot(left, right Action) *Not    { return &Not{left, right} }
+func (a Not) Left() Action              { return a.l }
+func (a Not) Right() Action             { return a.r }
+func (a Not) String() string            { return string(OperatorNot) }
+func (a Not) MarshalYAML() (any, error) { return [...]any{a.l, a.String(), a.r}, nil }
+
 // actionDecode decodes the Action from yaml.node
 func actionDecode(value *yaml.Node) (ret Action, err error) {
 	if value.Kind == yaml.DocumentNode {
@@ -415,6 +428,8 @@ func toActionOp(op string, left, right Action) (Action, error) {
 		return NewAnd(left, right), nil
 	case OperatorOr:
 		return NewOr(left, right), nil
+	case OperatorNot:
+		return NewNot(left, right), nil
 	default:
 		return nil, fmt.Errorf("invalid operator %v", op)
 	}
@@ -426,7 +441,7 @@ func GetString(act Action, ctx *plugin.Context, content any) (string, error) {
 		func(p parser.Parser) func(*plugin.Context, any, string) (string, error) {
 			return p.GetString
 		},
-		func(s1 string, s2 string) string {
+		func(s1, s2 string) string {
 			return s1 + s2
 		})
 }
@@ -437,7 +452,7 @@ func GetStrings(act Action, ctx *plugin.Context, content any) ([]string, error) 
 		func(p parser.Parser) func(*plugin.Context, any, string) ([]string, error) {
 			return p.GetStrings
 		},
-		func(s1 []string, s2 []string) []string {
+		func(s1, s2 []string) []string {
 			return append(s1, s2...)
 		})
 }
@@ -448,7 +463,7 @@ func GetElement(act Action, ctx *plugin.Context, content any) (string, error) {
 		func(p parser.Parser) func(*plugin.Context, any, string) (string, error) {
 			return p.GetElement
 		},
-		func(s1 string, s2 string) string {
+		func(s1, s2 string) string {
 			return s1 + s2
 		})
 }
@@ -459,7 +474,7 @@ func GetElements(act Action, ctx *plugin.Context, content any) ([]string, error)
 		func(p parser.Parser) func(*plugin.Context, any, string) ([]string, error) {
 			return p.GetElements
 		},
-		func(s1 []string, s2 []string) []string {
+		func(s1, s2 []string) []string {
 			return append(s1, s2...)
 		})
 }
@@ -468,33 +483,57 @@ func GetElements(act Action, ctx *plugin.Context, content any) ([]string, error)
 //
 //nolint:nakedret
 func runAction[T string | []string](
-	root Action,
+	node Action,
 	ctx *plugin.Context,
 	content any,
 	runFn func(parser.Parser) func(*plugin.Context, any, string) (T, error),
-	andFn func(T, T) T,
+	joinFn func(T, T) T,
 ) (ret T, err error) {
 	var stack []Action
+	var left, _empty T
+	var join bool
 
-	for len(stack) > 0 || root != nil {
-		for root != nil {
-			stack = append(stack, root)
-			root = root.Left()
+	for len(stack) > 0 || node != nil {
+		// traverse the left subtree and push the node to the stack
+		for node != nil {
+			stack = append(stack, node)
+			node = node.Left()
 		}
 
-		root = stack[len(stack)-1]
+		// pop the stack and process the node
+		node = stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 
-		switch root.(type) {
+		switch node.(type) {
 		case *Or:
-			if len(ret) > 0 {
-				// if left subtree result is not empty, discard right subtree
-				root = nil
+			if len(left) > 0 {
+				// discard right subtree if left subtree result is not empty
+				node = nil
+				if len(stack) == 0 {
+					ret = joinFn(ret, left)
+					left = _empty
+				}
 				continue
 			}
+			join = true
+		case *And:
+			if len(stack) == 0 {
+				// join the left subtree result to ret
+				ret = joinFn(ret, left)
+				left = _empty
+			}
+			join = true
+		case *Not:
+			if len(left) == 0 {
+				// discard right subtree if left subtree result is empty
+				node = nil
+				continue
+			}
+			left = _empty // discard left subtree result
+			join = true
 		case *Steps:
 			result := content
-			for _, step := range *root.(*Steps) {
+			for _, step := range *node.(*Steps) {
 				p, ok := parser.GetParser(step.K)
 				if !ok {
 					return ret, fmt.Errorf("parser %s not found", step.K)
@@ -504,10 +543,19 @@ func runAction[T string | []string](
 					return
 				}
 			}
-			ret = andFn(ret, result.(T))
+			if join {
+				if len(stack) == 0 {
+					ret = joinFn(ret, result.(T))
+					return
+				}
+				left = joinFn(left, result.(T))
+				join = false
+			} else {
+				left = result.(T)
+			}
 		}
 
-		root = root.Right()
+		node = node.Right()
 	}
 	return
 }

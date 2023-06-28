@@ -39,6 +39,13 @@ func TestSchemaYaml(t *testing.T) {
 		{
 			`
 - p: foo
+- not
+- p: title`, NewSchema(StringType).
+				SetRule(NewNot(NewSteps("p", "foo"), NewSteps("p", "title"))),
+		},
+		{
+			`
+- p: foo
 - or
 - p: title`, NewSchema(StringType).
 				SetRule(NewOr(NewSteps("p", "foo"), NewSteps("p", "title"))),
@@ -52,6 +59,18 @@ func TestSchemaYaml(t *testing.T) {
 - p: body`, NewSchema(StringType).
 				SetRule(NewOr(
 					NewAnd(NewSteps("p", "foo"), NewSteps("p", "bar")),
+					NewSteps("p", "body"),
+				)),
+		},
+		{
+			`
+- p: foo
+- not
+- p: bar
+- or
+- p: body`, NewSchema(StringType).
+				SetRule(NewOr(
+					NewNot(NewSteps("p", "foo"), NewSteps("p", "bar")),
 					NewSteps("p", "body"),
 				)),
 		},
@@ -133,6 +152,21 @@ init: { p: foo }
 properties:
   context: !number { p: foo }`, NewSchema(ObjectType).
 				SetInit(NewSteps("p", "foo")).
+				AddProperty("context", *NewSchema(NumberType).
+					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+init:
+  - p: foo
+  - not
+  - p: bar
+properties:
+  context:
+    type: number
+    rule: { p: foo }`, NewSchema(ObjectType).
+				SetInit(NewNot(NewSteps("p", "foo"), NewSteps("p", "bar"))).
 				AddProperty("context", *NewSchema(NumberType).
 					SetRule(NewSteps("p", "foo"))),
 		},
@@ -281,6 +315,20 @@ func TestActions(t *testing.T) {
 		{
 			`
 - act: 1
+- not
+- act: 1
+`, `1`, `1`, true,
+		},
+		{
+			`
+- act: 2
+- not
+- act: 1
+`, `1`, ``, true,
+		},
+		{
+			`
+- act: 1
 - and
 - act: 1
 - and
@@ -383,6 +431,17 @@ func TestActions(t *testing.T) {
 		},
 		{
 			`
+- - act: 1
+  - or
+  - act: 2
+- or
+- - act: 2
+  - or
+  - act: 1
+`, `1`, `1`, true,
+		},
+		{
+			`
 - - act: 2
   - and
   - act: 2
@@ -391,6 +450,52 @@ func TestActions(t *testing.T) {
   - or
   - act: 1
 `, `1`, `1`, true,
+		},
+		{
+			`
+- - act: 2
+  - and
+  - act: 1
+- and
+- - act: 2
+  - or
+  - act: 1
+`, `1`, `11`, true,
+		},
+		{
+			`
+- - act: 2
+  - or
+  - act: 1
+- not
+- - act: 2
+  - or
+  - act: 1
+`, `1`, `1`, true,
+		},
+		{
+			`
+- - act: 2
+  - and
+  - act: 2
+- not
+- - act: 2
+  - or
+  - act: 1
+`, `1`, ``, true,
+		},
+		{
+			`
+- - act: 1
+  - and
+  - act: 1
+- and
+- - act: 2
+  - or
+  - act: 2
+  - or
+  - act: 1
+`, `1`, `111`, true,
 		},
 		{
 			`
