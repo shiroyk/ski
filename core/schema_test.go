@@ -308,6 +308,16 @@ func TestActions(t *testing.T) {
 		{
 			`
 - act: 1
+`, `1`, `1`, true,
+		},
+		{
+			`
+- act: 2
+`, `1`, ``, true,
+		},
+		{
+			`
+- act: 1
 - and
 - act: 1
 `, `1`, `11`, true,

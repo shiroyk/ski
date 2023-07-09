@@ -543,14 +543,15 @@ func runAction[T string | []string](
 					return
 				}
 			}
-			if join {
-				if len(stack) == 0 {
-					ret = joinFn(ret, result.(T))
-					return
-				}
+
+			switch {
+			case len(stack) == 0:
+				ret = joinFn(ret, result.(T))
+				return
+			case join:
 				left = joinFn(left, result.(T))
 				join = false
-			} else {
+			default:
 				left = result.(T)
 			}
 		}
