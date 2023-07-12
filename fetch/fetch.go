@@ -3,7 +3,6 @@ package fetch
 import (
 	"compress/gzip"
 	"compress/zlib"
-	"context"
 	"fmt"
 	"io"
 	"net"
@@ -12,8 +11,8 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
-	utls "github.com/refraction-networking/utls"
 	"github.com/shiroyk/cloudcat/core"
+	"github.com/shiroyk/cloudcat/fetch/http2"
 	"golang.org/x/exp/slices"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
@@ -97,36 +96,18 @@ func NewFetcher(opt Options) cloudcat.Fetch {
 
 // DefaultRoundTripper the fetch default RoundTripper
 func DefaultRoundTripper() http.RoundTripper {
-	return &http.Transport{
+	return http2.ConfigureTransports(&http.Transport{
 		Proxy: RoundRobinProxy,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			tcpConn, err := (new(net.Dialer)).DialContext(ctx, network, addr)
-			if err != nil {
-				return nil, err
-			}
-			sni, _, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			config := utls.Config{ServerName: sni}
-			tlsConn := utls.UClient(tcpConn, &config, utls.HelloRandomizedNoALPN)
-			if err = tlsConn.HandshakeContext(ctx); err != nil {
-				return nil, err
-			}
-
-			return tlsConn, nil
-		},
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          0,
-		MaxIdleConnsPerHost:   1000,
+		ForceAttemptHTTP2:     false,
+		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-	}
+	})
 }
 
 // Do sends an HTTP request and returns an HTTP response, following

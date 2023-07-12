@@ -3,15 +3,19 @@ package fetch
 import (
 	"compress/gzip"
 	"compress/zlib"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync/atomic"
 	"testing"
 
 	"github.com/andybalholm/brotli"
+	tls "github.com/refraction-networking/utls"
 	"github.com/shiroyk/cloudcat/core"
+	"github.com/shiroyk/cloudcat/fetch/http2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -154,4 +158,78 @@ func newFetcherDefault() cloudcat.Fetch {
 		Timeout:        DefaultTimeout,
 		CachePolicy:    RFC2616,
 	})
+}
+
+var (
+	extNet = os.Getenv("EXTNET")
+)
+
+func TestFingerPrint(t *testing.T) {
+	if extNet == "" {
+		t.Skip("skipping external network test")
+	}
+	
+	req, err := http.NewRequest(http.MethodGet, "https://tls.peet.ws/api/all", nil)
+	assert.NoError(t, err)
+	req.Header = http.Header{
+		"Sec-Ch-Ua":          {`"Not.A/Brand";v="8", "Chromium";v="111", "Google Chrome";v="111"`},
+		"Sec-Ch-Ua-Platform": {`"Windows"`},
+		"Dnt":                {"1"},
+		"User-Agent":         {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.5563.111 Safari/537.36"},
+		"Accept":             {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"},
+		"Sec-Fetch-Site":     {"none"},
+		"Sec-Fetch-Mode":     {"navigate"},
+		"Sec-Fetch-User":     {"?1"},
+		"Sec-Fetch-Dest":     {"document"},
+		"Accept-Encoding":    {"gzip, deflate, br"},
+		"Accept-Language":    {"en,en_US;q=0.9"},
+	}
+
+	h2 := http2.ConfigureTransports(http.DefaultTransport.(*http.Transport), http2.Options{
+		HeaderOrder: []string{
+			"sec-ch-ua", "sec-ch-ua-platform", "dnt",
+			"user-agent", "accept", "sec-fetch-site",
+			"sec-fetch-mode", "sec-fetch-user", "sec-fetch-dest",
+			"accept-encoding", "accept-language",
+		},
+		PHeaderOrder: []string{":method", ":authority", ":scheme", ":path"},
+		Settings: []http2.Setting{
+			{ID: http2.SettingHeaderTableSize, Val: 65536},
+			{ID: http2.SettingEnablePush, Val: 0},
+			{ID: http2.SettingMaxConcurrentStreams, Val: 1000},
+			{ID: http2.SettingInitialWindowSize, Val: 6291456},
+			{ID: http2.SettingMaxHeaderListSize, Val: 262144},
+		},
+		WindowSizeIncrement: 15663105,
+		GetTlsClientHelloSpec: func() *tls.ClientHelloSpec {
+			spec, _ := tls.UTLSIdToSpec(tls.HelloChrome_102)
+			return &spec
+		},
+	})
+
+	res, err := h2.RoundTrip(req)
+	assert.NoError(t, err)
+	defer res.Body.Close()
+
+	b, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+	var data map[string]any
+	assert.NoError(t, json.Unmarshal(b, &data))
+
+	assert.Equal(t, data["http_version"], http2.NextProtoTLS)
+
+	if fp, ok := data["tls"].(map[string]any); ok {
+		assert.Equal(t, fp["ja3"], "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43-27-17513-21,29-23-24,0")
+		assert.Equal(t, fp["ja3_hash"], "cd08e31494f9531f560d64c695473da9")
+		assert.Equal(t, fp["peetprint"], "GREASE-772-771|2-1.1|GREASE-29-23-24|1027-2052-1025-1283-2053-1281-2054-1537|1|2|GREASE-4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53|0-10-11-13-16-17513-18-21-23-27-35-43-45-5-51-65281-GREASE-GREASE")
+		assert.Equal(t, fp["peetprint_hash"], "22a4f858cc83b9144c829ca411948a88")
+	} else {
+		assert.False(t, ok, data)
+	}
+	if fp, ok := data["http2"].(map[string]any); ok {
+		assert.Equal(t, fp["akamai_fingerprint"], "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p")
+		assert.Equal(t, fp["akamai_fingerprint_hash"], "46cedabdca2073198a42fa10ca4494d0")
+	} else {
+		assert.False(t, ok, data)
+	}
 }
