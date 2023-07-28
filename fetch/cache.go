@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"strings"
 	"time"
 
@@ -39,7 +38,6 @@ const (
 	stale = iota
 	fresh
 	transparent
-	prefix = "FETCH "
 )
 
 // CacheTransport is an implementation of http.RoundTripper that will return values from a cache
@@ -58,9 +56,9 @@ type CacheTransport struct {
 // cacheKey returns the cache key for req.
 func cacheKey(req *http.Request) string {
 	if req.Method == http.MethodGet {
-		return prefix + req.URL.String()
+		return req.URL.String()
 	}
-	return prefix + req.Method + " " + req.URL.String()
+	return req.Method + " " + req.URL.String()
 }
 
 // CachedResponse returns the cached http.Response for req if present, and nil
@@ -82,20 +80,6 @@ func NewTransport(c cloudcat.Cache) *CacheTransport {
 		Policy:              RFC2616,
 		Cache:               c,
 		MarkCachedResponses: true,
-	}
-}
-
-// Client returns an *http.Client that caches responses.
-func (t *CacheTransport) Client() *http.Client {
-	return &http.Client{Transport: t}
-}
-
-// SetProxy specifies a function to return a proxy for a given RequestConfig.
-func (t *CacheTransport) SetProxy(proxy func(*http.Request) (*url.URL, error)) {
-	if t.Transport != nil {
-		if transport, ok := t.Transport.(*http.Transport); ok {
-			transport.Proxy = proxy
-		}
 	}
 }
 
@@ -154,7 +138,7 @@ func (t *CacheTransport) RoundTripDummy(req *http.Request) (resp *http.Response,
 	if cacheable {
 		respBytes, err := httputil.DumpResponse(resp, true)
 		if err == nil {
-			t.Cache.Set(cacheKey, respBytes)
+			t.Cache.Set(cacheKey, respBytes, cloudcat.CacheOptions{Context: req.Context()})
 		}
 	} else {
 		t.Cache.Del(cacheKey)
@@ -279,14 +263,14 @@ func (t *CacheTransport) RoundTripRFC2616(req *http.Request) (resp *http.Respons
 					resp.Body = io.NopCloser(r)
 					respBytes, err := httputil.DumpResponse(&resp, true)
 					if err == nil {
-						t.Cache.Set(cacheKey, respBytes)
+						t.Cache.Set(cacheKey, respBytes, cloudcat.CacheOptions{Context: req.Context()})
 					}
 				},
 			}
 		default:
 			respBytes, err := httputil.DumpResponse(resp, true)
 			if err == nil {
-				t.Cache.Set(cacheKey, respBytes)
+				t.Cache.Set(cacheKey, respBytes, cloudcat.CacheOptions{Context: req.Context()})
 			}
 		}
 	} else {

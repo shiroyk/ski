@@ -1,6 +1,7 @@
 package cloudcat
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -8,9 +9,15 @@ import (
 // A Cache interface is used to store bytes.
 type Cache interface {
 	Get(key string) ([]byte, bool)
-	Set(key string, value []byte)
-	SetWithTimeout(key string, value []byte, timeout time.Duration)
+	Set(key string, value []byte, opts ...CacheOptions)
 	Del(key string)
+}
+
+type CacheOptions struct {
+	// Timeout the key expire time.
+	Timeout time.Duration
+	// Context
+	Context context.Context
 }
 
 // memoryCache is an implementation of Cache that stores bytes in in-memory.
@@ -38,17 +45,12 @@ func (c *memoryCache) Get(key string) ([]byte, bool) {
 }
 
 // Set saves []byte to the cache with key
-func (c *memoryCache) Set(key string, value []byte) {
+func (c *memoryCache) Set(key string, value []byte, opts ...CacheOptions) {
 	c.Lock()
 	c.items[key] = value
-	c.Unlock()
-}
-
-// SetWithTimeout saves []byte to the cache with key
-func (c *memoryCache) SetWithTimeout(key string, value []byte, timeout time.Duration) {
-	c.Lock()
-	c.items[key] = value
-	c.timeout[key] = time.Now().Add(timeout).Unix()
+	if len(opts) > 0 && opts[0].Timeout > 0 {
+		c.timeout[key] = time.Now().Add(opts[0].Timeout).Unix()
+	}
 	c.Unlock()
 }
 

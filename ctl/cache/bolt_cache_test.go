@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	cloudcat "github.com/shiroyk/cloudcat/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +34,7 @@ func TestCache(t *testing.T) {
 		t.Fatal("delete failed")
 	}
 
-	c.SetWithTimeout(key, []byte(value), time.Millisecond)
+	c.Set(key, []byte(value), cloudcat.CacheOptions{Timeout: time.Millisecond})
 	v1, _ := c.Get(key)
 	assert.Equal(t, value, string(v1))
 
