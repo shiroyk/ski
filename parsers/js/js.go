@@ -4,7 +4,7 @@ package js
 import (
 	"encoding/json"
 
-	"github.com/shiroyk/cloudcat/core/js"
+	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/spf13/cast"
