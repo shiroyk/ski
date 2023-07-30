@@ -17,7 +17,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx = plugin.NewContext(plugin.Options{
+	ctx = plugin.NewContext(plugin.ContextOptions{
 		URL: "http://localhost/home",
 	})
 	code := m.Run()

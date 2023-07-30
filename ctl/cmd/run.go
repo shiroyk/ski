@@ -73,7 +73,7 @@ func analyzeModel() (err error) {
 		return err
 	}
 
-	ctx := plugin.NewContext(plugin.Options{
+	ctx := plugin.NewContext(plugin.ContextOptions{
 		Timeout: cloudcat.ZeroOr(model.Source.Timeout, runTimeoutArg),
 		Logger:  slog.New(loggerHandler()),
 		URL:     model.Source.HTTP,
@@ -99,7 +99,7 @@ func runScript() (err error) {
 		return
 	}
 
-	ctx := plugin.NewContext(plugin.Options{
+	ctx := plugin.NewContext(plugin.ContextOptions{
 		Timeout: runTimeoutArg,
 		Logger:  slog.New(loggerHandler()),
 	})

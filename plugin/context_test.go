@@ -11,7 +11,7 @@ import (
 
 func TestContext(t *testing.T) {
 	t.Parallel()
-	ctx := NewContext(Options{
+	ctx := NewContext(ContextOptions{
 		URL:     "http://localhost",
 		Logger:  slog.Default(),
 		Timeout: time.Second,
@@ -45,7 +45,7 @@ func TestContext(t *testing.T) {
 
 	<-ctx.Done()
 
-	ctx1 := NewContext(Options{Timeout: time.Nanosecond})
+	ctx1 := NewContext(ContextOptions{Timeout: time.Nanosecond})
 	<-ctx1.Done()
 	assert.ErrorIs(t, ctx1.Err(), context.DeadlineExceeded)
 }
@@ -58,7 +58,7 @@ func TestParentContext(t *testing.T) {
 	valueCtx := context.WithValue(context.Background(), key, value)
 	parent, cancel := context.WithTimeout(valueCtx, time.Minute)
 
-	ctx := NewContext(Options{Parent: parent})
+	ctx := NewContext(ContextOptions{Parent: parent})
 	assert.Equal(t, value, ctx.Value(key))
 	cancel()
 

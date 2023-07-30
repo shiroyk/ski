@@ -36,7 +36,7 @@ func (t *testParser) GetElements(ctx *plugin.Context, content any, arg string) (
 func TestCat(t *testing.T) {
 	t.Parallel()
 	parser.Register("test", new(testParser))
-	ctx := plugin.NewContext(plugin.Options{
+	ctx := plugin.NewContext(plugin.ContextOptions{
 		URL:    "http://localhost/home",
 		Logger: slog.Default().WithGroup("js"),
 	})

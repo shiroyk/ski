@@ -31,7 +31,7 @@ func (p analyzerParser) GetElements(ctx *plugin.Context, c any, a string) ([]str
 }
 
 func TestAnalyzer(t *testing.T) {
-	ctx := plugin.NewContext(plugin.Options{})
+	ctx := plugin.NewContext(plugin.ContextOptions{})
 	parser.Register("ap", new(analyzerParser))
 	testCases := []struct {
 		schema string

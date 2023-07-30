@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+
+	"github.com/shiroyk/cloudcat/plugin"
 )
 
 // Fetch http client interface
@@ -19,6 +21,10 @@ var requestProxyKey int
 // WithProxyURL returns a copy of parent context in which the proxy associated with context.
 func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {
 	if proxy == nil {
+		return ctx
+	}
+	if c, ok := ctx.(*plugin.Context); ok {
+		c.SetValue(&requestProxyKey, proxy)
 		return ctx
 	}
 	return context.WithValue(ctx, &requestProxyKey, proxy)

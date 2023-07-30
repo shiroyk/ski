@@ -298,7 +298,7 @@ func TestActions(t *testing.T) {
 	t.Parallel()
 
 	parser.Register("act", new(testParser))
-	ctx := plugin.NewContext(plugin.Options{Timeout: time.Second})
+	ctx := plugin.NewContext(plugin.ContextOptions{Timeout: time.Second})
 
 	testCases := []struct {
 		acts, content string

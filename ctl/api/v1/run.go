@@ -36,7 +36,7 @@ func modelRun() handleFunc {
 
 		isJs := strings.HasPrefix(req.Header.Get(contentType), mimeApplicationJavaScript)
 		if isJs {
-			parserCtx := plugin.NewContext(plugin.Options{
+			parserCtx := plugin.NewContext(plugin.ContextOptions{
 				Parent: req.Context(),
 				Logger: slog.New(handler),
 			})
@@ -64,7 +64,7 @@ func modelRun() handleFunc {
 			return err
 		}
 
-		parserCtx := plugin.NewContext(plugin.Options{
+		parserCtx := plugin.NewContext(plugin.ContextOptions{
 			Parent: req.Context(),
 			Logger: slog.New(handler),
 			URL:    mReq.URL.String(),
@@ -94,7 +94,7 @@ func modelDebug() handleFunc {
 		isJs := strings.HasPrefix(r.Header.Get(contentType), mimeApplicationJavaScript)
 
 		if isJs {
-			parserCtx := plugin.NewContext(plugin.Options{
+			parserCtx := plugin.NewContext(plugin.ContextOptions{
 				Parent: r.Context(),
 				Logger: logger,
 			})
@@ -125,7 +125,7 @@ func modelDebug() handleFunc {
 		reqs, _ := httputil.DumpRequest(req, true)
 		logger.Debug("request", "result", string(reqs), reqAttr)
 
-		parserCtx := plugin.NewContext(plugin.Options{
+		parserCtx := plugin.NewContext(plugin.ContextOptions{
 			Parent: r.Context(),
 			Logger: logger,
 			URL:    req.URL.String(),
