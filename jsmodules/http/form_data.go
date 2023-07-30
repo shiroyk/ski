@@ -21,11 +21,11 @@ type FormData struct {
 	data map[string][]any
 }
 
-// NativeFormData js global module
-type NativeFormData struct{}
+// FormDataConstructor FormData Constructor
+type FormDataConstructor struct{}
 
 // Exports returns module instance
-func (*NativeFormData) Exports() any {
+func (*FormDataConstructor) Exports() any {
 	return func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
 		param := call.Argument(0)
 
@@ -62,7 +62,7 @@ func (*NativeFormData) Exports() any {
 }
 
 // Global it is a global module
-func (*NativeFormData) Global() {}
+func (*FormDataConstructor) Global() {}
 
 // Append method of the FormData interface appends a new value onto an existing key inside a FormData object,
 // or adds the key if it does not already exist.

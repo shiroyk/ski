@@ -229,7 +229,7 @@ func TestCacheableMethod(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("response status code isn't 200 OK: %v", resp.StatusCode)
 		}
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Errorf("XFromCache header isn't blank")
 		}
 	}
@@ -254,7 +254,7 @@ func TestDontServeHeadResponseToGetRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Header.Get(cloudcat.XFromCache) != "" {
+	if resp.Header.Get(XFromCache) != "" {
 		t.Errorf("Cache should not match")
 	}
 }
@@ -305,7 +305,7 @@ func TestDontStorePartialRangeInCache(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("response status code isn't 200 OK: %v", resp.StatusCode)
 		}
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Error("XFromCache header isn't blank")
 		}
 	}
@@ -330,8 +330,8 @@ func TestDontStorePartialRangeInCache(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("response status code isn't 200 OK: %v", resp.StatusCode)
 		}
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Errorf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Errorf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 	}
 	{
@@ -370,7 +370,7 @@ func TestCacheOnlyIfBodyRead(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 		// We do not read the body
@@ -386,7 +386,7 @@ func TestCacheOnlyIfBodyRead(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatalf("XFromCache header isn't blank")
 		}
 	}
@@ -423,7 +423,7 @@ func TestGetOnlyIfCachedHit(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 		_, err = io.ReadAll(resp.Body)
@@ -442,8 +442,8 @@ func TestGetOnlyIfCachedHit(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("response status code isn't 200 OK: %v", resp.StatusCode)
@@ -463,7 +463,7 @@ func TestGetOnlyIfCachedMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer assert.NoError(t, resp.Body.Close())
-	if resp.Header.Get(cloudcat.XFromCache) != "" {
+	if resp.Header.Get(XFromCache) != "" {
 		t.Fatal("XFromCache header isn't blank")
 	}
 	if resp.StatusCode != http.StatusGatewayTimeout {
@@ -484,7 +484,7 @@ func TestGetNoStoreRequest(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -494,7 +494,7 @@ func TestGetNoStoreRequest(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -512,7 +512,7 @@ func TestGetNoStoreResponse(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -522,7 +522,7 @@ func TestGetNoStoreResponse(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -540,7 +540,7 @@ func TestGetWithEtag(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 		_, err = io.ReadAll(resp.Body)
@@ -554,8 +554,8 @@ func TestGetWithEtag(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 		// additional assertions to verify that 304 response is converted properly
 		if resp.StatusCode != http.StatusOK {
@@ -579,7 +579,7 @@ func TestGetWithLastModified(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 		_, err = io.ReadAll(resp.Body)
@@ -593,8 +593,8 @@ func TestGetWithLastModified(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer assert.NoError(t, resp.Body.Close())
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 	}
 }
@@ -630,8 +630,8 @@ func TestGetWithVary(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 	}
 	req.Header.Set("Accept", "text/html")
@@ -643,7 +643,7 @@ func TestGetWithVary(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -656,7 +656,7 @@ func TestGetWithVary(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -694,8 +694,8 @@ func TestGetWithDoubleVary(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 	}
 	req.Header.Set("Accept-Language", "")
@@ -707,7 +707,7 @@ func TestGetWithDoubleVary(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -720,7 +720,7 @@ func TestGetWithDoubleVary(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -764,8 +764,8 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 	}
 	req.Header.Set("Accept-Language", "")
@@ -777,7 +777,7 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -790,7 +790,7 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -804,7 +804,7 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 	}
@@ -817,7 +817,7 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "" {
+		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
 		_, err = io.ReadAll(resp.Body)
@@ -833,8 +833,8 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 	}
 }
@@ -870,8 +870,8 @@ func TestGetVaryUnused(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 	}
 }
@@ -905,8 +905,8 @@ func TestUpdateFields(t *testing.T) {
 		defer func() {
 			assert.NoError(t, resp.Body.Close())
 		}()
-		if resp.Header.Get(cloudcat.XFromCache) != "1" {
-			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(cloudcat.XFromCache))
+		if resp.Header.Get(XFromCache) != "1" {
+			t.Fatalf(`XFromCache header isn't "1": %v`, resp.Header.Get(XFromCache))
 		}
 		counter2 = resp.Header.Get("x-counter")
 	}

@@ -50,7 +50,7 @@ func New(t *testing.T) *VM {
 		if err != nil {
 			js.Throw(vm, err)
 		}
-		return vm.ToValue(assert.Equal(t, a, b, call.Argument(2).String()))
+		return vm.ToValue(assert.Equal(t, b, a, call.Argument(2).String()))
 	})
 	_ = assertObject.Set("true", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 		return vm.ToValue(assert.True(t, call.Argument(0).ToBoolean(), call.Argument(1).String()))

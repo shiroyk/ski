@@ -1,11 +1,10 @@
 package cloudcat
 
 import (
+	"context"
 	"net/http"
+	"net/url"
 )
-
-// XFromCache is the header added to responses that are returned from the cache
-const XFromCache = "X-From-Cache"
 
 // Fetch http client interface
 type Fetch interface {
@@ -15,5 +14,20 @@ type Fetch interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-// IsFromCache returns true if the response is from cache
-func IsFromCache(res *http.Response) bool { return res.Header.Get(XFromCache) == "1" }
+var requestProxyKey int
+
+// WithProxyURL returns a copy of parent context in which the proxy associated with context.
+func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {
+	if proxy == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, &requestProxyKey, proxy)
+}
+
+// ProxyFromRequest returns a proxy URL on request context.
+func ProxyFromRequest(req *http.Request) (*url.URL, error) {
+	if proxy := req.Context().Value(&requestProxyKey); proxy != nil {
+		return proxy.(*url.URL), nil
+	}
+	return nil, nil
+}

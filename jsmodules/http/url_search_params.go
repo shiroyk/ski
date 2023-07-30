@@ -19,11 +19,11 @@ type URLSearchParams struct {
 	data map[string][]string
 }
 
-// NativeURLSearchParams Native module
-type NativeURLSearchParams struct{}
+// URLSearchParamsConstructor Constructor
+type URLSearchParamsConstructor struct{}
 
 // Exports instance URLSearchParams module
-func (*NativeURLSearchParams) Exports() any {
+func (*URLSearchParamsConstructor) Exports() any {
 	return func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
 		param := call.Argument(0)
 
@@ -52,7 +52,7 @@ func (*NativeURLSearchParams) Exports() any {
 }
 
 // Global it is a global module
-func (*NativeURLSearchParams) Global() {}
+func (*URLSearchParamsConstructor) Global() {}
 
 // encode encodes the values into “URL encoded” form
 // ("bar=baz&foo=qux") sorted by key.

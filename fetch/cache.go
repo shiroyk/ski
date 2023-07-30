@@ -32,6 +32,9 @@ const (
 	// aimed at production and used in continuous runs to avoid downloading unmodified data
 	// (to save bandwidth and speed up crawls).
 	RFC2616 Policy = "rfc2616"
+
+	// XFromCache is the header added to responses that are returned from the cache
+	XFromCache = "X-From-Cache"
 )
 
 const (
@@ -126,7 +129,7 @@ func (t *CacheTransport) RoundTripDummy(req *http.Request) (resp *http.Response,
 
 	if cacheable && cachedResp != nil && err == nil {
 		if t.MarkCachedResponses {
-			cachedResp.Header.Set(cloudcat.XFromCache, "1")
+			cachedResp.Header.Set(XFromCache, "1")
 		}
 		return cachedResp, nil
 	}
@@ -173,7 +176,7 @@ func (t *CacheTransport) RoundTripRFC2616(req *http.Request) (resp *http.Respons
 
 	if cacheable && cachedResp != nil && err == nil { //nolint:nestif
 		if t.MarkCachedResponses {
-			cachedResp.Header.Set(cloudcat.XFromCache, "1")
+			cachedResp.Header.Set(XFromCache, "1")
 		}
 
 		if varyMatches(cachedResp, req) {

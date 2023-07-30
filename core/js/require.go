@@ -132,14 +132,12 @@ func (r *require) resolveFile(modPath string) (module *goja.Object, err error) {
 }
 
 func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
-	data, cached, err := r.fetchFile(name)
+	data, err := r.fetchFile(name)
 	if err != nil {
 		return nil, err
 	}
 	if mod, exists := r.modules[name]; exists {
-		if cached {
-			return mod, nil
-		}
+		return mod, nil
 	}
 
 	module = r.vm.NewObject()
@@ -155,20 +153,20 @@ func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
 	return
 }
 
-func (r *require) fetchFile(name string) ([]byte, bool, error) {
+func (r *require) fetchFile(name string) ([]byte, error) {
 	if r.fetcher == nil {
 		r.fetcher = cloudcat.MustResolve[cloudcat.Fetch]()
 	}
 	req, err := http.NewRequest(http.MethodGet, name, nil)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	res, err := r.fetcher.Do(req)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	body, err := io.ReadAll(res.Body)
-	return body, cloudcat.IsFromCache(res), err
+	return body, err
 }
 
 func (r *require) loadAsFileOrDirectory(path string) (module *goja.Object, err error) {
@@ -228,11 +226,7 @@ func (r *require) loadAsDirectory(modPath string) (module *goja.Object, err erro
 // loadSource is used loads files from the host's filesystem.
 func (r *require) loadSource(filename string) ([]byte, error) {
 	if isHTTP(filename) {
-		data, _, err := r.fetchFile(filename)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
+		return r.fetchFile(filename)
 	}
 	data, err := os.ReadFile(filepath.FromSlash(filename))
 	if err != nil {

@@ -52,8 +52,4 @@ func (r *Response) Bytes(_ goja.FunctionCall, vm *goja.Runtime) goja.Value {
 }
 
 // JsonEncodable allows custom JSON encoding by JSON.stringify()
-func (r *Response) JsonEncodable() any { //nolint
-	j := make(map[string]any)
-	_ = json.Unmarshal(r.body, &j)
-	return j
-}
+func (r *Response) JsonEncodable() any { return r.Json() }
