@@ -12,13 +12,54 @@ import (
 	"time"
 
 	"github.com/shiroyk/cloudcat"
+	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHttp(t *testing.T) {
+func init() {
 	cloudcat.Provide[cloudcat.Fetch](&http.Client{Transport: &http.Transport{Proxy: cloudcat.ProxyFromRequest}})
-	ctx := context.Background()
+}
+
+func TestHttp(t *testing.T) {
+	vm := createVM(t)
+	testCase := []string{
+		`assert.equal(http.get(url).string(), "");`,
+		`assert.equal(http.post(url, { body: new FormData({'file': fa, 'name': 'foo'}) }).string(), "♂︎");`,
+		`assert.equal(http.post(url, { body: new URLSearchParams({'key': 'holy', 'value': 'fa'}) }).string(), "key=holy&value=fa");`,
+		`assert.equal(http.head(url).headers.get("X-Total-Count"), "114514");`,
+		`assert.equal(http.post(url).string(), "");`,
+		`assert.equal(new Uint8Array(http.post(url, { body: '1' }).bytes())[0], 49);`,
+		`assert.equal(http.post(url, { body: {'dark': 'o'} }).json()['dark'], "o");`,
+		`assert.equal(http.post(url, { body: "post" }).string(), "post");`,
+		`fetch(url, { method: 'put', body: 'put', headers: {"Authorization": "1919810"} }).then(res => assert.equal(res.string(), "put"));`,
+		`fetch(url, { method: 'patch', body: fa }).then(res => assert.equal(res.string(), "♂︎"));`,
+		`fetch(url, { method: 'PATCH', body: new Uint8Array([97]).buffer }).then(res => assert.equal(res.string(), "a"));`,
+		`fetch(url, { method: 'custom' }).then(res => assert.equal(res.string(), "CUSTOM"));`,
+		`fetch(url, { proxy: proxyURL }).then(res => assert.equal(res.string(), "proxy ok"))`,
+		`try {
+			fetch(url, { method: 'put', body: 114514 });
+		 } catch (e) {
+			assert.true(e.toString().includes("unsupported request body"), e.toString());
+		 }`,
+		`(async () => {
+			try {
+				await fetch(url, { signal: new AbortSignal(500), body: "sleep1000" });
+			} catch (e) {
+				assert.true(e.toString().includes("context deadline exceeded"), e);
+			}
+		 })()`,
+	}
+
+	for i, s := range testCase {
+		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
+			_, err := vm.RunString(context.Background(), s)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func createVM(t *testing.T) js.VM {
 	vm := modulestest.New(t)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,53 +100,21 @@ func TestHttp(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprint(w, "proxy ok")
+		assert.NoError(t, err)
+	}))
 
-	defer t.Cleanup(func() {
+	t.Cleanup(func() {
 		ts.Close()
+		proxy.Close()
 	})
 
 	_, _ = vm.Runtime().RunString(fmt.Sprintf(`
 		const http = require('cloudcat/http');
-		const fetch = require('cloudcat/fetch');
 		const url = "%s";
-		const fa = new Uint8Array([226, 153, 130, 239, 184, 142]).buffer;`, ts.URL))
+		const proxyURL = "%s";
+		const fa = new Uint8Array([226, 153, 130, 239, 184, 142]).buffer`, ts.URL, proxy.URL))
 
-	testCase := []string{
-		`assert.equal(http.post(url, { body: new FormData({'file': fa, 'name': 'foo'}) }).string(), "♂︎");`,
-		`form = new URLSearchParams({'key': 'holy', 'value': 'fa'});
-		 assert.equal(http.post(url, { body: form }).string(), "key=holy&value=fa");`,
-		`assert.equal(http.get(url).string(), "");`,
-		`assert.equal(http.head(url).headers.get("X-Total-Count"), "114514");`,
-		`assert.equal(http.post(url).string(), "");`,
-		`assert.equal(new Uint8Array(http.post(url, { body: '1' }).bytes())[0], 49);`,
-		`assert.equal(http.post(url, { body: {'dark': 'o'} }).json()['dark'], "o");`,
-		`assert.equal(http.post(url, { body: "post" }).string(), "post");`,
-		`assert.equal(fetch(url, { method: 'put', body: 'put', headers: {"Authorization": "1919810"} }).string(), "put");`,
-		`assert.equal(fetch(url, { method: 'patch', body: fa }).string(), "♂︎");`,
-		`assert.equal(fetch(url, { method: 'PATCH', body: new Uint8Array([97]).buffer }).string(), "a");`,
-		`assert.equal(fetch(url, { method: 'custom' }).string(), "CUSTOM");`,
-		`try {
-			fetch(url, { method: 'put', body: 114514 });
-		 } catch (e) {
-			assert.true(e.toString().includes("unsupported request body"), e);
-		 }`,
-		`try {
-			fetch(url, { proxy: 'http://127.0.0.1:22' });
-		 } catch (e) {
-			error = e.toString();
-         	assert.true(error.includes("connect: connection refused") || error.includes("read: connection reset by peer"), error);
-		 }`,
-		`try {
-			fetch(url, { signal: new AbortSignal(500), body: "sleep1000" });
-		 } catch (e) {
-         	assert.true(e.toString().includes("context deadline exceeded"), e);
-		 }`,
-	}
-
-	for i, s := range testCase {
-		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			_, err := vm.RunString(ctx, s)
-			assert.NoError(t, err)
-		})
-	}
+	return vm
 }

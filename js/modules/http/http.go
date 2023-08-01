@@ -31,20 +31,32 @@ func (*Module) Exports() any {
 
 func init() {
 	jsmodule.Register("http", new(Module))
-	jsmodule.Register("fetch", new(fetch))
+	jsmodule.Register("fetch", new(fetchModule))
 	jsmodule.Register("FormData", new(FormDataConstructor))
 	jsmodule.Register("URLSearchParams", new(URLSearchParamsConstructor))
 	jsmodule.Register("AbortSignal", new(AbortSignalConstructor))
 }
 
-type fetch struct{}
+type fetchModule struct{}
 
-func (*fetch) Exports() any {
+func (*fetchModule) Exports() any {
 	f := cloudcat.MustResolve[cloudcat.Fetch]()
-	return func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		return doRequest(f, http.MethodGet, call, vm)
+	return func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+		req, signal := buildRequest(http.MethodGet, call, vm)
+		return vm.ToValue(js.NewPromise(vm, func() (any, error) {
+			if signal != nil {
+				defer signal.timeout()
+			}
+			res, err := f.Do(req)
+			if err != nil {
+				return nil, err
+			}
+			return NewResponse(vm, res), nil
+		}))
 	}
 }
+
+func (*fetchModule) Global() {}
 
 // Http module for fetching resources (including across the network).
 type Http struct { //nolint
@@ -52,7 +64,7 @@ type Http struct { //nolint
 }
 
 // Get Make a HTTP GET request.
-func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return doRequest(h.fetch, http.MethodGet, call, vm)
 }
 
@@ -63,64 +75,56 @@ func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 // http.post(url, { body: new URLSearchParams({'key': 'foo', 'value': 'bar'}) })
 // Send POST with json:
 // http.post(url, { body: {'key': 'foo'} })
-func (h *Http) Post(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (h *Http) Post(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return doRequest(h.fetch, http.MethodPost, call, vm)
 }
 
 // Put Make a HTTP PUT request.
-func (h *Http) Put(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (h *Http) Put(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return doRequest(h.fetch, http.MethodPut, call, vm)
 }
 
 // Delete Make a HTTP DELETE request.
-func (h *Http) Delete(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (h *Http) Delete(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return doRequest(h.fetch, http.MethodDelete, call, vm)
 }
 
 // Head Make a HTTP HEAD request.
-func (h *Http) Head(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (h *Http) Head(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return doRequest(h.fetch, http.MethodHead, call, vm)
 }
 
-func doRequest(
-	fetch cloudcat.Fetch,
+func buildRequest(
 	method string,
 	call goja.FunctionCall,
 	vm *goja.Runtime,
-) goja.Value {
+) (req *http.Request, signal *AbortSignal) {
 	url := call.Argument(0).String()
 	opt := call.Argument(1)
 	var body io.Reader
 	var headers = make(map[string]string)
 	var proxy *urlpkg.URL
-	var signal *AbortSignal
 	var err error
 
 	if opt != nil && !goja.IsUndefined(opt) {
 		options, assert := opt.Export().(map[string]any)
 		if !assert {
-			js.Throw(vm, errors.New("request options must be an object"))
+			js.Throw(vm, errors.New("request options is invalid"))
 		}
 		if v, ok := options["method"]; ok {
 			method, err = cast.ToStringE(v)
 			if err != nil {
-				js.Throw(vm, err)
+				js.Throw(vm, errors.New("request options method is invalid string"))
 			}
 			method = strings.ToUpper(method)
 			if !validMethod(method) {
-				js.Throw(vm, fmt.Errorf("request options method %v is not valid HTTP method", method))
-			}
-		}
-		if v, ok := options["url"]; url == "" && ok {
-			url, err = cast.ToStringE(v)
-			if err != nil {
-				js.Throw(vm, err)
+				js.Throw(vm, fmt.Errorf("request options method %v is invalid HTTP method", method))
 			}
 		}
 		if v, ok := options["headers"]; ok {
 			headers, err = cast.ToStringMapStringE(v)
 			if err != nil {
-				js.Throw(vm, errors.New("request options headers is not valid object"))
+				js.Throw(vm, errors.New("request options headers is invalid"))
 			}
 		}
 		if v, ok := options["body"]; ok {
@@ -132,7 +136,7 @@ func doRequest(
 		if v, ok := options["cache"]; ok {
 			str, err := cast.ToStringE(v)
 			if err != nil {
-				js.Throw(vm, err)
+				js.Throw(vm, errors.New("request options cache is invalid string"))
 			}
 			headers["Cache-Control"] = str
 			headers["Pragma"] = str
@@ -140,17 +144,17 @@ func doRequest(
 		if v, ok := options["proxy"]; ok {
 			str, err := cast.ToStringE(v)
 			if err != nil {
-				js.Throw(vm, err)
+				js.Throw(vm, errors.New("request options proxy is invalid string"))
 			}
 			proxy, err = urlpkg.Parse(str)
 			if err != nil {
-				js.Throw(vm, err)
+				js.Throw(vm, errors.Join(errors.New("request options proxy is invalid URL"), err))
 			}
 		}
 		if v, ok := options["signal"]; ok {
 			signal, ok = v.(*AbortSignal)
 			if !ok {
-				js.Throw(vm, errors.New("request options signal is not Signal object"))
+				js.Throw(vm, errors.New("request options signal is invalid"))
 			}
 		}
 	}
@@ -158,20 +162,32 @@ func doRequest(
 	var parent context.Context
 	if signal != nil {
 		parent = signal.ctx
-		defer signal.timeout()
 	} else {
 		parent = js.VMContext(vm)
 	}
 
 	ctx := cloudcat.WithProxyURL(parent, proxy)
-
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	req, err = http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		js.Throw(vm, err)
 	}
 
 	for k, v := range headers {
 		req.Header.Set(k, v)
+	}
+
+	return
+}
+
+func doRequest(
+	fetch cloudcat.Fetch,
+	method string,
+	call goja.FunctionCall,
+	vm *goja.Runtime,
+) goja.Value {
+	req, signal := buildRequest(method, call, vm)
+	if signal != nil {
+		defer signal.timeout()
 	}
 
 	res, err := fetch.Do(req)
