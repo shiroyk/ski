@@ -13,18 +13,18 @@ func TestFormData(t *testing.T) {
 	ctx := context.Background()
 	vm := modulestest.New(t)
 
+	_, _ = vm.Runtime().RunString(`const mp = new FormData({
+			'file': new Uint8Array([50]).buffer,
+			'name': 'foo'
+		 });`)
+
 	testCase := []string{
-		`mp = new FormData();`,
 		`try {
-			mp = new FormData(0);
+			new FormData(0);
 		 } catch (e) {
 			assert.true(e.toString().includes('unsupported type'))
 		 }`,
-		`mp = new FormData({
-			'file': new Uint8Array([50]).buffer,
-			'name': 'foo'
-		 });
-		 assert.equal(mp.get('name'), 'foo')`,
+		`assert.equal(mp.get('name'), 'foo')`,
 		`mp.append('file', new Uint8Array([51]).buffer);
 		 assert.equal(mp.getAll('file').length, 2)`,
 		`mp.append('name', 'bar');

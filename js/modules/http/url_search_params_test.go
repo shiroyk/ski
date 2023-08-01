@@ -13,15 +13,15 @@ func TestURLSearchParams(t *testing.T) {
 	ctx := context.Background()
 	vm := modulestest.New(t)
 
+	_, _ = vm.Runtime().RunString(`const form = new URLSearchParams({'name': 'foo'});form.sort();`)
+
 	testCase := []string{
-		`form = new URLSearchParams();form.sort();`,
 		`try {
-			form = new URLSearchParams(0);
+			new URLSearchParams(0);
 		 } catch (e) {
 			assert.true(e.toString().includes('unsupported type'))
 		 }`,
-		`form = new URLSearchParams({'name': 'foo'});
-		 form.forEach((v, k) => assert.true(v.length == 1))
+		`form.forEach((v, k) => assert.true(v.length == 1))
 		 assert.equal(form.get('name'), 'foo')`,
 		`form.append('name', 'bar');
 		 assert.equal(form.getAll('name').length, 2)`,

@@ -67,14 +67,11 @@ func TestHttp(t *testing.T) {
 	_, _ = vm.RunString(ctx, fmt.Sprintf(`
 		const http = require('cloudcat/http');
 		const fetch = require('cloudcat/fetch');
-		const url = "%s";`, ts.URL))
+		const url = "%s";
+		const fa = new Uint8Array([226, 153, 130, 239, 184, 142]).buffer;`, ts.URL))
 
 	testCase := []string{
-		`fa = new Uint8Array([226, 153, 130, 239, 184, 142]).buffer`,
-		`mp = new FormData();
-		 mp.set('file', fa);
-		 mp.set('name', 'foo');
-		 assert.equal(http.post(url, { body: mp }).string(), "♂︎");`,
+		`assert.equal(http.post(url, { body: new FormData({'file': fa, 'name': 'foo'}) }).string(), "♂︎");`,
 		`form = new URLSearchParams({'key': 'holy', 'value': 'fa'});
 		 assert.equal(http.post(url, { body: form }).string(), "key=holy&value=fa");`,
 		`assert.equal(http.get(url).string(), "");`,

@@ -76,7 +76,6 @@ type Options struct {
 	MaxVMs             int           `yaml:"max-vms"`
 	MaxRetriesGetVM    int           `yaml:"max-retries-get-vm"`
 	MaxTimeToWaitGetVM time.Duration `yaml:"max-time-to-wait-get-vm"`
-	UseStrict          bool          `yaml:"use-strict"`
 	ModulePath         []string      `yaml:"module-path"`
 }
 
@@ -87,7 +86,6 @@ type schedulerImpl struct {
 	unInitVMs                        *atomic.Int64
 	closed                           *atomic.Bool
 	maxTimeToWaitGetVM               time.Duration
-	useStrict                        bool
 	modulePath                       []string
 }
 
@@ -102,7 +100,6 @@ func (s *schedulerImpl) Close() error {
 func NewScheduler(opt Options) Scheduler {
 	scheduler := &schedulerImpl{
 		mu:                 new(sync.Mutex),
-		useStrict:          opt.UseStrict,
 		closed:             new(atomic.Bool),
 		unInitVMs:          new(atomic.Int64),
 		maxVMs:             cloudcat.ZeroOr(opt.MaxVMs, 1),
@@ -113,7 +110,7 @@ func NewScheduler(opt Options) Scheduler {
 	}
 	scheduler.vms = make(chan VM, scheduler.maxVMs)
 	for i := 0; i < scheduler.initVMs; i++ {
-		scheduler.vms <- newVM(scheduler.useStrict, scheduler.modulePath)
+		scheduler.vms <- NewVM(scheduler.modulePath...)
 	}
 	scheduler.unInitVMs.Store(int64(scheduler.maxVMs - scheduler.initVMs))
 	return scheduler
@@ -136,7 +133,7 @@ func (s *schedulerImpl) Get() (VM, error) {
 			return vm, nil
 		case <-timer.C:
 			if s.unInitVMs.Add(-1) >= 0 {
-				return newVM(s.useStrict, s.modulePath), nil
+				return NewVM(s.modulePath...), nil
 			}
 			s.unInitVMs.Add(1)
 			slog.Warn(fmt.Sprintf("could not get VM in %v", time.Duration(i)*s.maxTimeToWaitGetVM))

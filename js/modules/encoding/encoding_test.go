@@ -74,8 +74,7 @@ func TestEncodingBase64(t *testing.T) {
 			_ = vm.Runtime().Set("toBuffer", testCase.toBuffer)
 
 			_, err := vm.RunString(context.Background(), `
-			result = encoding.base64.decode(raw, toBuffer);
-			assert.equal(want, result);
+			assert.equal(want, encoding.base64.decode(raw, toBuffer));
 			`)
 			assert.NoError(t, err)
 		})

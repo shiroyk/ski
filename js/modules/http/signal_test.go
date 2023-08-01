@@ -14,7 +14,7 @@ func TestAbortSignal(t *testing.T) {
 	vm := modulestest.New(t)
 
 	testCase := []string{
-		`signal = new AbortSignal();
+		`const signal = new AbortSignal();
 		 signal.abort();
          assert.equal(signal.reason, "context canceled");
          assert.true(signal.aborted);`,

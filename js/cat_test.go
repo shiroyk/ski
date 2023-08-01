@@ -40,20 +40,20 @@ func TestCat(t *testing.T) {
 		URL:    "http://localhost/home",
 		Logger: slog.Default().WithGroup("js"),
 	})
-	vm := newVM(true, nil)
+	vm := NewTestVM(t)
 
 	testCase := []string{
-		`cat.log('start test')`,
-		`if (cat.baseURL !== "http://localhost") throw ("not equal, got" + cat.baseURL);`,
-		`if (cat.url !== "http://localhost/home") throw ("not equal, got" + cat.url);`,
-		`cat.setVar('v1', 114514)`,
-		`if (cat.getVar('v1') !== 114514) throw ("not equal, got" + cat.getVar('v1'));`,
-		`cat.clearVar()
-		 if (cat.getVar('v1')) throw ("variable should be cleared");`,
-		`if (cat.getString('test', '1', 'foo') !== 'foo1') throw ("unexpect result");`,
-		`if (cat.getStrings('test', '2', ['foo'])[1] !== '2') throw ("unexpect result");`,
-		`if (cat.getElement('test', '3', 'foo') !== 'foo3') throw ("unexpect result");`,
-		`if (cat.getElements('test', '4', ['foo'])[1] !== '4') throw ("unexpect result");`,
+		`cat.log('start test');`,
+		`assert.equal(cat.baseURL, "http://localhost");`,
+		`assert.equal(cat.url,"http://localhost/home");`,
+		`cat.setVar('v1', 114514);`,
+		`assert.equal(cat.getVar('v1'), 114514);`,
+		`cat.clearVar();
+		 assert.equal(cat.getVar('v1'), null);`,
+		`assert.equal(cat.getString('test', '1', 'foo'), 'foo1');`,
+		`assert.equal(cat.getStrings('test', '2', ['foo'])[1], '2');`,
+		`assert.equal(cat.getElement('test', '3', 'foo'), 'foo3');`,
+		`assert.equal(cat.getElements('test', '4', ['foo'])[1], '4');`,
 	}
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {

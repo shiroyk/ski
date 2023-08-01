@@ -74,9 +74,9 @@ func Unwrap(value goja.Value) (any, error) {
 }
 
 // VMContext returns the current context of the goja.Runtime
-func VMContext(vm *goja.Runtime) context.Context {
+func VMContext(runtime *goja.Runtime) context.Context {
 	ctx := context.Background()
-	if v := vm.Get(VMContextKey); v != nil {
+	if v := runtime.Get(VMContextKey); v != nil {
 		if c, ok := v.Export().(context.Context); ok {
 			ctx = c
 		}
@@ -85,11 +85,11 @@ func VMContext(vm *goja.Runtime) context.Context {
 }
 
 // InitGlobalModule init all global modules
-func InitGlobalModule(vm *goja.Runtime) {
+func InitGlobalModule(runtime *goja.Runtime) {
 	// Init global modules
 	for _, extension := range jsmodule.AllModules() {
 		if mod, ok := extension.Module.(jsmodule.Global); ok {
-			_ = vm.Set(extension.Name, mod.Exports())
+			_ = runtime.Set(extension.Name, mod.Exports())
 		}
 	}
 }

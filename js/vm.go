@@ -3,15 +3,16 @@ package js
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"runtime/debug"
-	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/dop251/goja/ast"
 	"github.com/shiroyk/cloudcat/plugin"
 	"golang.org/x/exp/slog"
 )
+
+var errInitExecutor = errors.New("initializing JavaScript VM executor function failed")
 
 // VM the js runtime.
 // An instance of VM can only be used by a single goroutine at a time.
@@ -26,25 +27,50 @@ type VM interface {
 
 type vmImpl struct {
 	runtime   *goja.Runtime
+	eventloop *EventLoop
+	executor  goja.Callable
 	done      chan struct{}
-	useStrict bool
 }
 
-func newVM(useStrict bool, modulePath []string) VM {
-	vm := goja.New()
-	vm.SetFieldNameMapper(FieldNameMapper{})
-	EnableRequire(vm, modulePath...)
-	InitGlobalModule(vm)
-	EnableConsole(vm)
+// NewVM creates a new JavaScript VM
+// Initialize the EventLoop, require, global module, console
+func NewVM(modulePath ...string) VM {
+	runtime := goja.New()
+	runtime.SetFieldNameMapper(FieldNameMapper{})
+	EnableRequire(runtime, modulePath...)
+	InitGlobalModule(runtime)
+	EnableConsole(runtime)
 
-	return &vmImpl{vm, make(chan struct{}, 1), useStrict}
+	// TODO: any better way?
+	eval := `(function(ctx, code){with(ctx){return eval(code)}})`
+	program := goja.MustCompile("eval", eval, false)
+	callable, err := runtime.RunProgram(program)
+	if err != nil {
+		panic(errInitExecutor)
+	}
+	executor, ok := goja.AssertFunction(callable)
+	if !ok {
+		panic(errInitExecutor)
+	}
+
+	//keys, _ := runtime.RunString("Object.keys(this)")
+	//globalKeys := cast.ToStringSlice(keys.Export())
+
+	return &vmImpl{
+		runtime,
+		NewEventLoop(runtime),
+		executor,
+		make(chan struct{}, 1),
+	}
 }
 
 // Run the js program
-func (vm *vmImpl) Run(ctx context.Context, p Program) (goja.Value, error) {
+func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error) {
 	// resets the interrupt flag.
 	vm.runtime.ClearInterrupt()
 	defer func() {
+		vm.eventloop.WaitOnRegistered()
+
 		if r := recover(); r != nil {
 			stack := vm.runtime.CaptureCallStack(20, nil)
 			buf := new(bytes.Buffer)
@@ -78,42 +104,18 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (goja.Value, error) {
 	if args == nil {
 		args = make(map[string]any, 1)
 	}
+
 	args[VMContextKey] = ctx
-	argKeys := make([]string, 0, len(args))
-	argValues := make([]goja.Value, 0, len(args))
-
-	for k := range args {
-		argKeys = append(argKeys, k)
-		argValues = append(argValues, vm.runtime.ToValue(args[k]))
-	}
-
 	if ctx, ok := ctx.(*plugin.Context); ok {
-		argKeys = append(argKeys, "cat")
-		argValues = append(argValues, vm.runtime.ToValue(NewCat(ctx)))
+		args["cat"] = NewCat(ctx)
 	}
 
-	code, err := transformCode(code)
-	if err != nil {
-		return nil, err
-	}
+	err = vm.eventloop.Start(func() error {
+		ret, err = vm.executor(goja.Undefined(), vm.runtime.ToValue(args), vm.runtime.ToValue(code))
+		return err
+	})
 
-	code = `(function(` + strings.Join(argKeys, ", ") + "){\n" + code + "\n})"
-
-	program, err := goja.Compile("", code, vm.useStrict)
-	if err != nil {
-		return nil, err
-	}
-
-	fn, err := vm.runtime.RunProgram(program)
-	if err != nil {
-		return nil, err
-	}
-
-	if call, ok := goja.AssertFunction(fn); ok {
-		return call(goja.Undefined(), argValues...)
-	}
-
-	return nil, fmt.Errorf("unexpected function code:\n %s", code)
+	return
 }
 
 // RunString the js string
@@ -126,23 +128,52 @@ func (vm *vmImpl) Runtime() *goja.Runtime {
 	return vm.runtime
 }
 
-// transformCode transforms code into return statement
-func transformCode(code string) (string, error) {
-	jsAst, err := goja.Parse("", code)
-	if err != nil {
-		return "", err
-	}
+// NewPromise returns the new promise with the async function.
+// must be called on the EventLoop.
+// like this:
+//
+//	func main() {
+//		vm := js.NewVM()
+//		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+//		defer cancel()
+//
+//		goFunc := func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+//			return vm.ToValue(js.NewPromise(vm, func() (any, error) {
+//				time.Sleep(time.Second)
+//				return call.Argument(0).ToInteger() + call.Argument(1).ToInteger(), nil
+//			}))
+//		}
+//		_ = vm.Runtime().Set("asyncAdd", goFunc)
+//
+//		start := time.Now()
+//
+//		result, err := vm.RunString(ctx, `asyncAdd(1, 2)`)
+//		if err != nil {
+//			panic(err)
+//		}
+//		value, err := js.Unwrap(result)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		fmt.Println(value)
+//		fmt.Println(time.Now().Sub(start))
+//	}
+func NewPromise(runtime *goja.Runtime, asyncFunc func() (any, error)) *goja.Promise {
+	callback := runtime.Get(enqueueCallbackKey).Export().(func() EnqueueCallback)()
+	promise, resolve, reject := runtime.NewPromise()
 
-	statement := jsAst.Body[len(jsAst.Body)-1]
-	if _, ok := statement.(*ast.ExpressionStatement); !ok {
-		return code, nil
-	}
+	go func() {
+		result, err := asyncFunc()
+		callback(func() error {
+			if err != nil {
+				reject(err)
+			} else {
+				resolve(result)
+			}
+			return nil
+		})
+	}()
 
-	if len(jsAst.Body) == 1 {
-		return "return " + code, nil
-	}
-
-	index := statement.Idx0() - 1
-
-	return code[:index] + "return " + code[index:], nil
+	return promise
 }

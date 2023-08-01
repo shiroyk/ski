@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/shiroyk/cloudcat"
 	"github.com/shiroyk/cloudcat/plugin/jsmodule"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,9 +30,10 @@ func (testRGModule) Exports() any { return map[string]string{"key": "testrg"} }
 func (testRGModule) Global() {}
 
 func TestRequire(t *testing.T) {
+	cloudcat.Provide[cloudcat.Fetch](new(testFetcher))
 	jsmodule.Register("testr", new(testRModule))
 	jsmodule.Register("testrg", new(testRGModule))
-	vm := createTestVM(t)
+	vm := NewTestVM(t)
 
 	testCases := []struct {
 		script string
@@ -56,37 +57,4 @@ func TestRequire(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
-}
-
-func createTestVM(t *testing.T) VM {
-	vm := goja.New()
-	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
-
-	req := &require{
-		vm:          vm,
-		modules:     make(map[string]*goja.Object),
-		nodeModules: make(map[string]*goja.Object),
-		fetcher:     &testFetcher{},
-	}
-
-	_ = vm.Set("require", req.Require)
-	InitGlobalModule(vm)
-
-	assertObject := vm.NewObject()
-	_ = assertObject.Set("equal", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		a, err := Unwrap(call.Argument(0))
-		if err != nil {
-			Throw(vm, err)
-		}
-		b, err := Unwrap(call.Argument(1))
-		if err != nil {
-			Throw(vm, err)
-		}
-		return vm.ToValue(assert.Equal(t, a, b, call.Argument(2).String()))
-	})
-	_ = assertObject.Set("true", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		return vm.ToValue(assert.True(t, call.Argument(0).ToBoolean(), call.Argument(2).String()))
-	})
-	_ = vm.Set("assert", assertObject)
-	return &vmImpl{vm, make(chan struct{}, 1), false}
 }
