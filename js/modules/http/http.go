@@ -45,7 +45,7 @@ func (*fetchModule) Exports() any {
 		req, signal := buildRequest(http.MethodGet, call, vm)
 		return vm.ToValue(js.NewPromise(vm, func() (any, error) {
 			if signal != nil {
-				defer signal.timeout()
+				defer signal.Abort() // release resources
 			}
 			res, err := f.Do(req)
 			if err != nil {
@@ -187,7 +187,7 @@ func doRequest(
 ) goja.Value {
 	req, signal := buildRequest(method, call, vm)
 	if signal != nil {
-		defer signal.timeout()
+		defer signal.Abort() // release resources
 	}
 
 	res, err := fetch.Do(req)

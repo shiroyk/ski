@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
@@ -14,7 +13,7 @@ import (
 type AbortSignal struct {
 	ctx                   context.Context
 	timeoutCancel, cancel context.CancelFunc
-	Aborted               atomic.Bool
+	Aborted               bool
 	Reason                string
 }
 
@@ -40,19 +39,16 @@ func (*AbortSignalConstructor) Global() {}
 
 // Abort the signal
 func (s *AbortSignal) Abort() {
-	if s.Aborted.Load() {
+	if s.Aborted {
 		return
 	}
-	s.Aborted.Store(true)
-	s.cancel()
-	if err := s.ctx.Err(); err != nil {
-		s.Reason = err.Error()
-	}
-}
-
-func (s *AbortSignal) timeout() {
-	s.Aborted.Store(true)
+	s.Aborted = true
 	if s.timeoutCancel != nil {
 		s.timeoutCancel()
+	} else {
+		s.cancel()
+	}
+	if err := s.ctx.Err(); err != nil {
+		s.Reason = err.Error()
 	}
 }
