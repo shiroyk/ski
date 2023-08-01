@@ -64,7 +64,7 @@ func TestHttp(t *testing.T) {
 		ts.Close()
 	})
 
-	_, _ = vm.RunString(ctx, fmt.Sprintf(`
+	_, _ = vm.Runtime().RunString(fmt.Sprintf(`
 		const http = require('cloudcat/http');
 		const fetch = require('cloudcat/fetch');
 		const url = "%s";

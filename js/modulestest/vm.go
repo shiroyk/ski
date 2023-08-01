@@ -2,45 +2,19 @@
 package modulestest
 
 import (
-	"context"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/js"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slog"
 )
 
-// VM test vm
-type VM struct {
-	runtime *goja.Runtime
-}
-
-// RunString the js string
-func (vm *VM) RunString(ctx context.Context, script string) (goja.Value, error) {
-	_ = vm.runtime.Set(js.VMContextKey, ctx)
-	return vm.runtime.RunString(script)
-}
-
-// Run the js program
-func (vm *VM) Run(ctx context.Context, program js.Program) (goja.Value, error) {
-	_ = vm.runtime.Set(js.VMContextKey, ctx)
-	return vm.runtime.RunString(program.Code)
-}
-
-// Runtime returns the runtime
-func (vm *VM) Runtime() *goja.Runtime {
-	return vm.runtime
-}
-
 // New returns a test VM instance
-func New(t *testing.T) *VM {
-	vm := goja.New()
-	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
-	js.EnableRequire(vm)
-	js.InitGlobalModule(vm)
+func New(t *testing.T) js.VM {
+	vm := js.NewVM()
+	runtime := vm.Runtime()
 
-	assertObject := vm.NewObject()
+	assertObject := runtime.NewObject()
 	_ = assertObject.Set("equal", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 		a, err := js.Unwrap(call.Argument(0))
 		if err != nil {
@@ -56,14 +30,7 @@ func New(t *testing.T) *VM {
 		return vm.ToValue(assert.True(t, call.Argument(0).ToBoolean(), call.Argument(1).String()))
 	})
 
-	consoleObject := vm.NewObject()
-	_ = consoleObject.Set("log", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		slog.Info(js.Format(call, vm).String())
-		return
-	})
+	_ = runtime.Set("assert", assertObject)
 
-	_ = vm.Set("console", consoleObject)
-	_ = vm.Set("assert", assertObject)
-
-	return &VM{vm}
+	return vm
 }

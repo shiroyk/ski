@@ -15,6 +15,7 @@ func TestConsole(t *testing.T) {
 
 	_, err := vm.RunString(`
 		console.log("hello %s", "cloudcat");
+		console.log("json %j", {'foo': 'bar'});
 	`)
 	assert.NoError(t, err)
 }

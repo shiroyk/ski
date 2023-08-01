@@ -22,7 +22,7 @@ func TestHashAlgorithms(t *testing.T) {
 	}
 
 	vm := modulestest.New(t)
-	_, _ = vm.RunString(context.Background(), `
+	_, _ = vm.Runtime().RunString(`
 		const crypto = require('cloudcat/crypto');
 	`)
 
@@ -146,7 +146,7 @@ func TestStreamingApi(t *testing.T) {
 	}
 
 	vm := modulestest.New(t)
-	_, _ = vm.RunString(context.Background(), `
+	_, _ = vm.Runtime().RunString(`
 		const crypto = require('cloudcat/crypto');
 	`)
 
@@ -195,7 +195,7 @@ func TestOutputEncoding(t *testing.T) {
 	}
 
 	vm := modulestest.New(t)
-	_, _ = vm.RunString(context.Background(), `
+	_, _ = vm.Runtime().RunString(`
 		const crypto = require('cloudcat/crypto');
 	`)
 
@@ -224,7 +224,7 @@ func TestOutputEncoding(t *testing.T) {
 		_, err := vm.RunString(context.Background(), `
 		crypto.createHash("md5").encrypt("hello world").someInvalidEncoding();
 		`)
-		assert.Contains(t, err.Error(), "Object has no member 'someInvalidEncoding'")
+		assert.ErrorContains(t, err, "Object has no member 'someInvalidEncoding'")
 	})
 }
 
@@ -234,7 +234,7 @@ func TestHMac(t *testing.T) {
 	}
 
 	vm := modulestest.New(t)
-	_, _ = vm.RunString(context.Background(), `
+	_, _ = vm.Runtime().RunString(`
 		const crypto = require('cloudcat/crypto');
 	`)
 
@@ -317,7 +317,7 @@ func TestAWSv4(t *testing.T) {
 	// example values from https://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html
 	vm := modulestest.New(t)
 
-	_, err := vm.RunString(context.Background(), `
+	_, err := vm.Runtime().RunString(`
 		const crypto = require('cloudcat/crypto');
 		let hmacSHA256 = function(data, key) {
 			return crypto.hmac("sha256", key, data);

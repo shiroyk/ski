@@ -15,7 +15,7 @@ func TestCookie(t *testing.T) {
 	ctx := context.Background()
 	vm := modulestest.New(t)
 
-	_, _ = vm.RunString(ctx, `const cookie = require('cloudcat/cookie')`)
+	_, _ = vm.Runtime().RunString(`const cookie = require('cloudcat/cookie')`)
 
 	var err error
 	errScript := []string{`cookie.set('\x0000', "");`, `cookie.get('\x0000');`, `cookie.del('\x0000');`}

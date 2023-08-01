@@ -15,7 +15,7 @@ func TestCipherAlgorithm(t *testing.T) {
 	}
 
 	vm := modulestest.New(t)
-	_, _ = vm.RunString(context.Background(), `
+	_, _ = vm.Runtime().RunString(`
 		const crypto = require('cloudcat/crypto');
 	`)
 
