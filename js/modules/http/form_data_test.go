@@ -14,7 +14,7 @@ func TestFormData(t *testing.T) {
 	vm := modulestest.New(t)
 
 	_, _ = vm.Runtime().RunString(`const mp = new FormData({
-			'file': new Uint8Array([50]).buffer,
+			'file': new Uint8Array([50]),
 			'name': 'foo'
 		 });`)
 

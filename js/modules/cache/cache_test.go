@@ -23,8 +23,10 @@ func TestCache(t *testing.T) {
 			cache.set("cache2", "2", "1s");
 			cache.get("cache2");
 			assert.equal(cache.get("cache2"), "2");
-			cache.setBytes("cache3", new Uint8Array([50]).buffer);
+			cache.setBytes("cache3", new Uint8Array([50]));
 			assert.equal(new Uint8Array(cache.getBytes("cache3"))[0], 50);
+			cache.setBytes("cache4", new Uint8Array([60]).buffer);
+			assert.equal(new Uint8Array(cache.getBytes("cache4"))[0], 60);
 		`)
 	assert.NoError(t, err)
 }

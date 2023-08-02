@@ -44,6 +44,12 @@ func (*FormDataConstructor) Exports() any {
 
 		for k, v := range pa {
 			switch ve := v.(type) {
+			case []byte:
+				// Default filename "blob".
+				data[k] = []any{FileData{
+					Data:     ve,
+					Filename: "blob",
+				}}
 			case goja.ArrayBuffer:
 				// Default filename "blob".
 				data[k] = []any{FileData{
@@ -79,6 +85,11 @@ func (f *FormData) Append(name string, value any, filename string) (ret goja.Val
 	}
 
 	switch v := value.(type) {
+	case []byte:
+		ele = append(ele, FileData{
+			Data:     v,
+			Filename: filename,
+		})
 	case goja.ArrayBuffer:
 		ele = append(ele, FileData{
 			Data:     v.Bytes(),

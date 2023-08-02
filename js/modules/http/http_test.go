@@ -34,7 +34,7 @@ func TestHttp(t *testing.T) {
 		`assert.equal(http.post(url, { body: "post" }).string(), "post");`,
 		`fetch(url, { method: 'put', body: 'put', headers: {"Authorization": "1919810"} }).then(res => assert.equal(res.string(), "put"));`,
 		`fetch(url, { method: 'patch', body: fa }).then(res => assert.equal(res.string(), "♂︎"));`,
-		`fetch(url, { method: 'PATCH', body: new Uint8Array([97]).buffer }).then(res => assert.equal(res.string(), "a"));`,
+		`fetch(url, { method: 'PATCH', body: new Uint8Array([97]) }).then(res => assert.equal(res.string(), "a"));`,
 		`fetch(url, { method: 'custom' }).then(res => assert.equal(res.string(), "CUSTOM"));`,
 		`fetch(url, { proxy: proxyURL }).then(res => assert.equal(res.string(), "proxy ok"))`,
 		`try {
@@ -119,7 +119,7 @@ func createVM(t *testing.T) js.VM {
 		const http = require('cloudcat/http');
 		const url = "%s";
 		const proxyURL = "%s";
-		const fa = new Uint8Array([226, 153, 130, 239, 184, 142]).buffer`, ts.URL, proxy.URL))
+		const fa = new Uint8Array([226, 153, 130, 239, 184, 142])`, ts.URL, proxy.URL))
 
 	return vm
 }

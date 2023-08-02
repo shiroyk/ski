@@ -205,7 +205,7 @@ func TestOutputEncoding(t *testing.T) {
 		let correctBase64 = "XrY7u+Ae7tCTyyK7j1rNww==";
 		let correctBase64URL = "XrY7u-Ae7tCTyyK7j1rNww=="
 		let correctBase64RawURL = "XrY7u-Ae7tCTyyK7j1rNww";
-		let correctBinary = new Uint8Array([94,182,59,187,224,30,238,208,147,203,34,187,143,90,205,195]).buffer;
+		let correctBinary = new Uint8Array([94,182,59,187,224,30,238,208,147,203,34,187,143,90,205,195]);
 
 		let hasher = crypto.createHash("md5");
 		let encoder = hasher.encrypt("hello world");
@@ -274,7 +274,7 @@ func TestHMac(t *testing.T) {
 		t.Run(algorithm+" ArrayBuffer: valid", func(t *testing.T) {
 			_, err := vm.RunString(context.Background(), `
 			var data = new Uint8Array([115,111,109,101,32,100,97,116,97,32,116,
-										111,32,104,97,115,104]).buffer;
+										111,32,104,97,115,104]);
 			var resultHex = crypto.hmac(algorithm, "a secret", data).hex();
 			assert.equal(correctHex, resultHex);
 			`)
