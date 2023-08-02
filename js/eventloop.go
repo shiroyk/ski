@@ -86,8 +86,8 @@ type EnqueueCallback func(func() error)
 //
 // A common pattern for async work is something like this:
 //
-//	func doAsyncWork(vm VM) *goja.Promise {
-//	    enqueueCallback := vm.RegisterCallback()
+//	func doAsyncWork(vm js.VM) *goja.Promise {
+//	    enqueueCallback := vm.Runtime().Get(enqueueCallbackKey).Export().(func() EnqueueCallback)()
 //	    p, resolve, reject := vm.Runtime().NewPromise()
 //
 //	    // Do the actual async work in a new independent goroutine, but make
@@ -95,7 +95,7 @@ type EnqueueCallback func(func() error)
 //	    go func() {
 //	        // Also make sure to abort early if the context is cancelled, so
 //	        // the VM is not stuck when the scenario ends or Ctrl+C is used:
-//	        result, err := doTheActualAsyncWork(VMContext(vm.Runtime()))
+//	        result, err := doTheActualAsyncWork()
 //	        enqueueCallback(func() error {
 //	            if err != nil {
 //	                reject(err)
