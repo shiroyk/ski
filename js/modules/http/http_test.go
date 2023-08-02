@@ -42,6 +42,11 @@ func TestHttp(t *testing.T) {
 		 } catch (e) {
 			assert.true(e.toString().includes("unsupported request body"), e.toString());
 		 }`,
+		`const signal = new AbortSignal();
+		 fetch(url, { signal: signal, body: "sleep1000" }).catch(e => {});
+		 signal.abort();
+		 assert.equal(signal.reason, "context canceled");
+		 assert.true(signal.aborted);`,
 		`(async () => {
 			try {
 				await fetch(url, { signal: new AbortSignal(500), body: "sleep1000" });
