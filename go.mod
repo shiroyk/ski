@@ -11,9 +11,9 @@ require (
 	github.com/shiroyk/cloudcat/plugin v0.4.0
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/crypto v0.9.0
+	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.13.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
