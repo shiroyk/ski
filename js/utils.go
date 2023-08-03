@@ -42,6 +42,8 @@ func ToStrings(data any) (s any, err error) {
 		return dt, nil
 	case []string:
 		return dt, nil
+	case []byte:
+		return string(dt), nil
 	case []any:
 		return cast.ToStringSliceE(dt)
 	case goja.ArrayBuffer:

@@ -99,7 +99,6 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 		}
 	}()
 
-	code := p.Code
 	args := p.Args
 	if args == nil {
 		args = make(map[string]any, 1)
@@ -111,7 +110,7 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 	}
 
 	err = vm.eventloop.Start(func() error {
-		ret, err = vm.executor(goja.Undefined(), vm.runtime.ToValue(args), vm.runtime.ToValue(code))
+		ret, err = vm.executor(goja.Undefined(), vm.runtime.ToValue(args), vm.runtime.ToValue(p.Code))
 		return err
 	})
 
