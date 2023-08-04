@@ -2,6 +2,7 @@
 package modulestest
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -24,10 +25,24 @@ func New(t *testing.T) js.VM {
 		if err != nil {
 			js.Throw(vm, err)
 		}
-		return vm.ToValue(assert.Equal(t, b, a, call.Argument(2).String()))
+		var msg string
+		if !goja.IsUndefined(call.Argument(2)) {
+			msg = call.Argument(2).String()
+		}
+		if !assert.Equal(t, b, a, msg) {
+			js.Throw(vm, errors.New("not equal"))
+		}
+		return
 	})
 	_ = assertObject.Set("true", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		return vm.ToValue(assert.True(t, call.Argument(0).ToBoolean(), call.Argument(1).String()))
+		var msg string
+		if !goja.IsUndefined(call.Argument(1)) {
+			msg = call.Argument(1).String()
+		}
+		if !assert.True(t, call.Argument(0).ToBoolean(), msg) {
+			js.Throw(vm, errors.New("should be true"))
+		}
+		return
 	})
 
 	_ = runtime.Set("assert", assertObject)
