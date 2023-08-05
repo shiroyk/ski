@@ -181,6 +181,29 @@ func NewPromise(runtime *goja.Runtime, asyncFunc func() (any, error)) *goja.Prom
 // asynchronous work off the main thread and that you may need to execute some
 // code back on the main thread when you are done.
 // see EventLoop.RegisterCallback.
+//
+//	func doAsyncWork(runtime *goja.Runtime) *goja.Promise {
+//		enqueueCallback := js.NewEnqueueCallback(runtime)
+//		promise, resolve, reject := runtime.NewPromise()
+//
+//		// Do the actual async work in a new independent goroutine, but make
+//		// sure that the Promise resolution is done on the main thread:
+//
+//		go func() {
+//			// Also make sure to abort early if the context is cancelled, so
+//			// the VM is not stuck when the scenario ends or Ctrl+C is used:
+//			result, err := doTheActualAsyncWork()
+//			enqueueCallback(func() error {
+//				if err != nil {
+//					reject(err)
+//				} else {
+//					resolve(result)
+//				}
+//				return nil // do not abort the iteration
+//			})
+//		}()
+//		return promise
+//	}
 func NewEnqueueCallback(runtime *goja.Runtime) EnqueueCallback {
 	return runtime.GlobalObject().GetSymbol(enqueueCallbackSymbol).Export().(func() EnqueueCallback)()
 }
