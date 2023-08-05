@@ -38,6 +38,10 @@ func init() {
 	jsmodule.Register("AbortSignal", new(AbortSignalModule))
 }
 
+// FetchModule the global fetch() method starts the process of
+// fetching a resource from the network, returning a promise
+// which is fulfilled once the response is available.
+// https://developer.mozilla.org/en-US/docs/Web/API/fetch
 type FetchModule struct{}
 
 func (*FetchModule) Exports() any {

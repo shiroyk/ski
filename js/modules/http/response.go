@@ -50,7 +50,7 @@ func NewAsyncResponse(vm *goja.Runtime, res *http.Response) goja.Value {
 
 	readBody := func() ([]byte, error) {
 		if bodyUsed {
-			return nil, errors.New("body is used")
+			return nil, errors.New("body used already for")
 		}
 		bodyUsed = true
 		defer res.Body.Close()
@@ -62,6 +62,9 @@ func NewAsyncResponse(vm *goja.Runtime, res *http.Response) goja.Value {
 	}
 
 	_ = object.DefineAccessorProperty("body", vm.ToValue(func(call goja.FunctionCall) goja.Value {
+		if bodyUsed {
+			js.Throw(vm, errors.New("body used already for"))
+		}
 		return NewReadableStream(res.Body, vm, &bodyUsed)
 	}), nil, goja.FLAG_FALSE, goja.FLAG_FALSE)
 	defineAccessorProperty(vm, object, "bodyUsed", &bodyUsed)
@@ -115,9 +118,6 @@ func joinHeader(header http.Header) map[string]string {
 // NewReadableStream ReadableStream API
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
 func NewReadableStream(body io.ReadCloser, vm *goja.Runtime, bodyUsed *bool) *goja.Object {
-	if *bodyUsed {
-		js.Throw(vm, errors.New("body is used"))
-	}
 	var lock bool
 	object := vm.NewObject()
 	_ = object.Set("cancel", func() {
@@ -127,11 +127,11 @@ func NewReadableStream(body io.ReadCloser, vm *goja.Runtime, bodyUsed *bool) *go
 	})
 	_ = object.Set("getReader", func(call goja.FunctionCall) goja.Value {
 		if *bodyUsed {
-			js.Throw(vm, errors.New("body is used"))
+			js.Throw(vm, errors.New("body used already for"))
 		}
 		*bodyUsed = true
 		if lock {
-			js.Throw(vm, errors.New("ReadableStream is locked"))
+			js.Throw(vm, errors.New("ReadableStream locked"))
 		}
 		lock = true
 		return NewReadableStreamDefaultReader(body, vm, &lock)
