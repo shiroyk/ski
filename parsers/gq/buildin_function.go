@@ -39,9 +39,10 @@ func builtins() FuncMap {
 }
 
 func contentToString(content any, fn func(*goquery.Selection) (string, error)) (any, error) {
-	if node, ok := content.(*goquery.Selection); ok {
-		list := make([]string, node.Length())
-		node.EachWithBreak(func(i int, sel *goquery.Selection) bool {
+	switch c := content.(type) {
+	case *goquery.Selection:
+		list := make([]string, c.Length())
+		c.EachWithBreak(func(i int, sel *goquery.Selection) bool {
 			result, err := fn(sel)
 			if err != nil {
 				return false
@@ -53,8 +54,16 @@ func contentToString(content any, fn func(*goquery.Selection) (string, error)) (
 			return list[0], nil
 		}
 		return list, nil
+	case string:
+		return c, nil
+	case []string:
+		if len(c) == 1 {
+			return c[0], nil
+		}
+		return c, nil
+	default:
+		return nil, fmt.Errorf("unexpected type %T", content)
 	}
-	return nil, fmt.Errorf("unexpected type %T", content)
 }
 
 // Get returns the value associated with this context for key, or nil
@@ -167,7 +176,7 @@ func Href(ctx *plugin.Context, content any, _ ...string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return baseURL.ResolveReference(hrefURL), nil
+		return baseURL.ResolveReference(hrefURL).String(), nil
 	}
 
 	return nil, fmt.Errorf("unexpected content type %T", content)
