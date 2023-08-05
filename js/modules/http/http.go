@@ -31,32 +31,40 @@ func (*Module) Exports() any {
 
 func init() {
 	jsmodule.Register("http", new(Module))
-	jsmodule.Register("fetch", new(fetchModule))
+	jsmodule.Register("fetch", new(FetchModule))
 	jsmodule.Register("FormData", new(FormDataConstructor))
 	jsmodule.Register("URLSearchParams", new(URLSearchParamsConstructor))
-	jsmodule.Register("AbortSignal", new(AbortSignalConstructor))
+	jsmodule.Register("AbortController", new(AbortControllerConstructor))
+	jsmodule.Register("AbortSignal", new(AbortSignalModule))
 }
 
-type fetchModule struct{}
+type FetchModule struct{}
 
-func (*fetchModule) Exports() any {
+func (*FetchModule) Exports() any {
 	f := cloudcat.MustResolve[cloudcat.Fetch]()
 	return func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 		req, signal := buildRequest(http.MethodGet, call, vm)
-		return vm.ToValue(js.NewPromise(vm, func() (any, error) {
+		callback := js.NewEnqueueCallback(vm)
+		promise, resolve, reject := vm.NewPromise()
+		go func() {
 			if signal != nil {
-				defer signal.Abort() // release resources
+				defer signal.abort() // release resources
 			}
 			res, err := f.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			return NewResponse(vm, res), nil
-		}))
+			callback(func() error {
+				if err != nil {
+					reject(err)
+				} else {
+					resolve(NewAsyncResponse(vm, res))
+				}
+				return nil
+			})
+		}()
+		return vm.ToValue(promise)
 	}
 }
 
-func (*fetchModule) Global() {}
+func (*FetchModule) Global() {}
 
 // Http module for fetching resources (including across the network).
 type Http struct { //nolint
@@ -154,7 +162,7 @@ func buildRequest(
 		if v, ok := options["signal"]; ok {
 			signal, ok = v.(*AbortSignal)
 			if !ok {
-				js.Throw(vm, errors.New("request options signal is invalid"))
+				js.Throw(vm, errors.New("request options signal is invalid AbortSignal"))
 			}
 		}
 	}
@@ -187,7 +195,7 @@ func doRequest(
 ) goja.Value {
 	req, signal := buildRequest(method, call, vm)
 	if signal != nil {
-		defer signal.Abort() // release resources
+		defer signal.abort() // release resources
 	}
 
 	res, err := fetch.Do(req)

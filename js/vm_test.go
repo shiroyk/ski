@@ -51,7 +51,7 @@ func TestVMRunContext(t *testing.T) {
 	vm := NewVM()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	v, err := vm.RunString(ctx, VMContextKey)
+	v, err := vm.RunString(ctx, vmContextKey)
 	assert.NoError(t, err)
 	assert.Equal(t, ctx, v.Export())
 }

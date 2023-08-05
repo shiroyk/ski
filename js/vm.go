@@ -104,7 +104,7 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 		args = make(map[string]any, 1)
 	}
 
-	args[VMContextKey] = ctx
+	args[vmContextKey] = ctx
 	if ctx, ok := ctx.(*plugin.Context); ok {
 		args["cat"] = NewCat(ctx)
 	}
@@ -159,7 +159,7 @@ func (vm *vmImpl) Runtime() *goja.Runtime {
 //		fmt.Println(time.Now().Sub(start))
 //	}
 func NewPromise(runtime *goja.Runtime, asyncFunc func() (any, error)) *goja.Promise {
-	callback := runtime.Get(enqueueCallbackKey).Export().(func() EnqueueCallback)()
+	callback := NewEnqueueCallback(runtime)
 	promise, resolve, reject := runtime.NewPromise()
 
 	go func() {
@@ -175,4 +175,12 @@ func NewPromise(runtime *goja.Runtime, asyncFunc func() (any, error)) *goja.Prom
 	}()
 
 	return promise
+}
+
+// NewEnqueueCallback signals to the event loop that you are going to do some
+// asynchronous work off the main thread and that you may need to execute some
+// code back on the main thread when you are done.
+// see EventLoop.RegisterCallback.
+func NewEnqueueCallback(runtime *goja.Runtime) EnqueueCallback {
+	return runtime.GlobalObject().GetSymbol(enqueueCallbackSymbol).Export().(func() EnqueueCallback)()
 }

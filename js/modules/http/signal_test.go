@@ -14,10 +14,16 @@ func TestAbortSignal(t *testing.T) {
 	vm := modulestest.New(t)
 
 	testCase := []string{
-		`const signal = new AbortSignal();
-		 signal.abort();
+		`const controller = new AbortController();
+		 controller.abort();
+         assert.equal(controller.reason, "context canceled");
+         assert.true(controller.aborted);`,
+		`const signal = AbortSignal.abort();
          assert.equal(signal.reason, "context canceled");
          assert.true(signal.aborted);`,
+		`const signal = AbortSignal.timeout(100);
+         assert.equal(signal.reason, "");
+         assert.true(!signal.aborted);`,
 	}
 
 	for i, s := range testCase {

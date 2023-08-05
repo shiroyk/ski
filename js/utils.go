@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cast"
 )
 
-// VMContextKey the VM current context
-const VMContextKey = "__ctx__"
+// vmContextKey the VM current context
+const vmContextKey = "__ctx__"
 
 // Throw js exception
 func Throw(vm *goja.Runtime, err error) {
@@ -70,7 +70,7 @@ func Unwrap(value goja.Value) (any, error) {
 		case goja.PromiseStateFulfilled:
 			return v.Result().Export(), nil
 		default:
-			return nil, fmt.Errorf("unexpected promise state: %v", v.State())
+			return nil, errors.New("unexpected promise pending state")
 		}
 	}
 }
@@ -78,7 +78,7 @@ func Unwrap(value goja.Value) (any, error) {
 // VMContext returns the current context of the goja.Runtime
 func VMContext(runtime *goja.Runtime) context.Context {
 	ctx := context.Background()
-	if v := runtime.Get(VMContextKey); v != nil {
+	if v := runtime.Get(vmContextKey); v != nil {
 		if c, ok := v.Export().(context.Context); ok {
 			ctx = c
 		}

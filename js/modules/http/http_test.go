@@ -24,32 +24,42 @@ func init() {
 func TestHttp(t *testing.T) {
 	vm := createVM(t)
 	testCase := []string{
-		`assert.equal(http.get(url).string(), "");`,
-		`assert.equal(http.post(url, { body: new FormData({'file': fa, 'name': 'foo'}) }).string(), "♂︎");`,
-		`assert.equal(http.post(url, { body: new URLSearchParams({'key': 'holy', 'value': 'fa'}) }).string(), "key=holy&value=fa");`,
-		`assert.equal(http.head(url).headers.get("X-Total-Count"), "114514");`,
-		`assert.equal(http.post(url).string(), "");`,
-		`assert.equal(new Uint8Array(http.post(url, { body: '1' }).bytes())[0], 49);`,
+		`assert.equal(http.get(url).text(), "");`,
+		`assert.equal(http.post(url, { body: new FormData({'file': fa, 'name': 'foo'}) }).text(), "♂︎");`,
+		`assert.equal(http.post(url, { body: new URLSearchParams({'key': 'holy', 'value': 'fa'}) }).text(), "key=holy&value=fa");`,
+		`assert.equal(http.head(url).headers["X-Total-Count"], "114514");`,
+		`assert.equal(http.post(url).text(), "");`,
+		`assert.equal(new Uint8Array(http.post(url, { body: '1' }).arrayBuffer())[0], 49);`,
 		`assert.equal(http.post(url, { body: {'dark': 'o'} }).json()['dark'], "o");`,
-		`assert.equal(http.post(url, { body: "post" }).string(), "post");`,
-		`fetch(url, { method: 'put', body: 'put', headers: {"Authorization": "1919810"} }).then(res => assert.equal(res.string(), "put"));`,
-		`fetch(url, { method: 'patch', body: fa }).then(res => assert.equal(res.string(), "♂︎"));`,
-		`fetch(url, { method: 'PATCH', body: new Uint8Array([97]) }).then(res => assert.equal(res.string(), "a"));`,
-		`fetch(url, { method: 'custom' }).then(res => assert.equal(res.string(), "CUSTOM"));`,
-		`fetch(url, { proxy: proxyURL }).then(res => assert.equal(res.string(), "proxy ok"))`,
+		`assert.equal(http.post(url, { body: "post" }).text(), "post");`,
+		`fetch(url, { method: 'put', body: 'put', headers: {"Authorization": "1919810"} })
+		 .then(res => res.text())
+		 .then(body => assert.equal(body, "put"));`,
+		`fetch(url, { method: 'patch', body: fa })
+		 .then(res => res.text())
+		 .then(body => assert.equal(body, "♂︎"));`,
+		`fetch(url, { method: 'PATCH', body: new Uint8Array([97]) })
+		 .then(res => res.text())
+		 .then(body => assert.equal(body, "a"));`,
+		`fetch(url, { method: 'custom' })
+		 .then(res => res.text())
+		 .then(body => assert.equal(body,  "CUSTOM"));`,
+		`fetch(url, { proxy: proxyURL })
+		 .then(res => res.text())
+		 .then(body => assert.equal(body, "proxy ok"))`,
 		`try {
-			fetch(url, { method: 'put', body: 114514 });
+			fetch(url, { method: 'put', body: 114514 })
 		 } catch (e) {
 			assert.true(e.toString().includes("unsupported request body"), e.toString());
 		 }`,
-		`const signal = new AbortSignal();
-		 fetch(url, { signal: signal, body: "sleep1000" }).catch(e => {});
-		 signal.abort();
-		 assert.equal(signal.reason, "context canceled");
-		 assert.true(signal.aborted);`,
+		`const controller = new AbortController();
+		 fetch(url, { signal: controller.signal, body: "sleep1000" }).catch(e => {});
+		 controller.abort();
+		 assert.equal(controller.reason, "context canceled");
+		 assert.true(controller.aborted);`,
 		`(async () => {
 			try {
-				await fetch(url, { signal: new AbortSignal(500), body: "sleep1000" });
+				await fetch(url, { signal: AbortSignal.timeout(500), body: "sleep1000" });
 			} catch (e) {
 				assert.true(e.toString().includes("context deadline exceeded"), e);
 			}

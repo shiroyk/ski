@@ -44,7 +44,7 @@ func NewEventLoop(runtime *goja.Runtime) *EventLoop {
 		runtime:                  runtime,
 	}
 	runtime.SetPromiseRejectionTracker(e.promiseRejectionTracker)
-	_ = runtime.Set(enqueueCallbackKey, e.RegisterCallback)
+	_ = runtime.GlobalObject().SetSymbol(enqueueCallbackSymbol, e.RegisterCallback)
 	return e
 }
 
@@ -55,7 +55,7 @@ func (e *EventLoop) wakeup() {
 	}
 }
 
-const enqueueCallbackKey = "__enqueueCallback__"
+var enqueueCallbackSymbol = goja.NewSymbol("__enqueueCallback__")
 
 type EnqueueCallback func(func() error)
 
@@ -87,7 +87,7 @@ type EnqueueCallback func(func() error)
 // A common pattern for async work is something like this:
 //
 //	func doAsyncWork(vm js.VM) *goja.Promise {
-//	    enqueueCallback := vm.Runtime().Get(enqueueCallbackKey).Export().(func() EnqueueCallback)()
+//	    enqueueCallback := vm.Runtime().GlobalObject().GetSymbol(enqueueCallbackSymbol).Export().(func() EnqueueCallback)()
 //	    p, resolve, reject := vm.Runtime().NewPromise()
 //
 //	    // Do the actual async work in a new independent goroutine, but make
