@@ -166,13 +166,30 @@ func TestGetElements(t *testing.T) {
 }
 
 func TestExternalFunc(t *testing.T) {
-	fun := func(logger *slog.Logger) GFunc {
-		return func(_ *plugin.Context, content any, args ...string) (any, error) {
-			logger.Info(fmt.Sprintf("result type was %T", content))
-			return content, nil
+	{
+		fun := func(logger *slog.Logger) GFunc {
+			return func(_ *plugin.Context, content any, args ...string) (any, error) {
+				logger.Info(fmt.Sprintf("result type was %T", content))
+				return content, nil
+			}
 		}
+		p := NewGoQueryParser(FuncMap{"logger": fun(slog.Default())})
+		_, err := p.GetString(ctx, content, ".body ul a -> logger -> text")
+		assert.NoError(t, err)
 	}
-	p := NewGoQueryParser(FuncMap{"logger": fun(slog.Default())})
-	_, err := p.GetString(ctx, content, ".body ul a -> logger -> text")
-	assert.NoError(t, err)
+
+	{
+		fun := func(_ *plugin.Context, content any, args ...string) (any, error) {
+			return nil, nil
+		}
+		p := NewGoQueryParser(FuncMap{"nil": fun})
+		_, err := p.GetString(ctx, content, ".body ul a -> nil -> text")
+		assert.NoError(t, err)
+		_, err = p.GetStrings(ctx, content, ".body ul a -> nil -> text")
+		assert.NoError(t, err)
+		_, err = p.GetElement(ctx, content, ".body ul a -> nil -> text")
+		assert.NoError(t, err)
+		_, err = p.GetElements(ctx, content, ".body ul a -> nil -> text")
+		assert.NoError(t, err)
+	}
 }

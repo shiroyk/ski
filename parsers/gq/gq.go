@@ -51,17 +51,18 @@ func (p *Parser) GetString(ctx *plugin.Context, content any, arg string) (ret st
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
+		if err != nil || node == nil {
 			return ret, err
 		}
 	}
 
-	join, err := Join(ctx, node, "\n")
+	node, err = Join(ctx, node, "\n")
 	if err != nil {
 		return
 	}
 
-	return cast.ToStringE(join)
+	return node.(string), nil
 }
 
 // GetStrings gets the strings of the content with the given arguments.
@@ -82,7 +83,8 @@ func (p *Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret [
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
+		if err != nil || node == nil {
 			return nil, err
 		}
 	}
@@ -116,7 +118,8 @@ func (p *Parser) GetElement(ctx *plugin.Context, content any, arg string) (ret s
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
+		if err != nil || node == nil {
 			return ret, err
 		}
 	}
@@ -146,7 +149,8 @@ func (p *Parser) GetElements(ctx *plugin.Context, content any, arg string) (ret 
 	var node any = nodes.Find(rule)
 
 	for _, fun := range funcs {
-		if node, err = p.parseFuncs[fun.name](ctx, node, fun.args...); err != nil {
+		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
+		if err != nil || node == nil {
 			return nil, err
 		}
 	}
