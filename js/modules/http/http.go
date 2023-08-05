@@ -101,6 +101,16 @@ func (h *Http) Delete(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return doRequest(h.fetch, http.MethodDelete, call, vm)
 }
 
+// Patch Make a HTTP PATCH request.
+func (h *Http) Patch(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+	return doRequest(h.fetch, http.MethodPatch, call, vm)
+}
+
+// Request Make a HTTP request.
+func (h *Http) Request(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+	return doRequest(h.fetch, http.MethodGet, call, vm)
+}
+
 // Head Make a HTTP HEAD request.
 func (h *Http) Head(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return doRequest(h.fetch, http.MethodHead, call, vm)
