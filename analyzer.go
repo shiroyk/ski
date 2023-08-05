@@ -91,7 +91,7 @@ func analyzeString(
 			ret, err = GetFormatter().Format(ret, s.Type)
 			if err != nil {
 				ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
-					path, ret, s.Format), "error", err, attr)
+					path, ret, s.Type), "error", err, attr)
 				return
 			}
 			ctx.Logger().Debug("format", "path", path, "result", ret, attr)
