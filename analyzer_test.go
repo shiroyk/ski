@@ -162,10 +162,13 @@ func TestFormat(t *testing.T) {
 		typ  Type
 		want any
 	}{
+		{"", StringType, ""},
 		{"1", StringType, "1"},
 		{"2.1", NumberType, 2.1},
+		{"", NumberType, nil},
 		{"3", IntegerType, 3},
 		{"1", BooleanType, true},
+		{"", BooleanType, nil},
 		{`{"k":"v"}`, ObjectType, map[string]any{"k": "v"}},
 		{`[1,2]`, ArrayType, []any{1.0, 2.0}},
 		{[]string{"1", "2"}, IntegerType, []any{1, 2}},
@@ -185,7 +188,6 @@ func TestFormat(t *testing.T) {
 		typ  Type
 		want any
 	}{
-		{"", NumberType, nil},
 		{"9-", IntegerType, nil},
 		{"114", BooleanType, nil},
 		{[]string{"1", "?"}, IntegerType, nil},

@@ -216,6 +216,9 @@ type defaultFormatHandler struct{}
 func (f defaultFormatHandler) Format(data any, format Type) (ret any, err error) {
 	switch data := data.(type) {
 	case string:
+		if data == "" && format != StringType {
+			return
+		}
 		switch format {
 		case StringType:
 			return data, nil
