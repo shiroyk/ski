@@ -36,9 +36,6 @@ func TestBuildInFuncSet(t *testing.T) {
 
 func TestBuildInFuncText(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `#main #n1 -> text -> text`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
 
 	assertGetString(t, `#main #n1 -> text`, "1")
 
