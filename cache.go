@@ -8,9 +8,9 @@ import (
 
 // A Cache interface is used to store bytes.
 type Cache interface {
-	Get(key string) ([]byte, bool)
+	Get(key string, opts ...CacheOptions) ([]byte, bool)
 	Set(key string, value []byte, opts ...CacheOptions)
-	Del(key string)
+	Del(key string, opts ...CacheOptions)
 }
 
 type CacheOptions struct {
@@ -28,7 +28,7 @@ type memoryCache struct {
 }
 
 // Get returns the []byte and true, if not existing returns false.
-func (c *memoryCache) Get(key string) ([]byte, bool) {
+func (c *memoryCache) Get(key string, _ ...CacheOptions) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ddl, exist := c.timeout[key]; exist {
@@ -55,7 +55,7 @@ func (c *memoryCache) Set(key string, value []byte, opts ...CacheOptions) {
 }
 
 // Del removes key from the cache
-func (c *memoryCache) Del(key string) {
+func (c *memoryCache) Del(key string, _ ...CacheOptions) {
 	c.Lock()
 	delete(c.items, key)
 	delete(c.timeout, key)

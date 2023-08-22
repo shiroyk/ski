@@ -28,23 +28,25 @@ type Cache struct {
 }
 
 // Get returns string.
-func (c *Cache) Get(name string) string {
-	if bytes, ok := c.cache.Get(name); ok {
-		return string(bytes)
+func (c *Cache) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+	opt := cloudcat.CacheOptions{Context: js.VMContext(vm)}
+	if bytes, ok := c.cache.Get(call.Argument(0).String(), opt); ok {
+		return vm.ToValue(string(bytes))
 	}
-	return ""
+	return goja.Undefined()
 }
 
 // GetBytes returns ArrayBuffer.
-func (c *Cache) GetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-	if bytes, ok := c.cache.Get(call.Argument(0).String()); ok {
+func (c *Cache) GetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+	opt := cloudcat.CacheOptions{Context: js.VMContext(vm)}
+	if bytes, ok := c.cache.Get(call.Argument(0).String(), opt); ok {
 		return vm.ToValue(vm.NewArrayBuffer(bytes))
 	}
-	return
+	return goja.Undefined()
 }
 
 // Set saves string to the cache with key.
-func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	var timeout time.Duration
 	if !goja.IsUndefined(call.Argument(2)) {
 		var err error
@@ -58,11 +60,11 @@ func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 
 	c.cache.Set(call.Argument(0).String(), []byte(call.Argument(1).String()), opt)
 
-	return
+	return goja.Undefined()
 }
 
 // SetBytes saves ArrayBuffer to the cache with key.
-func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	var timeout time.Duration
 	if !goja.IsUndefined(call.Argument(2)) {
 		var err error
@@ -80,10 +82,13 @@ func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Val
 	opt := cloudcat.CacheOptions{Timeout: timeout, Context: js.VMContext(vm)}
 
 	c.cache.Set(call.Argument(0).String(), value, opt)
-	return
+
+	return goja.Undefined()
 }
 
 // Del removes key from the cache.
-func (c *Cache) Del(key string) {
-	c.cache.Del(key)
+func (c *Cache) Del(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+	opt := cloudcat.CacheOptions{Context: js.VMContext(vm)}
+	c.cache.Del(call.Argument(0).String(), opt)
+	return goja.Undefined()
 }

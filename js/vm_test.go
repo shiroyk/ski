@@ -2,6 +2,7 @@ package js
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -69,10 +70,24 @@ func NewTestVM(t *testing.T) VM {
 		if err != nil {
 			Throw(vm, err)
 		}
-		return vm.ToValue(assert.Equal(t, a, b, call.Argument(2).String()))
+		var msg string
+		if !goja.IsUndefined(call.Argument(2)) {
+			msg = call.Argument(2).String()
+		}
+		if !assert.Equal(t, b, a, msg) {
+			Throw(vm, errors.New("not equal"))
+		}
+		return
 	})
 	_ = assertObject.Set("true", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		return vm.ToValue(assert.True(t, call.Argument(0).ToBoolean(), call.Argument(2).String()))
+		var msg string
+		if !goja.IsUndefined(call.Argument(1)) {
+			msg = call.Argument(1).String()
+		}
+		if !assert.True(t, call.Argument(0).ToBoolean(), msg) {
+			Throw(vm, errors.New("should be true"))
+		}
+		return
 	})
 	_ = vm.Runtime().Set("assert", assertObject)
 
