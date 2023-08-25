@@ -12,7 +12,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-var errInitExecutor = errors.New("initializing JavaScript VM executor function failed")
+var errInitExecutor = errors.New("initializing JavaScript VM executor failed")
 
 // VM the js runtime.
 // An instance of VM can only be used by a single goroutine at a time.
@@ -42,7 +42,7 @@ func NewVM(modulePath ...string) VM {
 	EnableConsole(runtime)
 
 	// TODO: any better way?
-	eval := `(function(ctx, code){with(ctx){return eval(code)}})`
+	eval := `((ctx, code)=>function(){with(this){return eval(code)}}.call(ctx))`
 	program := goja.MustCompile("eval", eval, false)
 	callable, err := runtime.RunProgram(program)
 	if err != nil {
@@ -81,6 +81,7 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 				"stack", string(debug.Stack()), "js stack", buf.String())
 		}
 
+		_ = vm.runtime.GlobalObject().DeleteSymbol(vmContextKey)
 		vm.done <- struct{}{} // End of run
 	}()
 
@@ -103,11 +104,10 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 	if args == nil {
 		args = make(map[string]any, 1)
 	}
-
-	args[vmContextKey] = ctx
 	if ctx, ok := ctx.(*plugin.Context); ok {
 		args["cat"] = NewCat(ctx)
 	}
+	_ = vm.runtime.GlobalObject().SetSymbol(vmContextKey, ctx)
 
 	err = vm.eventloop.Start(func() error {
 		ret, err = vm.executor(goja.Undefined(), vm.runtime.ToValue(args), vm.runtime.ToValue(p.Code))

@@ -11,7 +11,7 @@ import (
 )
 
 // vmContextKey the VM current context
-const vmContextKey = "__ctx__"
+var vmContextKey = goja.NewSymbol("__ctx__")
 
 // Throw js exception
 func Throw(vm *goja.Runtime, err error) {
@@ -78,7 +78,7 @@ func Unwrap(value goja.Value) (any, error) {
 // VMContext returns the current context of the goja.Runtime
 func VMContext(runtime *goja.Runtime) context.Context {
 	ctx := context.Background()
-	if v := runtime.Get(vmContextKey); v != nil {
+	if v := runtime.GlobalObject().GetSymbol(vmContextKey); v != nil {
 		if c, ok := v.Export().(context.Context); ok {
 			ctx = c
 		}

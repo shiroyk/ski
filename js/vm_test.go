@@ -52,9 +52,13 @@ func TestVMRunContext(t *testing.T) {
 	vm := NewVM()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	v, err := vm.RunString(ctx, vmContextKey)
+	_ = vm.Runtime().Set("testContext", func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+		return vm.ToValue(VMContext(vm))
+	})
+	v, err := vm.RunString(ctx, "testContext()")
 	assert.NoError(t, err)
 	assert.Equal(t, ctx, v.Export())
+	assert.Equal(t, context.Background(), VMContext(vm.Runtime()))
 }
 
 func NewTestVM(t *testing.T) VM {
