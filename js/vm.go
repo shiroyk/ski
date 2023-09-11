@@ -42,7 +42,7 @@ func NewVM(modulePath ...string) VM {
 	EnableConsole(runtime)
 
 	// TODO: any better way?
-	eval := `((ctx, code)=>function(){with(this){return eval(code)}}.call(ctx))`
+	eval := `(function(ctx, code){with(ctx){return eval(code)}})`
 	program := goja.MustCompile("eval", eval, false)
 	callable, err := runtime.RunProgram(program)
 	if err != nil {
