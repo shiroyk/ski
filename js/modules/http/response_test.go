@@ -89,7 +89,7 @@ func TestAsyncResponse(t *testing.T) {
 	testCase := []string{
 		`(async () => {
 			const res = await fetch(url+'/chunked');
-			const reader = res.body.getReader();
+			const reader = res.body.getReader({ mode: "byob" });
 			const chunks = [];
 			let size = 0;
 			const read = async () => {

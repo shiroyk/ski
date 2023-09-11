@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -45,19 +46,19 @@ func (*AbortControllerConstructor) Global() {}
 type AbortSignal struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
+	once    sync.Once
 	Aborted bool
 	Reason  string
 }
 
 func (s *AbortSignal) abort() {
-	if s.Aborted {
-		return
-	}
-	s.Aborted = true
-	s.cancel()
-	if err := s.ctx.Err(); err != nil {
-		s.Reason = err.Error()
-	}
+	s.once.Do(func() {
+		s.Aborted = true
+		s.cancel()
+		if err := s.ctx.Err(); err != nil {
+			s.Reason = err.Error()
+		}
+	})
 }
 
 type AbortSignalModule struct{}
