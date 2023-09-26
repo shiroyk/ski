@@ -6,7 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/dlclark/regexp2 v1.10.0
-	github.com/dop251/goja v0.0.0-20230828202809-3dbe69dd2b8e
+	github.com/dop251/goja v0.0.0-20230919151941-fc55792775de
 	github.com/ohler55/ojg v1.19.3
 	github.com/shiroyk/cloudcat/plugin v0.4.0
 	github.com/spf13/cast v1.5.1
@@ -23,7 +23,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/pprof v0.0.0-20230912144702-c363fe2c2ed8 // indirect
+	github.com/google/pprof v0.0.0-20230926050212-f7f687d19a98 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 )
