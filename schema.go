@@ -208,6 +208,17 @@ func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
 		case "rule":
 			schema.Rule, err = actionDecode(value)
 		case "properties":
+			if len(value.Content) == 2 {
+				schema.Properties = make(Property, 2)
+				k, v := value.Content[0], value.Content[1]
+				if k.Kind == yaml.MappingNode {
+					schema.Properties["$key"], err = buildSchema(k)
+					schema.Properties["$value"], err = buildSchema(v)
+					return
+				}
+				schema.Properties[k.Value], err = buildSchema(v)
+				return
+			}
 			schema.Properties = make(Property, len(value.Content)/2)
 			for j := 0; j < len(value.Content); j += 2 {
 				k, v := value.Content[j], value.Content[j+1]
@@ -307,7 +318,7 @@ func (s *Steps) UnmarshalYAML(value *yaml.Node) error {
 			if v.Kind == yaml.AliasNode {
 				v = v.Alias
 			}
-			if k.Kind != yaml.ScalarNode && v.Kind != yaml.ScalarNode {
+			if k.Kind != yaml.ScalarNode || v.Kind != yaml.ScalarNode {
 				return ErrInvalidStep
 			}
 			*s = append(*s, Step{k.Value, v.Value})

@@ -85,6 +85,11 @@ func TestSchemaYaml(t *testing.T) {
 		},
 		{
 			`
+!integer { p: foo }`, NewSchema(IntegerType).
+				SetRule(NewSteps("p", "foo")),
+		},
+		{
+			`
 type: integer
 rule: { p: foo }`, NewSchema(IntegerType).
 				SetRule(NewSteps("p", "foo")),
@@ -154,6 +159,40 @@ properties:
 				SetInit(NewSteps("p", "foo")).
 				AddProperty("context", *NewSchema(NumberType).
 					SetRule(NewSteps("p", "foo"))),
+		},
+		{
+			`
+type: object
+properties:
+  ? p: foo
+  : p: bar`, NewSchema(ObjectType).
+				AddProperty("$key", *NewSchema(StringType).
+					SetRule(NewSteps("p", "foo"))).
+				AddProperty("$value", *NewSchema(StringType).
+					SetRule(NewSteps("p", "bar"))),
+		},
+		{
+			`
+type: object
+properties:
+  ? p: foo
+  : type: integer
+    rule: { p: bar }`, NewSchema(ObjectType).
+				AddProperty("$key", *NewSchema(StringType).
+					SetRule(NewSteps("p", "foo"))).
+				AddProperty("$value", *NewSchema(IntegerType).
+					SetRule(NewSteps("p", "bar"))),
+		},
+		{
+			`
+type: object
+properties:
+  $key: { p: foo }
+  $value: { p: bar }`, NewSchema(ObjectType).
+				AddProperty("$key", *NewSchema(StringType).
+					SetRule(NewSteps("p", "foo"))).
+				AddProperty("$value", *NewSchema(StringType).
+					SetRule(NewSteps("p", "bar"))),
 		},
 		{
 			`

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/shiroyk/cloudcat/plugin"
@@ -14,12 +15,15 @@ import (
 
 type analyzerParser struct{}
 
-func (analyzerParser) GetString(_ *plugin.Context, _ any, a string) (string, error) {
+func (analyzerParser) GetString(_ *plugin.Context, c any, a string) (string, error) {
+	if s, ok := c.(string); ok && a == "$" {
+		return s, nil
+	}
 	return a, nil
 }
 
 func (analyzerParser) GetStrings(_ *plugin.Context, _ any, a string) ([]string, error) {
-	return []string{a}, nil
+	return strings.Split(a, ","), nil
 }
 
 func (p analyzerParser) GetElement(ctx *plugin.Context, c any, a string) (string, error) {
@@ -133,6 +137,40 @@ type: array
 format: number
 rule: { ap: "1" }
 `, `[1]`,
+		},
+		{
+			`
+type: object
+properties:
+ ? ap: 'k'
+ : ap: 'v'
+`, `{"k":"v"}`,
+		},
+		{
+			`
+type: object
+properties:
+ $key: { ap: 'k' }
+ $value: { ap: 'v' }
+`, `{"k":"v"}`,
+		},
+		{
+			`
+type: object
+init: { ap: "a,b,c,1,2,3" }
+properties:
+ ? ap: '$'
+ : ap: '$'
+`, `{"1":"1", "2":"2", "3":"3", "a":"a", "b":"b", "c":"c"}`,
+		},
+		{
+			`
+type: object
+init: { ap: "a,b,c,1,2,3" }
+properties:
+ $key: { ap: '$' }
+ $value: { ap: '$' }
+`, `{"1":"1", "2":"2", "3":"3", "a":"a", "b":"b", "c":"c"}`,
 		},
 	}
 	for i, testCase := range testCases {

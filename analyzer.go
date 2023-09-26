@@ -121,11 +121,31 @@ func analyzeObject(
 	path string, // the path of properties
 ) (ret any) {
 	if s.Properties != nil {
-		element := analyzeInit(ctx, s, content, path)
+		var object map[string]any
+		ks, k := s.Properties["$key"]
+		vs, v := s.Properties["$value"]
+		if k && v {
+			elements := analyzeInit(ctx, s.Init, ArrayType, content, path)
+			if len(elements) == 0 {
+				return
+			}
+			object = make(map[string]any, len(elements))
+			for i, element := range elements {
+				key, err := GetString(ks.Rule, ctx, element)
+				ctx.Logger().Debug("parse", "path", fmt.Sprintf("%s.[%v].key", path, i), "result", key, attr)
+				if err != nil {
+					return nil
+				}
+				object[key] = analyze(ctx, &vs, element, fmt.Sprintf("%s.[%v].value", path, i))
+			}
+			return object
+		}
+
+		element := analyzeInit(ctx, s.Init, s.Type, content, path)
 		if len(element) == 0 {
 			return
 		}
-		object := make(map[string]any, len(s.Properties))
+		object = make(map[string]any, len(s.Properties))
 
 		for field, fieldSchema := range s.Properties {
 			object[field] = analyze(ctx, &fieldSchema, element[0], path+"."+field) //nolint:gosec
@@ -149,7 +169,7 @@ func analyzeArray(
 	path string, // the path of properties
 ) any {
 	if s.Properties != nil {
-		elements := analyzeInit(ctx, s, content, path)
+		elements := analyzeInit(ctx, s.Init, s.Type, content, path)
 		array := make([]any, len(elements))
 
 		for i, item := range elements {
@@ -168,11 +188,12 @@ func analyzeArray(
 // analyzeInit get elements
 func analyzeInit(
 	ctx *plugin.Context,
-	s *Schema,
+	init Action,
+	typ Type,
 	content any,
 	path string, // the path of properties
 ) (ret []string) {
-	if s.Init == nil {
+	if init == nil {
 		switch data := content.(type) {
 		case []string:
 			return data
@@ -185,8 +206,8 @@ func analyzeInit(
 		}
 	}
 
-	if s.Type == ArrayType {
-		elements, err := GetElements(s.Init, ctx, content)
+	if typ == ArrayType {
+		elements, err := GetElements(init, ctx, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
 			return
@@ -195,7 +216,7 @@ func analyzeInit(
 		return elements
 	}
 
-	element, err := GetElement(s.Init, ctx, content)
+	element, err := GetElement(init, ctx, content)
 	if err != nil {
 		ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
 		return
