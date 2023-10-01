@@ -74,6 +74,12 @@ func TestBuildInFuncHref(t *testing.T) {
 
 	assertGetString(t, `.body ul #a4 a -> href`, "https://localhost/home")
 
+	assertGetString(t, `.body ul #a4 a -> href(path)`, "https://localhost/path/home")
+
+	assertGetString(t, `.body ul #a4 a -> href(path/)`, "https://localhost/path/home")
+
+	assertGetString(t, `.body ul #a4 a -> href(/path/)`, "https://localhost/path/home")
+
 	_, err := gq.GetString(ctx, content, `#main #n1 -> href`)
 	assert.Error(t, err)
 }

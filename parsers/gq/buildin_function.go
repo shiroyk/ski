@@ -161,11 +161,19 @@ func Attr(_ *plugin.Context, content any, args ...string) (any, error) {
 }
 
 // Href gets the href attribute's value, if URL is not absolute returns the absolute URL.
-func Href(ctx *plugin.Context, content any, _ ...string) (any, error) {
+func Href(ctx *plugin.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
+		var path string
 		href, exists := node.Attr("href")
 		if !exists {
 			return nil, errors.New("href attribute's value is not exist")
+		}
+		if len(args) > 0 {
+			path = args[0]
+			if !strings.HasSuffix(path, "/") {
+				path = path + "/"
+			}
+			href = strings.TrimPrefix(href, "/")
 		}
 		hrefURL, err := url.Parse(href)
 		if err != nil {
@@ -176,7 +184,7 @@ func Href(ctx *plugin.Context, content any, _ ...string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return baseURL.ResolveReference(hrefURL).String(), nil
+		return baseURL.JoinPath(path).ResolveReference(hrefURL).String(), nil
 	}
 
 	return nil, fmt.Errorf("unexpected content type %T", content)
