@@ -7,7 +7,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/dop251/goja v0.0.0-20230919151941-fc55792775de
-	github.com/ohler55/ojg v1.19.4
+	github.com/ohler55/ojg v1.20.1
 	github.com/shiroyk/cloudcat/plugin v0.4.0
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
