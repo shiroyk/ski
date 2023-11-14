@@ -12,11 +12,11 @@ func TestBuildInFuncGet(t *testing.T) {
 		t.Error("Unexpected function error")
 	}
 
-	if _, err := gq.GetString(ctx, content, `.body #a1 -> set(v1)`); err != nil {
+	if _, err := gq.GetString(ctx, content, `.body #a1 -> set(key111)`); err != nil {
 		t.Error(err)
 	}
 
-	assertGetString(t, `-> get(v1) -> child`, "Google")
+	assertGetString(t, `-> get(key111) -> child`, "Google")
 }
 
 func TestBuildInFuncSet(t *testing.T) {
@@ -29,7 +29,7 @@ func TestBuildInFuncSet(t *testing.T) {
 		t.Error(err)
 	}
 
-	if _, err := gq.GetString(ctx, content, `.body #a1 -> text -> set(v1)`); err != nil {
+	if _, err := gq.GetString(ctx, content, `.body #a1 -> text -> set(key222)`); err != nil {
 		t.Error(err)
 	}
 }
