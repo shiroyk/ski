@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/spf13/cast"
 )
 
@@ -19,6 +20,10 @@ var cacheTimeoutKey struct{}
 
 // WithCacheTimeout returns the context with the cache timeout.
 func WithCacheTimeout(ctx context.Context, timeout time.Duration) context.Context {
+	if c, ok := ctx.(*plugin.Context); ok {
+		c.SetValue(&cacheTimeoutKey, timeout)
+		return ctx
+	}
 	return context.WithValue(ctx, &cacheTimeoutKey, timeout)
 }
 
