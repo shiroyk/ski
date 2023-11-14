@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/dop251/goja"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 // console implements the js console

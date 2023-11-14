@@ -3,11 +3,10 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slog"
 )
 
 const (

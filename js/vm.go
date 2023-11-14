@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"runtime/debug"
 
+	"log/slog"
+
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/plugin"
-	"golang.org/x/exp/slog"
 )
 
 var errInitExecutor = errors.New("initializing JavaScript VM executor failed")

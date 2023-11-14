@@ -3,15 +3,16 @@
 package plugin
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"plugin"
 )
 
-func LoadPlugin(dir string) []error {
+func LoadPlugin(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return []error{err}
+		return err
 	}
 	loadErr := make([]error, 0)
 	for _, entry := range entries {
@@ -23,5 +24,5 @@ func LoadPlugin(dir string) []error {
 			loadErr = append(loadErr, err)
 		}
 	}
-	return loadErr
+	return errors.Join(loadErr...)
 }

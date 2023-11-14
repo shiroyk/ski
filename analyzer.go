@@ -3,13 +3,13 @@ package cloudcat
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"runtime/debug"
 	"strings"
 	"sync/atomic"
 
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/spf13/cast"
-	"golang.org/x/exp/slog"
 )
 
 var attr = slog.String("type", "analyze")

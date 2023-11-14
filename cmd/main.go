@@ -13,12 +13,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"log/slog"
+
 	"github.com/shiroyk/cloudcat"
 	"github.com/shiroyk/cloudcat/js"
 	_ "github.com/shiroyk/cloudcat/js/modules"
 	_ "github.com/shiroyk/cloudcat/parsers"
 	"github.com/shiroyk/cloudcat/plugin"
-	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
 
@@ -212,9 +213,9 @@ func main() {
 		if err != nil {
 			return
 		}
-		errs := plugin.LoadPlugin(pluginPath)
-		if len(errs) > 0 {
-			panic(fmt.Sprintf("load external plugin fail %v", errs))
+		err = plugin.LoadPlugin(pluginPath)
+		if err != nil {
+			panic(fmt.Sprintf("load external plugin fail %v", err))
 		}
 	}
 

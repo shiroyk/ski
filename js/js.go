@@ -9,9 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"log/slog"
+
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat"
-	"golang.org/x/exp/slog"
 )
 
 const (

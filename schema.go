@@ -3,11 +3,11 @@ package cloudcat
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
-	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 )
 

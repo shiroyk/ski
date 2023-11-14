@@ -3,7 +3,7 @@
 package plugin
 
 import (
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 func LoadPlugin(dir string) []error {

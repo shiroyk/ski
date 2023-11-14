@@ -2,11 +2,11 @@ package js
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
-	"golang.org/x/exp/slog"
 )
 
 var attr = slog.String("type", "js")

@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	"github.com/shiroyk/cloudcat"
 	"github.com/shiroyk/cloudcat/js"
 	"github.com/spf13/cast"
-	"golang.org/x/exp/maps"
 )
 
 // The URLSearchParams defines utility methods to work with the query string of a URL,
@@ -61,7 +61,7 @@ func (u *URLSearchParams) encode() string {
 		return ""
 	}
 	var buf strings.Builder
-	keys := maps.Keys(u.data)
+	keys := cloudcat.MapKeys(u.data)
 	sort.Strings(keys)
 	for _, k := range keys {
 		vs := u.data[k]
@@ -144,7 +144,7 @@ func (u *URLSearchParams) Has(name string) bool {
 // Keys method of the URLSearchParams interface returns an iterator allowing iteration
 // through all keys contained in this object. The keys are string objects.
 func (u *URLSearchParams) Keys() []string {
-	return maps.Keys(u.data)
+	return cloudcat.MapKeys(u.data)
 }
 
 // Set method of the URLSearchParams interface sets the value associated
@@ -168,5 +168,5 @@ func (u *URLSearchParams) ToString() string {
 // Values method of the URLSearchParams interface returns an iterator allowing iteration through
 // all values contained in this object. The values are string objects.
 func (u *URLSearchParams) Values() [][]string {
-	return maps.Values(u.data)
+	return cloudcat.MapValues(u.data)
 }

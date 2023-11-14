@@ -6,7 +6,7 @@ import (
 
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 type testParser struct{}

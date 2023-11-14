@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
+	"github.com/shiroyk/cloudcat"
 	"github.com/shiroyk/cloudcat/js"
-	"golang.org/x/exp/maps"
 )
 
 // FileData wraps the file data and filename
@@ -146,9 +146,7 @@ func (f *FormData) Has(name string) bool {
 
 // Keys method returns an iterator which iterates through all keys contained in the FormData.
 // The keys are strings.
-func (f *FormData) Keys() any {
-	return maps.Keys(f.data)
-}
+func (f *FormData) Keys() any { return cloudcat.MapKeys(f.data) }
 
 // Set method of the FormData interface sets a new value for an existing key inside a FormData object,
 // or adds the key/value if it does not already exist.
@@ -171,6 +169,4 @@ func (f *FormData) Set(name string, value any, filename string) {
 }
 
 // Values method returns an iterator which iterates through all values contained in the FormData.
-func (f *FormData) Values() any {
-	return maps.Values(f.data)
-}
+func (f *FormData) Values() any { return cloudcat.MapValues(f.data) }
