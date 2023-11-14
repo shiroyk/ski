@@ -16,7 +16,7 @@ type Fetch interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-var requestProxyKey int
+var requestProxyKey struct{}
 
 // WithProxyURL returns a copy of parent context in which the proxy associated with context.
 func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {

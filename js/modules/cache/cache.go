@@ -29,8 +29,7 @@ type Cache struct {
 
 // Get returns string.
 func (c *Cache) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	opt := cloudcat.CacheOptions{Context: js.VMContext(vm)}
-	if bytes, ok := c.cache.Get(call.Argument(0).String(), opt); ok {
+	if bytes, ok := c.cache.Get(js.VMContext(vm), call.Argument(0).String()); ok {
 		return vm.ToValue(string(bytes))
 	}
 	return goja.Undefined()
@@ -38,8 +37,7 @@ func (c *Cache) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 
 // GetBytes returns ArrayBuffer.
 func (c *Cache) GetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	opt := cloudcat.CacheOptions{Context: js.VMContext(vm)}
-	if bytes, ok := c.cache.Get(call.Argument(0).String(), opt); ok {
+	if bytes, ok := c.cache.Get(js.VMContext(vm), call.Argument(0).String()); ok {
 		return vm.ToValue(vm.NewArrayBuffer(bytes))
 	}
 	return goja.Undefined()
@@ -47,31 +45,29 @@ func (c *Cache) GetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 
 // Set saves string to the cache with key.
 func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	var timeout time.Duration
+	ctx := js.VMContext(vm)
 	if !goja.IsUndefined(call.Argument(2)) {
-		var err error
-		timeout, err = time.ParseDuration(call.Argument(2).String())
+		timeout, err := time.ParseDuration(call.Argument(2).String())
 		if err != nil {
 			js.Throw(vm, err)
 		}
+		ctx = cloudcat.WithCacheTimeout(ctx, timeout)
 	}
 
-	opt := cloudcat.CacheOptions{Timeout: timeout, Context: js.VMContext(vm)}
-
-	c.cache.Set(call.Argument(0).String(), []byte(call.Argument(1).String()), opt)
+	c.cache.Set(ctx, call.Argument(0).String(), []byte(call.Argument(1).String()))
 
 	return goja.Undefined()
 }
 
 // SetBytes saves ArrayBuffer to the cache with key.
 func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	var timeout time.Duration
+	ctx := js.VMContext(vm)
 	if !goja.IsUndefined(call.Argument(2)) {
-		var err error
-		timeout, err = time.ParseDuration(call.Argument(2).String())
+		timeout, err := time.ParseDuration(call.Argument(2).String())
 		if err != nil {
 			js.Throw(vm, err)
 		}
+		ctx = cloudcat.WithCacheTimeout(ctx, timeout)
 	}
 
 	value, err := js.ToBytes(call.Argument(1).Export())
@@ -79,16 +75,13 @@ func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 		js.Throw(vm, err)
 	}
 
-	opt := cloudcat.CacheOptions{Timeout: timeout, Context: js.VMContext(vm)}
-
-	c.cache.Set(call.Argument(0).String(), value, opt)
+	c.cache.Set(ctx, call.Argument(0).String(), value)
 
 	return goja.Undefined()
 }
 
 // Del removes key from the cache.
 func (c *Cache) Del(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	opt := cloudcat.CacheOptions{Context: js.VMContext(vm)}
-	c.cache.Del(call.Argument(0).String(), opt)
+	c.cache.Del(js.VMContext(vm), call.Argument(0).String())
 	return goja.Undefined()
 }
