@@ -34,13 +34,12 @@ var (
 
 // EnableRequire set runtime require module
 func EnableRequire(vm *goja.Runtime, path ...string) {
-	fetch, _ := cloudcat.Resolve[cloudcat.Fetch]()
 	req := &require{
 		vm:            vm,
 		modules:       make(map[string]*goja.Object),
 		nodeModules:   make(map[string]*goja.Object),
 		globalFolders: path,
-		fetch:         fetch,
+		fetch:         cloudcat.MustResolveLazy[cloudcat.Fetch](),
 	}
 
 	_ = vm.Set("require", req.Require)
@@ -50,7 +49,7 @@ type require struct {
 	vm          *goja.Runtime
 	modules     map[string]*goja.Object
 	nodeModules map[string]*goja.Object
-	fetch       cloudcat.Fetch
+	fetch       func() cloudcat.Fetch
 
 	globalFolders []string
 }
@@ -153,14 +152,11 @@ func (r *require) resolveRemote(name string) (module *goja.Object, err error) {
 }
 
 func (r *require) fetchFile(name string) ([]byte, error) {
-	if r.fetch == nil {
-		r.fetch = cloudcat.MustResolve[cloudcat.Fetch]()
-	}
 	req, err := http.NewRequest(http.MethodGet, name, nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := r.fetch.Do(req)
+	res, err := r.fetch().Do(req)
 	if err != nil {
 		return nil, err
 	}

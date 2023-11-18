@@ -45,7 +45,7 @@ func init() {
 type FetchModule struct{}
 
 func (*FetchModule) Exports() any {
-	f := cloudcat.MustResolve[cloudcat.Fetch]()
+	fetch := cloudcat.MustResolveLazy[cloudcat.Fetch]()
 	return func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 		req, signal := buildRequest(http.MethodGet, call, vm)
 		callback := js.NewEnqueueCallback(vm)
@@ -54,7 +54,7 @@ func (*FetchModule) Exports() any {
 			if signal != nil {
 				defer signal.abort() // release resources
 			}
-			res, err := f.Do(req)
+			res, err := fetch().Do(req)
 			callback(func() error {
 				if err != nil {
 					reject(err)

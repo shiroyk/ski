@@ -17,11 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func init() {
-	cloudcat.Provide[cloudcat.Fetch](&http.Client{Transport: &http.Transport{Proxy: cloudcat.ProxyFromRequest}})
-}
-
 func TestHttp(t *testing.T) {
+	cloudcat.Provide[cloudcat.Fetch](&http.Client{Transport: &http.Transport{Proxy: cloudcat.ProxyFromRequest}})
 	vm := createVM(t)
 	testCase := []string{
 		`assert.equal(http.get(url).text(), "");`,

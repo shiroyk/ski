@@ -43,11 +43,8 @@ func ProvideLazy[T any](initFunc func() (T, error)) bool {
 
 // ProvideNamed save the value for the name and return is it saved
 func ProvideNamed(name string, value any) (ok bool) {
-	if _, ok = diServices.Load(name); !ok {
-		diServices.Store(name, value)
-		return true
-	}
-	return
+	_, ok = diServices.LoadOrStore(name, value)
+	return !ok
 }
 
 // Override save the value and return is it override
@@ -62,14 +59,29 @@ func OverrideLazy[T any](initFunc func() (T, error)) bool {
 
 // OverrideNamed save the value for the name and return is it override
 func OverrideNamed(name string, value any) (ok bool) {
-	_, ok = diServices.Load(name)
-	diServices.Store(name, value)
-	return
+	_, ok = diServices.Swap(name, value)
+	return ok
 }
 
 // Resolve get the value, if not exist returns error
 func Resolve[T any]() (T, error) {
 	return ResolveNamed[T](getName[T]())
+}
+
+// ResolveLazy get the value lazy once, if not exist returns error
+func ResolveLazy[T any]() func() (T, error) {
+	var (
+		once  sync.Once
+		value T
+		err   error
+	)
+	g := func() {
+		value, err = Resolve[T]()
+	}
+	return func() (T, error) {
+		once.Do(g)
+		return value, err
+	}
 }
 
 // ResolveNamed get the value for the name if not exist returns error
@@ -94,6 +106,18 @@ func MustResolve[T any]() T {
 		panic(err)
 	}
 	return value
+}
+
+// MustResolveLazy get the value lazy once, if not exist create panic
+func MustResolveLazy[T any]() func() T {
+	g := ResolveLazy[T]()
+	return func() T {
+		value, err := g()
+		if err != nil {
+			panic(err)
+		}
+		return value
+	}
 }
 
 // MustResolveNamed get the value for the name, if not exist create panic
