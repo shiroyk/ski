@@ -90,13 +90,6 @@ type schedulerImpl struct {
 	modulePath                       []string
 }
 
-// Close the scheduler
-func (s *schedulerImpl) Close() error {
-	s.closed.Store(true)
-	close(s.vms)
-	return nil
-}
-
 // NewScheduler returns a new Scheduler
 func NewScheduler(opt Options) Scheduler {
 	scheduler := &schedulerImpl{
@@ -115,6 +108,13 @@ func NewScheduler(opt Options) Scheduler {
 	}
 	scheduler.unInitVMs.Store(int64(scheduler.maxVMs - scheduler.initVMs))
 	return scheduler
+}
+
+// Close the scheduler
+func (s *schedulerImpl) Close() error {
+	s.closed.Store(true)
+	close(s.vms)
+	return nil
 }
 
 // Get the VM

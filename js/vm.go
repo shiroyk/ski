@@ -5,9 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime/debug"
-
 	"log/slog"
+	"runtime/debug"
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/plugin"
@@ -124,9 +123,7 @@ func (vm *vmImpl) RunString(ctx context.Context, s string) (goja.Value, error) {
 }
 
 // Runtime the js runtime
-func (vm *vmImpl) Runtime() *goja.Runtime {
-	return vm.runtime
-}
+func (vm *vmImpl) Runtime() *goja.Runtime { return vm.runtime }
 
 // NewPromise returns the new promise with the async function.
 // must be called on the EventLoop.
@@ -137,17 +134,17 @@ func (vm *vmImpl) Runtime() *goja.Runtime {
 //		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 //		defer cancel()
 //
-//		goFunc := func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-//			return vm.ToValue(js.NewPromise(vm, func() (any, error) {
+//		goFunc := func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+//			return rt.ToValue(NewPromise(rt, func() (any, error) {
 //				time.Sleep(time.Second)
-//				return call.Argument(0).ToInteger() + call.Argument(1).ToInteger(), nil
+//				return max(call.Argument(0).ToInteger(), call.Argument(1).ToInteger()), nil
 //			}))
 //		}
-//		_ = vm.Runtime().Set("asyncAdd", goFunc)
+//		_ = vm.Runtime().Set("max", goFunc)
 //
 //		start := time.Now()
 //
-//		result, err := vm.RunString(ctx, `asyncAdd(1, 2)`)
+//		result, err := vm.RunString(ctx, `max(1, 2)`)
 //		if err != nil {
 //			panic(err)
 //		}

@@ -19,7 +19,7 @@ func (*Module) Exports() any {
 }
 
 func init() {
-	jsmodule.Register("cookie", &Module{})
+	jsmodule.Register("cookie", new(Module))
 }
 
 // Cookie manages storage and use of cookies in HTTP requests.

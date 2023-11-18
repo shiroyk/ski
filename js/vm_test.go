@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestVM(t *testing.T) {
+func TestVMRunString(t *testing.T) {
 	t.Parallel()
-	vm := NewVM()
+	vm := NewTestVM(t)
 
 	testCases := []struct {
 		script string
@@ -41,24 +42,67 @@ func TestVM(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 
-	_, err := NewVM().RunString(ctx, `while(true){}`)
+	_, err := NewTestVM(t).RunString(ctx, `while(true){}`)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
-func TestVMRunContext(t *testing.T) {
-	vm := NewVM()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+func TestVMRunWithContext(t *testing.T) {
+	t.Parallel()
+	{
+		vm := NewTestVM(t)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = vm.Runtime().Set("testContext", func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+			return vm.ToValue(VMContext(vm))
+		})
+		v, err := vm.RunString(ctx, "testContext()")
+		assert.NoError(t, err)
+		assert.Equal(t, ctx, v.Export())
+		assert.Equal(t, context.Background(), VMContext(vm.Runtime()))
+	}
+	{
+		vm := NewTestVM(t)
+		ctx := plugin.NewContext(plugin.ContextOptions{})
+		_ = vm.Runtime().Set("testContext", func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+			return vm.ToValue(VMContext(vm))
+		})
+		v, err := vm.RunString(ctx, "testContext()")
+		assert.NoError(t, err)
+		assert.Equal(t, ctx, v.Export())
+		assert.Equal(t, context.Background(), VMContext(vm.Runtime()))
+	}
+}
+
+func TestNewPromise(t *testing.T) {
+	t.Parallel()
+	vm := NewTestVM(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	_ = vm.Runtime().Set("testContext", func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-		return vm.ToValue(VMContext(vm))
-	})
-	v, err := vm.RunString(ctx, "testContext()")
-	assert.NoError(t, err)
-	assert.Equal(t, ctx, v.Export())
-	assert.Equal(t, context.Background(), VMContext(vm.Runtime()))
+
+	goFunc := func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+		return rt.ToValue(NewPromise(rt, func() (any, error) {
+			time.Sleep(time.Second)
+			return max(call.Argument(0).ToInteger(), call.Argument(1).ToInteger()), nil
+		}))
+	}
+	_ = vm.Runtime().Set("max", goFunc)
+
+	start := time.Now()
+
+	result, err := vm.RunString(ctx, `max(1, 2)`)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+	value, err := Unwrap(result)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+	assert.EqualValues(t, 2, value)
+	assert.EqualValues(t, 1, int(time.Now().Sub(start).Seconds()))
 }
 
 func NewTestVM(t *testing.T) VM {
@@ -96,32 +140,4 @@ func NewTestVM(t *testing.T) VM {
 	_ = vm.Runtime().Set("assert", assertObject)
 
 	return vm
-}
-
-func TestNewPromise(t *testing.T) {
-	vm := NewTestVM(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	goFunc := func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-		return vm.ToValue(NewPromise(vm, func() (any, error) {
-			time.Sleep(time.Second)
-			return call.Argument(0).ToInteger() + call.Argument(1).ToInteger(), nil
-		}))
-	}
-	_ = vm.Runtime().Set("asyncAdd", goFunc)
-
-	start := time.Now()
-
-	result, err := vm.RunString(ctx, `asyncAdd(1, 2)`)
-	if err != nil {
-		assert.NoError(t, err)
-	}
-	value, err := Unwrap(result)
-	if err != nil {
-		assert.NoError(t, err)
-	}
-	assert.EqualValues(t, 3, value)
-	assert.EqualValues(t, 1, int(time.Now().Sub(start).Seconds()))
 }

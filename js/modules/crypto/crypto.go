@@ -36,7 +36,7 @@ func (*Module) Exports() any {
 }
 
 func init() {
-	jsmodule.Register("crypto", &Module{})
+	jsmodule.Register("crypto", new(Module))
 }
 
 // Encoder the encoded

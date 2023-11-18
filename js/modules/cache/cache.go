@@ -19,7 +19,7 @@ func (*Module) Exports() any {
 }
 
 func init() {
-	jsmodule.Register("cache", &Module{})
+	jsmodule.Register("cache", new(Module))
 }
 
 // Cache interface is used to store string or bytes.

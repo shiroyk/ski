@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shiroyk/cloudcat"
 	"github.com/shiroyk/cloudcat/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,6 +17,7 @@ import (
 func TestResponse(t *testing.T) {
 	ctx := context.Background()
 	vm := modulestest.New(t)
+	cloudcat.Provide[cloudcat.Fetch](http.DefaultClient)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -62,6 +64,7 @@ func TestResponse(t *testing.T) {
 func TestAsyncResponse(t *testing.T) {
 	ctx := context.Background()
 	vm := modulestest.New(t)
+	cloudcat.Provide[cloudcat.Fetch](http.DefaultClient)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

@@ -21,7 +21,7 @@ func (*Module) Exports() any {
 }
 
 func init() {
-	jsmodule.Register("encoding", &Module{})
+	jsmodule.Register("encoding", new(Module))
 }
 
 // Base64 encoding and decoding
