@@ -6,7 +6,7 @@ go build -buildmode=plugin -o prefix.so
 ```
 ### Plugin usage
 ```shell
-cat << EOF | cloudcat --plugin $(pwd) run -s -
+cat << EOF | cloudcat -p $(pwd) run -s -
 cat.getString("prefix", "...", "test");
 EOF
 # "...test"
