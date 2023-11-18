@@ -11,7 +11,7 @@ import (
 func TestScheduler(t *testing.T) {
 	goroutineNum := 15
 	blockNum := 4
-	SetOptions(Options{InitialVMs: 2, MaxVMs: 4})
+	SetScheduler(NewScheduler(Options{InitialVMs: 2, MaxVMs: 4}))
 	wg := new(sync.WaitGroup)
 
 	for i := 1; i <= goroutineNum; i++ {
