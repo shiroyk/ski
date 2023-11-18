@@ -9,34 +9,34 @@ import (
 	"github.com/shiroyk/cloudcat/plugin/parser"
 )
 
-var attr = slog.String("type", "js")
+var attr = slog.String("source", "js")
 
-// Cat an analyzer context
-type Cat struct {
+// ctxWrapper an analyzer context
+type ctxWrapper struct {
 	ctx     *plugin.Context
 	BaseURL string
 	URL     string `js:"url"`
 }
 
-// NewCat returns a new Cat instance
-func NewCat(ctx *plugin.Context) *Cat {
-	return &Cat{ctx, ctx.BaseURL(), ctx.URL()}
+// NewCtxWrapper returns a new ctxWrapper instance
+func NewCtxWrapper(vm VM, ctx *plugin.Context) goja.Value {
+	return vm.Runtime().ToValue(&ctxWrapper{ctx, ctx.BaseURL(), ctx.URL()})
 }
 
 // Log print the msg to logger
-func (c *Cat) Log(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *ctxWrapper) Log(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	c.ctx.Logger().Info(Format(call, vm).String(), attr)
 	return goja.Undefined()
 }
 
 // GetVar returns the value associated with this context for key, or nil
 // if no value is associated with key.
-func (c *Cat) GetVar(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *ctxWrapper) GetVar(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return vm.ToValue(c.ctx.Value(call.Argument(0).String()))
 }
 
 // SetVar value associated with key is val.
-func (c *Cat) SetVar(key string, value goja.Value) error {
+func (c *ctxWrapper) SetVar(key string, value goja.Value) error {
 	v, err := Unwrap(value)
 	if err != nil {
 		return err
@@ -46,18 +46,18 @@ func (c *Cat) SetVar(key string, value goja.Value) error {
 }
 
 // ClearVar clean all values
-func (c *Cat) ClearVar() {
+func (c *ctxWrapper) ClearVar() {
 	c.ctx.ClearValue()
 }
 
 // Cancel this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this Context complete.
-func (c *Cat) Cancel() {
+func (c *ctxWrapper) Cancel() {
 	c.ctx.Cancel()
 }
 
 // GetString gets the string of the content with the given arguments
-func (c *Cat) GetString(key string, rule string, content any) (ret string, err error) {
+func (c *ctxWrapper) GetString(key string, rule string, content any) (ret string, err error) {
 	str, err := ToStrings(content)
 	if err != nil {
 		return
@@ -71,7 +71,7 @@ func (c *Cat) GetString(key string, rule string, content any) (ret string, err e
 }
 
 // GetStrings gets the string of the content with the given arguments
-func (c *Cat) GetStrings(key string, rule string, content any) (ret []string, err error) {
+func (c *ctxWrapper) GetStrings(key string, rule string, content any) (ret []string, err error) {
 	str, err := ToStrings(content)
 	if err != nil {
 		return
@@ -85,7 +85,7 @@ func (c *Cat) GetStrings(key string, rule string, content any) (ret []string, er
 }
 
 // GetElement gets the string of the content with the given arguments
-func (c *Cat) GetElement(key string, rule string, content any) (ret string, err error) {
+func (c *ctxWrapper) GetElement(key string, rule string, content any) (ret string, err error) {
 	str, err := ToStrings(content)
 	if err != nil {
 		return
@@ -99,7 +99,7 @@ func (c *Cat) GetElement(key string, rule string, content any) (ret string, err 
 }
 
 // GetElements gets the string of the content with the given arguments
-func (c *Cat) GetElements(key string, rule string, content any) (ret []string, err error) {
+func (c *ctxWrapper) GetElements(key string, rule string, content any) (ret []string, err error) {
 	str, err := ToStrings(content)
 	if err != nil {
 		return

@@ -2,11 +2,11 @@ package js
 
 import (
 	"fmt"
+	"log/slog"
 	"testing"
 
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
-	"log/slog"
 )
 
 type testParser struct{}
@@ -33,12 +33,12 @@ func (t *testParser) GetElements(ctx *plugin.Context, content any, arg string) (
 	return t.GetStrings(ctx, content, arg)
 }
 
-func TestCat(t *testing.T) {
+func TestCtxWrapper(t *testing.T) {
 	t.Parallel()
 	parser.Register("test", new(testParser))
 	ctx := plugin.NewContext(plugin.ContextOptions{
 		URL:    "http://localhost/home",
-		Logger: slog.Default().WithGroup("js"),
+		Logger: slog.Default(),
 	})
 	vm := NewTestVM(t)
 

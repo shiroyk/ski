@@ -105,7 +105,7 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 		args = make(map[string]any, 1)
 	}
 	if ctx, ok := ctx.(*plugin.Context); ok {
-		args["cat"] = NewCat(ctx)
+		args["cat"] = NewCtxWrapper(vm, ctx)
 	}
 	_ = vm.runtime.GlobalObject().SetSymbol(vmContextKey, ctx)
 
