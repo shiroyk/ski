@@ -84,11 +84,10 @@ func TestParser(t *testing.T) {
 		t.Fatal("schema not registered")
 	}
 
-	contents := []any{114514, `}{`}
+	contents := []any{`][`, `}{`}
 	for _, ct := range contents {
-		if _, err := json.GetString(ctx, ct, ``); err == nil {
-			t.Fatal("Unexpected type")
-		}
+		_, err := json.GetString(ctx, ct, ``)
+		assert.ErrorContains(t, err, "unexpected")
 	}
 
 	if _, err := json.GetString(ctx, &contents[len(contents)-1], ""); err == nil {

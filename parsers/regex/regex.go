@@ -9,6 +9,7 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
+	"github.com/spf13/cast"
 )
 
 // Parser the regexp2 parser
@@ -28,11 +29,20 @@ func (p Parser) GetString(_ *plugin.Context, content any, arg string) (string, e
 		return "", err
 	}
 
-	if str, ok := content.(string); ok {
-		return re.Replace(str, replace, start, count)
+	var str string
+	switch conv := content.(type) {
+	case string:
+		str = conv
+	case []string:
+		str = strings.Join(conv, "")
+	default:
+		str, err = cast.ToStringE(conv)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	return "", fmt.Errorf("unexpected content type %T", content)
+	return re.Replace(str, replace, start, count)
 }
 
 // GetStrings gets the strings of the content with the given arguments.
@@ -43,17 +53,26 @@ func (p Parser) GetStrings(_ *plugin.Context, content any, arg string) ([]string
 		return nil, err
 	}
 
-	if str, ok := content.([]string); ok {
-		for i := 0; i < len(str); i++ {
-			str[i], err = re.Replace(str[i], replace, start, count)
-			if err != nil {
-				return nil, err
-			}
+	var str []string
+	switch conv := content.(type) {
+	case string:
+		str = []string{conv}
+	case []string:
+		str = conv
+	default:
+		str, err = cast.ToStringSliceE(conv)
+		if err != nil {
+			return nil, err
 		}
-		return str, nil
 	}
 
-	return nil, fmt.Errorf("unexpected content type %T", content)
+	for i := 0; i < len(str); i++ {
+		str[i], err = re.Replace(str[i], replace, start, count)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return str, nil
 }
 
 // GetElement gets the element of the content with the given arguments.

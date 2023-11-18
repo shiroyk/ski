@@ -9,6 +9,7 @@ import (
 	"github.com/ohler55/ojg/oj"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
+	"github.com/spf13/cast"
 )
 
 // Parser the json parser
@@ -81,9 +82,15 @@ func getDoc(content any, arg string) ([]any, error) {
 	var doc any
 	switch data := content.(type) {
 	default:
-		return nil, fmt.Errorf("unexpected content type %T", content)
+		str, err := cast.ToStringE(content)
+		if err != nil {
+			return nil, err
+		}
+		if doc, err = oj.ParseString(str); err != nil {
+			return nil, err
+		}
 	case nil:
-		return []any{}, nil
+		return nil, nil
 	case []string:
 		if len(data) == 0 {
 			return nil, fmt.Errorf("unexpected content %s", content)

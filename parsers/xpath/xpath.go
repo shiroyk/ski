@@ -2,12 +2,12 @@
 package xpath
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/antchfx/htmlquery"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
+	"github.com/spf13/cast"
 	"golang.org/x/net/html"
 )
 
@@ -117,7 +117,16 @@ func getHTMLNode(content any, arg string) ([]*html.Node, error) {
 	var node *html.Node
 	switch data := content.(type) {
 	default:
-		return nil, fmt.Errorf("unexpected content type %T", data)
+		str, err := cast.ToStringE(content)
+		if err != nil {
+			return nil, err
+		}
+		node, err = html.Parse(strings.NewReader(str))
+		if err != nil {
+			return nil, err
+		}
+	case nil:
+		return nil, nil
 	case []string:
 		node, err = html.Parse(strings.NewReader(strings.Join(data, "\n")))
 		if err != nil {

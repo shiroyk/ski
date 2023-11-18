@@ -6,10 +6,11 @@ import (
 	"os"
 	"testing"
 
+	"log/slog"
+
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
-	"log/slog"
 )
 
 var (
@@ -109,26 +110,21 @@ func TestParser(t *testing.T) {
 		t.Fatal("schema not registered")
 	}
 
-	if _, err := gq.GetString(ctx, 0, ``); err == nil {
-		t.Fatal("expected empty error")
-	}
+	_, err := gq.GetString(ctx, 0x11, `0x11`)
+	assert.NoError(t, err)
 
-	if _, err := gq.GetString(ctx, nil, ``); err != nil {
-		t.Fatal(err)
-	}
+	_, err = gq.GetString(ctx, nil, ``)
+	assert.NoError(t, err)
 
-	if _, err := gq.GetString(ctx, []string{"<br>"}, ``); err != nil {
-		t.Fatal(err)
-	}
+	_, err = gq.GetString(ctx, []string{"<br>"}, ``)
+	assert.NoError(t, err)
 
-	if _, err := gq.GetString(ctx, `<a href="https://go.dev" title="Golang page">Golang</a>`, ``); err != nil {
-		t.Fatal(err)
-	}
+	_, err = gq.GetString(ctx, `<a href="https://go.dev" title="Golang page">Golang</a>`, ``)
+	assert.NoError(t, err)
 
 	sel, _ := gq.GetElement(ctx, content, `#main .row`)
-	if _, err := gq.GetString(ctx, sel, ``); err != nil {
-		t.Fatal(err)
-	}
+	_, err = gq.GetString(ctx, sel, ``)
+	assert.NoError(t, err)
 }
 
 func TestGetString(t *testing.T) {
@@ -173,7 +169,7 @@ func TestExternalFunc(t *testing.T) {
 				return content, nil
 			}
 		}
-		p := NewGoQueryParser(FuncMap{"logger": fun(slog.Default())})
+		p := NewParser(FuncMap{"logger": fun(slog.Default())})
 		_, err := p.GetString(ctx, content, ".body ul a -> logger -> text")
 		assert.NoError(t, err)
 	}
@@ -182,7 +178,7 @@ func TestExternalFunc(t *testing.T) {
 		fun := func(_ *plugin.Context, content any, args ...string) (any, error) {
 			return nil, nil
 		}
-		p := NewGoQueryParser(FuncMap{"nil": fun})
+		p := NewParser(FuncMap{"nil": fun})
 		_, err := p.GetString(ctx, content, ".body ul a -> nil -> text")
 		assert.NoError(t, err)
 		_, err = p.GetStrings(ctx, content, ".body ul a -> nil -> text")

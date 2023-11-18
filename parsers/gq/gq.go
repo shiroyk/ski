@@ -2,7 +2,6 @@
 package gq
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -19,8 +18,8 @@ type Parser struct {
 	parseFuncs FuncMap
 }
 
-// NewGoQueryParser creates a new goquery Parser with the given FuncMap.
-func NewGoQueryParser(funcs FuncMap) parser.Parser {
+// NewParser creates a new goquery Parser with the given FuncMap.
+func NewParser(funcs FuncMap) parser.Parser {
 	p := &Parser{parseFuncs: builtins()}
 	for k, v := range funcs {
 		p.parseFuncs[k] = v
@@ -175,9 +174,17 @@ func (p *Parser) GetElements(ctx *plugin.Context, content any, arg string) (ret 
 func getSelection(content any) (*goquery.Selection, error) {
 	switch data := content.(type) {
 	default:
-		return nil, fmt.Errorf("unexpected content type %T", content)
+		str, err := cast.ToStringE(content)
+		if err != nil {
+			return nil, err
+		}
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(str))
+		if err != nil {
+			return nil, err
+		}
+		return doc.Selection, nil
 	case nil:
-		return &goquery.Selection{}, nil
+		return new(goquery.Selection), nil
 	case []string:
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(strings.Join(data, "\n")))
 		if err != nil {
