@@ -12,181 +12,216 @@ import (
 	"github.com/spf13/cast"
 )
 
-var attr = slog.String("type", "analyze")
+var attr = slog.String("source", "analyze")
 
-var formatter atomic.Value
+var defaultAnalyzer atomic.Value
 
 func init() {
-	formatter.Store(new(defaultFormatHandler))
+	defaultAnalyzer.Store(NewAnalyzer(new(defaultFormatHandler), true))
 }
 
-// SetFormatter set the formatter
-func SetFormatter(formatHandler FormatHandler) {
-	formatter.Store(formatHandler)
+// SetAnalyzer sets the default Analyzer
+func SetAnalyzer(analyzer Analyzer) {
+	defaultAnalyzer.Store(analyzer)
 }
 
-// GetFormatter get the formatter
-func GetFormatter() FormatHandler {
-	return formatter.Load().(FormatHandler)
+// Analyze a Schema with default Analyzer, returns the result.
+func Analyze(ctx *plugin.Context, schema *Schema, content string) any {
+	return defaultAnalyzer.Load().(Analyzer).Analyze(ctx, schema, content)
 }
 
-// Analyze analyze a schema.Schema, returns the result
-func Analyze(ctx *plugin.Context, s *Schema, content string) any {
+// Analyzer the schema with content.
+type Analyzer interface {
+	// Analyze a Schema, returns the result.
+	Analyze(ctx *plugin.Context, schema *Schema, content string) any
+}
+
+// NewAnalyzer creates a new analyzer
+func NewAnalyzer(formatter FormatHandler, debug bool) Analyzer {
+	return &analyzer{formatter, debug}
+}
+
+type analyzer struct {
+	formatter FormatHandler
+	debug     bool
+}
+
+// Analyze a Schema, returns the result
+func (a *analyzer) Analyze(ctx *plugin.Context, schema *Schema, content string) any {
 	defer func() {
 		if r := recover(); r != nil {
 			ctx.Logger().Error(fmt.Sprintf("analyze error %s", r),
 				"stack", string(debug.Stack()), attr)
 		}
 	}()
-
-	return analyze(ctx, s, content, "$")
+	return a.analyze(ctx, schema, content, "$")
 }
 
 // analyze execute the corresponding to analyze by schema.Type
-func analyze(
+func (a *analyzer) analyze(
 	ctx *plugin.Context,
-	s *Schema,
+	schema *Schema,
 	content any,
 	path string, // the path of properties
 ) any {
-	switch s.Type {
+	switch schema.Type {
 	default:
 		return nil
 	case StringType, IntegerType, NumberType, BooleanType:
-		return analyzeString(ctx, s, content, path)
+		return a.string(ctx, schema, content, path)
 	case ObjectType:
-		return analyzeObject(ctx, s, content, path)
+		return a.object(ctx, schema, content, path)
 	case ArrayType:
-		return analyzeArray(ctx, s, content, path)
+		return a.array(ctx, schema, content, path)
 	}
 }
 
-// analyzeString get string or slice string and convert it to the specified type.
+// string get string or slice string and convert it to the specified type.
 // If the type is not schema.StringType then convert to the specified type.
 //
 //nolint:nakedret
-func analyzeString(
+func (a *analyzer) string(
 	ctx *plugin.Context,
-	s *Schema,
+	schema *Schema,
 	content any,
 	path string, // the path of properties
 ) (ret any) {
 	var err error
-	if s.Type == ArrayType { //nolint:nestif
-		ret, err = GetStrings(s.Rule, ctx, content)
+	if schema.Type == ArrayType { //nolint:nestif
+		ret, err = GetStrings(schema.Rule, ctx, content)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
+			ctx.Logger().Error(fmt.Sprintf("failed analyze %s", path), "error", err, attr)
 			return nil
 		}
-		ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
+		if a.debug {
+			ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
+		}
 	} else {
-		ret, err = GetString(s.Rule, ctx, content)
+		ret, err = GetString(schema.Rule, ctx, content)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyze %s failed", path), "error", err, attr)
+			ctx.Logger().Error(fmt.Sprintf("failed analyze %s", path), "error", err, attr)
 			return nil
 		}
-		ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
+		if a.debug {
+			ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
+		}
 
-		if s.Type != StringType {
-			ret, err = GetFormatter().Format(ret, s.Type)
+		if schema.Type != StringType {
+			ret, err = a.formatter.Format(ret, schema.Type)
 			if err != nil {
-				ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
-					path, ret, s.Type), "error", err, attr)
+				ctx.Logger().Error(fmt.Sprintf("failed format %s %v to %v",
+					path, ret, schema.Type), "error", err, attr)
 				return
 			}
-			ctx.Logger().Debug("format", "path", path, "result", ret, attr)
+			if a.debug {
+				ctx.Logger().Debug("format", "path", path, "result", ret, attr)
+			}
 		}
 	}
 
-	if s.Format != "" {
-		ret, err = GetFormatter().Format(ret, s.Format)
+	if schema.Format != "" {
+		ret, err = a.formatter.Format(ret, schema.Format)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("format %s failed %v to %v",
-				path, ret, s.Format), "error", err, attr)
+			ctx.Logger().Error(fmt.Sprintf("failed format %s %v to %v",
+				path, ret, schema.Format), "error", err, attr)
 			return
 		}
-		ctx.Logger().Debug("format", "path", path, "result", ret, attr)
+		if a.debug {
+			ctx.Logger().Debug("format", "path", path, "result", ret, attr)
+		}
 	}
 
 	return
 }
 
-// analyzeObject get object.
-// If properties is not empty, execute analyzeInit to get the object element then analyze properties.
-// If rule is not empty, execute analyzeString to get object.
-func analyzeObject(
+// object get object.
+// If properties is not empty, execute init to get the object element then analyze properties.
+// If rule is not empty, execute string to get object.
+func (a *analyzer) object(
 	ctx *plugin.Context,
-	s *Schema,
+	schema *Schema,
 	content any,
 	path string, // the path of properties
 ) (ret any) {
-	if s.Properties != nil {
+	if schema.Properties != nil {
 		var object map[string]any
-		ks, k := s.Properties["$key"]
-		vs, v := s.Properties["$value"]
+		ks, k := schema.Properties["$key"]
+		vs, v := schema.Properties["$value"]
 		if k && v {
-			elements := analyzeInit(ctx, s.Init, ArrayType, content, path)
+			elements := a.init(ctx, schema.Init, ArrayType, content, path)
 			if len(elements) == 0 {
 				return
 			}
 			object = make(map[string]any, len(elements))
 			for i, element := range elements {
 				key, err := GetString(ks.Rule, ctx, element)
-				ctx.Logger().Debug("parse", "path", fmt.Sprintf("%s.[%v].key", path, i), "result", key, attr)
+				keyPath := fmt.Sprintf("%s.[%v].value", path, i)
+				if a.debug {
+					ctx.Logger().Debug("parse", "path", keyPath, "result", key, attr)
+				}
 				if err != nil {
+					ctx.Logger().Error(fmt.Sprintf("failed to analyze key %v", keyPath), "error", err, attr)
 					return nil
 				}
-				object[key] = analyze(ctx, &vs, element, fmt.Sprintf("%s.[%v].value", path, i))
+				object[key] = a.analyze(ctx, &vs, element, keyPath)
 			}
 			return object
 		}
 
-		element := analyzeInit(ctx, s.Init, s.Type, content, path)
+		element := a.init(ctx, schema.Init, schema.Type, content, path)
 		if len(element) == 0 {
 			return
 		}
-		object = make(map[string]any, len(s.Properties))
+		object = make(map[string]any, len(schema.Properties))
 
-		for field, fieldSchema := range s.Properties {
-			object[field] = analyze(ctx, &fieldSchema, element[0], path+"."+field) //nolint:gosec
+		for field, fieldSchema := range schema.Properties {
+			object[field] = a.analyze(ctx, &fieldSchema, element[0], path+"."+field) //nolint:gosec
 		}
 
 		return object
-	} else if s.Rule != nil {
-		return analyzeString(ctx, s.CloneWithType(ObjectType), content, path)
+	} else if schema.Rule != nil {
+		return a.string(ctx, &Schema{
+			Type:   ObjectType,
+			Format: schema.Format,
+			Rule:   schema.Rule,
+		}, content, path)
 	}
 
 	return
 }
 
-// analyzeArray get array.
-// If properties is not empty, execute analyzeInit to get the slice of elements then analyze properties.
-// If rule is not empty, execute analyzeString to get array
-func analyzeArray(
+// array get array.
+// If properties is not empty, execute init to get the slice of elements then analyze properties.
+// If rule is not empty, execute string to get array
+func (a *analyzer) array(
 	ctx *plugin.Context,
 	s *Schema,
 	content any,
 	path string, // the path of properties
 ) any {
 	if s.Properties != nil {
-		elements := analyzeInit(ctx, s.Init, s.Type, content, path)
+		elements := a.init(ctx, s.Init, s.Type, content, path)
 		array := make([]any, len(elements))
 
 		for i, item := range elements {
 			newSchema := NewSchema(ObjectType).SetProperty(s.Properties)
-			array[i] = analyzeObject(ctx, newSchema, item, fmt.Sprintf("%s.[%v]", path, i))
+			array[i] = a.object(ctx, newSchema, item, fmt.Sprintf("%s.[%v]", path, i))
 		}
 
 		return array
 	} else if s.Rule != nil {
-		return analyzeString(ctx, s.CloneWithType(ArrayType), content, path)
+		return a.string(ctx, &Schema{
+			Type:   ArrayType,
+			Format: s.Format,
+			Rule:   s.Rule,
+		}, content, path)
 	}
 
 	return nil
 }
 
-// analyzeInit get elements
-func analyzeInit(
+// init get elements
+func (a *analyzer) init(
 	ctx *plugin.Context,
 	init Action,
 	typ Type,
@@ -200,7 +235,7 @@ func analyzeInit(
 		case string:
 			return []string{data}
 		default:
-			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path),
+			ctx.Logger().Error(fmt.Sprintf("failed analyze init %s", path),
 				"error", fmt.Errorf("unexpected content type %T", content), attr)
 			return
 		}
@@ -209,19 +244,23 @@ func analyzeInit(
 	if typ == ArrayType {
 		elements, err := GetElements(init, ctx, content)
 		if err != nil {
-			ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
+			ctx.Logger().Error(fmt.Sprintf("failed analyze init %s", path), "error", err, attr)
 			return
 		}
-		ctx.Logger().Debug("init", "path", path, "result", strings.Join(elements, "\n"), attr)
+		if a.debug {
+			ctx.Logger().Debug("init", "path", path, "result", strings.Join(elements, "\n"), attr)
+		}
 		return elements
 	}
 
 	element, err := GetElement(init, ctx, content)
 	if err != nil {
-		ctx.Logger().Error(fmt.Sprintf("analyze %s init failed", path), "error", err, attr)
+		ctx.Logger().Error(fmt.Sprintf("failed analyze init %s", path), "error", err, attr)
 		return
 	}
-	ctx.Logger().Debug("init", "path", path, "result", element)
+	if a.debug {
+		ctx.Logger().Debug("init", "path", path, "result", element, attr)
+	}
 	return []string{element}
 }
 
@@ -279,5 +318,5 @@ func (f defaultFormatHandler) Format(data any, format Type) (ret any, err error)
 		}
 		return maps, nil
 	}
-	return nil, fmt.Errorf("unable format type %T to %s", data, format)
+	return nil, fmt.Errorf("failed format type %T to %s", data, format)
 }

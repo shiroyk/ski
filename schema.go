@@ -14,8 +14,6 @@ import (
 var (
 	// ErrInvalidSchema invalid schema error
 	ErrInvalidSchema = errors.New("invalid schema")
-	// ErrAliasRecursive invalid alias error
-	ErrAliasRecursive = errors.New("alias can't be recursive")
 	// ErrInvalidAction invalid action error
 	ErrInvalidAction = errors.New("invalid action")
 	// ErrInvalidStep invalid step error
@@ -132,16 +130,6 @@ func (schema *Schema) SetInit(action Action) *Schema {
 func (schema *Schema) SetRule(action Action) *Schema {
 	schema.Rule = action
 	return schema
-}
-
-// CloneWithType returns a copy of Schema.
-// Schema.Format and Schema.Rule will be copied.
-func (schema *Schema) CloneWithType(typ Type) *Schema {
-	return &Schema{
-		Type:   typ,
-		Format: schema.Format,
-		Rule:   schema.Rule,
-	}
 }
 
 // UnmarshalYAML decodes the Schema from yaml
@@ -551,7 +539,7 @@ func runAction[T string | []string](
 				}
 				result, err = runFn(p)(ctx, result, step.V)
 				if err != nil {
-					return
+					return ret, fmt.Errorf("parser %s: %s", step.K, err)
 				}
 			}
 
