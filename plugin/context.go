@@ -16,29 +16,38 @@ const (
 
 // Context The Parser context
 type Context struct {
-	context.Context // set to non-nil by the first cancel call
+	context.Context                 // set to non-nil by the first cancel call
+	parent          context.Context // the parent context
 	cancelFunc      context.CancelFunc
-	opt             ContextOptions
+	logger          *slog.Logger
 	value           *sync.Map
 	baseURL, url    string
 }
 
 // ContextOptions The Context options
 type ContextOptions struct {
-	Parent  context.Context
-	Timeout time.Duration
-	Logger  *slog.Logger
-	URL     string
+	Parent  context.Context // the parent context
+	Timeout time.Duration   // the context timeout, default DefaultTimeout.
+	Logger  *slog.Logger    // the context logger, default slog.Default if nil.
+	Values  map[any]any     // the values
+	URL     string          // the analyzer URL
 }
 
 // NewContext creates a new Context with ContextOptions
 func NewContext(opt ContextOptions) *Context {
-	if opt.Logger == nil {
-		opt.Logger = slog.Default()
-	}
 	ctx := &Context{
-		value: new(sync.Map),
-		opt:   opt,
+		value:  new(sync.Map),
+		logger: opt.Logger,
+		parent: opt.Parent,
+	}
+	if ctx.logger == nil {
+		ctx.logger = slog.Default()
+	}
+	if ctx.parent == nil {
+		ctx.parent = context.Background()
+	}
+	for k, v := range opt.Values {
+		ctx.value.Store(k, v)
 	}
 	if opt.URL != "" {
 		ctx.url = opt.URL
@@ -47,15 +56,11 @@ func NewContext(opt ContextOptions) *Context {
 		}
 	}
 
-	parent := opt.Parent
-	if parent == nil {
-		parent = context.Background()
-	}
 	timeout := DefaultTimeout
 	if opt.Timeout > 0 {
 		timeout = opt.Timeout
 	}
-	ctx.Context, ctx.cancelFunc = context.WithTimeout(parent, timeout)
+	ctx.Context, ctx.cancelFunc = context.WithTimeout(ctx.parent, timeout)
 	return ctx
 }
 
@@ -79,10 +84,7 @@ func (c *Context) Value(key any) any {
 	if v, ok := c.value.Load(key); ok {
 		return v
 	}
-	if c.opt.Parent != nil {
-		return c.opt.Parent.Value(key)
-	}
-	return nil
+	return c.parent.Value(key)
 }
 
 // GetValue returns the value associated with this context for key, or nil
@@ -99,7 +101,7 @@ func (c *Context) SetValue(key any, value any) {
 
 // Logger returns the logger, if ContextOptions.Logger is nil return slog.Default
 func (c *Context) Logger() *slog.Logger {
-	return c.opt.Logger
+	return c.logger
 }
 
 // BaseURL returns the baseURL string

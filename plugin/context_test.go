@@ -11,12 +11,26 @@ import (
 
 func TestContext(t *testing.T) {
 	t.Parallel()
+	url := "https://example.com/some/path?offset=1"
+	baseURL := "https://example.com"
+	logger := slog.Default().With(slog.String("source", "ctx"))
 	ctx := NewContext(ContextOptions{
-		URL:     "http://localhost",
-		Logger:  slog.Default(),
-		Timeout: time.Second,
+		URL:     url,
+		Logger:  logger,
+		Timeout: time.Minute,
+		Values: map[any]any{
+			"key1": "value1",
+		},
 	})
 	defer ctx.Cancel()
+
+	assert.NotNil(t, ctx.Logger())
+	assert.Equal(t, ctx.Logger(), logger)
+	assert.Equal(t, ctx.URL(), url)
+	assert.Equal(t, ctx.BaseURL(), baseURL)
+	assert.Equal(t, ctx.Value("key1"), "value1")
+	assert.Nil(t, ctx.Value("notExists"))
+
 	if _, ok := ctx.Deadline(); !ok {
 		t.Error("deadline not set")
 	}
@@ -24,21 +38,13 @@ func TestContext(t *testing.T) {
 	value := "1"
 	ctx.SetValue(key, value)
 	if v, ok := ctx.GetValue(key); ok {
-		if v != value {
-			t.Errorf("want %v, got %v", value, v)
-		}
+		assert.Equalf(t, v, value, "want %v, got %v", value, v)
 	}
 	if v := ctx.Value(key); v != value {
 		t.Errorf("want %v, got %v", value, v)
 	}
 	ctx.ClearValue()
-	if _, ok := ctx.GetValue(key); ok {
-		t.Error("value not clear")
-	}
-
-	assert.NotNil(t, ctx.Logger())
-	assert.NotEmpty(t, ctx.BaseURL())
-	assert.NotEmpty(t, ctx.URL())
+	assert.Nil(t, ctx.Value(key), "values should be nil")
 
 	ctx.Cancel()
 	assert.ErrorIs(t, ctx.Err(), context.Canceled)

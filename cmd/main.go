@@ -213,9 +213,13 @@ func main() {
 		if err != nil {
 			return
 		}
-		err = plugin.LoadPlugin(pluginPath)
+		size, err := plugin.LoadPlugin(pluginPath)
 		if err != nil {
-			panic(fmt.Sprintf("load external plugin fail %v", err))
+			if size == 0 {
+				panic(fmt.Sprintf("failed to load external modules: %v", err))
+			} else {
+				slog.Warn(fmt.Sprintf("failed to load some external modules :%v", err))
+			}
 		}
 	}
 
