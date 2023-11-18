@@ -30,10 +30,13 @@ func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {
 	return context.WithValue(ctx, &requestProxyKey, proxy)
 }
 
-// ProxyFromRequest returns a proxy URL on request context.
-func ProxyFromRequest(req *http.Request) (*url.URL, error) {
-	if proxy := req.Context().Value(&requestProxyKey); proxy != nil {
+// ProxyFromContext returns a proxy URL on context.
+func ProxyFromContext(ctx context.Context) (*url.URL, error) {
+	if proxy := ctx.Value(&requestProxyKey); proxy != nil {
 		return proxy.(*url.URL), nil
 	}
 	return nil, nil
 }
+
+// ProxyFromRequest returns a proxy URL on request context.
+func ProxyFromRequest(req *http.Request) (*url.URL, error) { return ProxyFromContext(req.Context()) }
