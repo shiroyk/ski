@@ -175,32 +175,23 @@ func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *
 			value = call.Argument(0).ToObject(vm)
 		}
 
-		callback := js.NewEnqueueCallback(vm)
-		promise, resolve, reject := vm.NewPromise()
-		go func() {
-			n, err := body.Read(buffer)
-			callback(func() error {
+		return vm.ToValue(js.NewPromise(vm, func() (int, error) { return body.Read(buffer) },
+			func(n int, err error) (any, error) {
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						resolve(chunk{goja.Undefined(), true})
-						return nil
+						return chunk{goja.Undefined(), true}, nil
 					}
-					reject(err)
-				} else {
-					if !view {
-						buffer = buffer[:n]
-						value, err = vm.New(vm.Get("Uint8Array"), vm.ToValue(&buffer))
-						if err != nil {
-							js.Throw(vm, err)
-						}
-					}
-					resolve(chunk{value, false})
+					return nil, err
 				}
-				return nil
-			})
-		}()
-
-		return vm.ToValue(promise)
+				if !view {
+					buffer = buffer[:n]
+					value, err = vm.New(vm.Get("Uint8Array"), vm.ToValue(&buffer))
+					if err != nil {
+						js.Throw(vm, err)
+					}
+				}
+				return chunk{value, false}, nil
+			}))
 	})
 
 	_ = object.Set("releaseLock", func() { *lock = false })

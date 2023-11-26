@@ -135,7 +135,7 @@ func (vm *vmImpl) Runtime() *goja.Runtime { return vm.runtime }
 //		defer cancel()
 //
 //		goFunc := func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
-//			return rt.ToValue(NewPromise(rt, func() (any, error) {
+//			return rt.ToValue(js.NewPromise(rt, func() (any, error) {
 //				time.Sleep(time.Second)
 //				return max(call.Argument(0).ToInteger(), call.Argument(1).ToInteger()), nil
 //			}))
@@ -156,17 +156,25 @@ func (vm *vmImpl) Runtime() *goja.Runtime { return vm.runtime }
 //		fmt.Println(value)
 //		fmt.Println(time.Now().Sub(start))
 //	}
-func NewPromise(runtime *goja.Runtime, asyncFunc func() (any, error)) *goja.Promise {
+func NewPromise[T any](runtime *goja.Runtime, async func() (T, error), then ...func(T, error) (any, error)) *goja.Promise {
 	callback := NewEnqueueCallback(runtime)
 	promise, resolve, reject := runtime.NewPromise()
+	thenFun := func(r T, e error) (any, error) {
+		return r, e
+	}
+	if len(then) > 0 {
+		thenFun = then[0]
+	}
 
 	go func() {
-		result, err := asyncFunc()
+		result, err := async()
 		callback(func() error {
+			var value any = result
+			value, err = thenFun(result, err)
 			if err != nil {
 				reject(err)
 			} else {
-				resolve(result)
+				resolve(value)
 			}
 			return nil
 		})
