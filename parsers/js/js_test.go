@@ -32,7 +32,7 @@ func TestParser(t *testing.T) {
 
 func TestGetString(t *testing.T) {
 	{
-		str, err := jsParser.GetString(ctx, "a", `(async () => content + 1)()`)
+		str, err := jsParser.GetString(ctx, "a", `(async () => ctx.get('content') + 1)()`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,7 +54,7 @@ func TestGetStrings(t *testing.T) {
 	{
 		str, err := jsParser.GetStrings(ctx, `["a1"]`,
 			`new Promise((r, j) => {
-					let s = JSON.parse(content);
+					let s = JSON.parse(ctx.get('content'));
 					s.push('a2');
 					r(s)
 				});`)
@@ -76,7 +76,7 @@ func TestGetStrings(t *testing.T) {
 }
 
 func TestGetElement(t *testing.T) {
-	ele, err := jsParser.GetElement(ctx, ``, `cat.setVar('size', 1 + 2);cat.getVar('size');`)
+	ele, err := jsParser.GetElement(ctx, ``, `ctx.set('size', 1 + 2);ctx.get('size');`)
 	if err != nil {
 		t.Fatal(err)
 	}

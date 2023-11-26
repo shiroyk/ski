@@ -29,14 +29,14 @@ func (c *ctxWrapper) Log(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return goja.Undefined()
 }
 
-// GetVar returns the value associated with this context for key, or nil
+// Get returns the value associated with this context for key, or nil
 // if no value is associated with key.
-func (c *ctxWrapper) GetVar(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *ctxWrapper) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 	return vm.ToValue(c.ctx.Value(call.Argument(0).String()))
 }
 
-// SetVar value associated with key is val.
-func (c *ctxWrapper) SetVar(key string, value goja.Value) error {
+// Set value associated with key is val.
+func (c *ctxWrapper) Set(key string, value goja.Value) error {
 	v, err := Unwrap(value)
 	if err != nil {
 		return err

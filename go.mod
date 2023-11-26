@@ -27,4 +27,7 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 )
 
-replace github.com/shiroyk/cloudcat/plugin => ./plugin
+replace (
+	github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20231115172654-7aaf816c3720
+	github.com/shiroyk/cloudcat/plugin => ./plugin
+)

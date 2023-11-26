@@ -51,13 +51,13 @@ func RunString(ctx context.Context, script string) (goja.Value, error) {
 	return tr.RunString(ctx, script)
 }
 
-// Run the js program
-func Run(ctx context.Context, p Program) (goja.Value, error) {
+// RunModule the goja.CyclicModuleRecord
+func RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error) {
 	tr, err := GetScheduler().Get()
 	if err != nil {
 		return nil, err
 	}
-	return tr.Run(ctx, p)
+	return tr.RunModule(ctx, module)
 }
 
 // Scheduler the VM scheduler
@@ -76,7 +76,6 @@ type Options struct {
 	MaxVMs             int           `yaml:"max-vms"`
 	MaxRetriesGetVM    int           `yaml:"max-retries-get-vm"`
 	MaxTimeToWaitGetVM time.Duration `yaml:"max-time-to-wait-get-vm"`
-	ModulePath         []string      `yaml:"module-path"`
 }
 
 type schedulerImpl struct {
@@ -86,7 +85,6 @@ type schedulerImpl struct {
 	unInitVMs                        *atomic.Int64
 	closed                           *atomic.Bool
 	maxTimeToWaitGetVM               time.Duration
-	modulePath                       []string
 }
 
 // NewScheduler returns a new Scheduler
@@ -99,11 +97,10 @@ func NewScheduler(opt Options) Scheduler {
 		initVMs:            cloudcat.ZeroOr(opt.InitialVMs, 1),
 		maxRetriesGetVM:    cloudcat.ZeroOr(opt.MaxRetriesGetVM, DefaultMaxRetriesGetVM),
 		maxTimeToWaitGetVM: cloudcat.ZeroOr(opt.MaxTimeToWaitGetVM, DefaultMaxTimeToWaitGetVM),
-		modulePath:         opt.ModulePath,
 	}
 	scheduler.vms = make(chan VM, scheduler.maxVMs)
 	for i := 0; i < scheduler.initVMs; i++ {
-		scheduler.vms <- NewVM(scheduler.modulePath...)
+		scheduler.vms <- NewVM()
 	}
 	scheduler.unInitVMs.Store(int64(scheduler.maxVMs - scheduler.initVMs))
 	return scheduler
@@ -133,7 +130,7 @@ func (s *schedulerImpl) Get() (VM, error) {
 			return vm, nil
 		case <-timer.C:
 			if s.unInitVMs.Add(-1) >= 0 {
-				return NewVM(s.modulePath...), nil
+				return NewVM(), nil
 			}
 			s.unInitVMs.Add(1)
 			slog.Warn(fmt.Sprintf("could not get VM in %v", time.Duration(i)*s.maxTimeToWaitGetVM))

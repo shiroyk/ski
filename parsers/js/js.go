@@ -44,9 +44,8 @@ func (p *Parser) GetElements(ctx *plugin.Context, content any, arg string) ([]st
 }
 
 func getString(ctx *plugin.Context, content any, script string) (ret string, err error) {
-	result, err := js.Run(ctx, js.Program{Code: script, Args: map[string]any{
-		"content": content,
-	}})
+	ctx.SetValue("content", content)
+	result, err := js.RunString(ctx, script)
 	if err != nil {
 		return ret, err
 	}
@@ -71,9 +70,8 @@ func getString(ctx *plugin.Context, content any, script string) (ret string, err
 }
 
 func getStrings(ctx *plugin.Context, content any, script string) (ret []string, err error) {
-	result, err := js.Run(ctx, js.Program{Code: script, Args: map[string]any{
-		"content": content,
-	}})
+	ctx.SetValue("content", content)
+	result, err := js.RunString(ctx, script)
 	if err != nil {
 		return nil, err
 	}

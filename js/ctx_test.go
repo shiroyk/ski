@@ -43,17 +43,17 @@ func TestCtxWrapper(t *testing.T) {
 	vm := NewTestVM(t)
 
 	testCase := []string{
-		`cat.log('start test');`,
-		`assert.equal(cat.baseURL, "http://localhost");`,
-		`assert.equal(cat.url,"http://localhost/home");`,
-		`cat.setVar('v1', 114514);`,
-		`assert.equal(cat.getVar('v1'), 114514);`,
-		`cat.clearVar();
-		 assert.equal(cat.getVar('v1'), null);`,
-		`assert.equal(cat.getString('test', '1', 'foo'), 'foo1');`,
-		`assert.equal(cat.getStrings('test', '2', ['foo'])[1], '2');`,
-		`assert.equal(cat.getElement('test', '3', 'foo'), 'foo3');`,
-		`assert.equal(cat.getElements('test', '4', ['foo'])[1], '4');`,
+		`ctx.log('start test');`,
+		`assert.equal(ctx.baseURL, "http://localhost");`,
+		`assert.equal(ctx.url,"http://localhost/home");`,
+		`ctx.set('v1', 114514);`,
+		`assert.equal(ctx.get('v1'), 114514);`,
+		`ctx.clearVar();
+		 assert.equal(ctx.get('v1'), null);`,
+		`assert.equal(ctx.getString('test', '1', 'foo'), 'foo1');`,
+		`assert.equal(ctx.getStrings('test', '2', ['foo'])[1], '2');`,
+		`assert.equal(ctx.getElement('test', '3', 'foo'), 'foo3');`,
+		`assert.equal(ctx.getElements('test', '4', ['foo'])[1], '4');`,
 	}
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {

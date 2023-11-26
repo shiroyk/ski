@@ -9,6 +9,8 @@ import (
 	"runtime/debug"
 
 	"github.com/dop251/goja"
+	"github.com/shiroyk/cloudcat"
+	"github.com/shiroyk/cloudcat/js/loader"
 	"github.com/shiroyk/cloudcat/plugin"
 )
 
@@ -17,34 +19,34 @@ var errInitExecutor = errors.New("initializing JavaScript VM executor failed")
 // VM the js runtime.
 // An instance of VM can only be used by a single goroutine at a time.
 type VM interface {
-	// Run the js program
-	Run(context.Context, Program) (goja.Value, error)
-	// RunString the js string
-	RunString(context.Context, string) (goja.Value, error)
-	// Runtime the js runtime
+	// RunModule run the goja.CyclicModuleRecord.
+	// The module default export must be a function.
+	// To compile the module, goja.ParseModule("name", "module", resolver.ResolveModule)
+	RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error)
+	// RunString run the script string
+	RunString(ctx context.Context, src string) (goja.Value, error)
+	// Runtime return the js runtime
 	Runtime() *goja.Runtime
 }
 
-type vmImpl struct {
-	runtime   *goja.Runtime
-	eventloop *EventLoop
-	executor  goja.Callable
-	done      chan struct{}
-}
-
 // NewVM creates a new JavaScript VM
-// Initialize the EventLoop, require, global module, console
-func NewVM(modulePath ...string) VM {
-	runtime := goja.New()
-	runtime.SetFieldNameMapper(FieldNameMapper{})
-	EnableRequire(runtime, modulePath...)
-	InitGlobalModule(runtime)
-	EnableConsole(runtime)
+// Initialize the EventLoop, require, global module, console.
+// If loader.ModuleLoader not declared, use the default loader.NewModuleLoader().
+func NewVM() VM {
+	rt := goja.New()
+	rt.SetFieldNameMapper(FieldNameMapper{})
+	InitGlobalModule(rt)
+	mr, err := cloudcat.Resolve[loader.ModuleLoader]()
+	if err != nil {
+		slog.Warn(fmt.Sprintf("ModuleLoader not declared, using default"))
+		mr = loader.NewModuleLoader()
+	}
+	mr.EnableRequire(rt)
+	EnableConsole(rt)
 
-	// TODO: any better way?
-	eval := `(function(ctx, code){with(ctx){return eval(code)}})`
-	program := goja.MustCompile("eval", eval, false)
-	callable, err := runtime.RunProgram(program)
+	eval := `(ctx, code)=>{return eval(code)}`
+	program := goja.MustCompile("<eval>", eval, false)
+	callable, err := rt.RunProgram(program)
 	if err != nil {
 		panic(errInitExecutor)
 	}
@@ -53,19 +55,61 @@ func NewVM(modulePath ...string) VM {
 		panic(errInitExecutor)
 	}
 
-	//keys, _ := runtime.RunString("Object.keys(this)")
-	//globalKeys := cast.ToStringSlice(keys.Export())
-
 	return &vmImpl{
-		runtime,
-		NewEventLoop(runtime),
+		rt,
+		NewEventLoop(rt),
 		executor,
 		make(chan struct{}, 1),
+		mr,
 	}
 }
 
-// Run the js program
-func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error) {
+type (
+	vmImpl struct {
+		runtime   *goja.Runtime
+		eventloop *EventLoop
+		executor  goja.Callable
+		done      chan struct{}
+		mr        loader.ModuleLoader
+	}
+
+	vmctx struct{ ctx context.Context }
+)
+
+// RunModule run the goja.CyclicModuleRecord.
+// The module default export must be a function.
+func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error) {
+	if err := module.Link(); err != nil {
+		return nil, err
+	}
+	promise := vm.runtime.CyclicModuleRecordEvaluate(module, vm.mr.ResolveModule)
+	switch promise.State() {
+	case goja.PromiseStateRejected:
+		return nil, promise.Result().Export().(error)
+	case goja.PromiseStateFulfilled:
+	default:
+	}
+	value := vm.runtime.GetModuleInstance(module).GetBindingValue("default")
+	fn, ok := goja.AssertFunction(value)
+	if !ok {
+		Throw(vm.runtime, fmt.Errorf("module default exports must be a function"))
+	}
+
+	if pc, ok := ctx.(*plugin.Context); ok {
+		return vm.run(ctx, fn, NewCtxWrapper(vm, pc))
+	}
+	return vm.run(ctx, fn)
+}
+
+// RunString run the script string
+func (vm *vmImpl) RunString(ctx context.Context, src string) (goja.Value, error) {
+	if pc, ok := ctx.(*plugin.Context); ok {
+		return vm.run(ctx, vm.executor, NewCtxWrapper(vm, pc), vm.runtime.ToValue(src))
+	}
+	return vm.run(ctx, vm.executor, goja.Undefined(), vm.runtime.ToValue(src))
+}
+
+func (vm *vmImpl) run(ctx context.Context, call goja.Callable, args ...goja.Value) (ret goja.Value, err error) {
 	// resets the interrupt flag.
 	vm.runtime.ClearInterrupt()
 	defer func() {
@@ -81,7 +125,7 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 				"stack", string(debug.Stack()), "js stack", buf.String())
 		}
 
-		_ = vm.runtime.GlobalObject().DeleteSymbol(vmContextKey)
+		_ = vm.runtime.GlobalObject().Delete("__ctx__")
 		vm.done <- struct{}{} // End of run
 	}()
 
@@ -99,30 +143,17 @@ func (vm *vmImpl) Run(ctx context.Context, p Program) (ret goja.Value, err error
 			return
 		}
 	}()
-
-	args := p.Args
-	if args == nil {
-		args = make(map[string]any, 1)
-	}
-	if ctx, ok := ctx.(*plugin.Context); ok {
-		args["cat"] = NewCtxWrapper(vm, ctx)
-	}
-	_ = vm.runtime.GlobalObject().SetSymbol(vmContextKey, ctx)
+	_ = vm.runtime.GlobalObject().Set("__ctx__", vmctx{ctx})
 
 	err = vm.eventloop.Start(func() error {
-		ret, err = vm.executor(goja.Undefined(), vm.runtime.ToValue(args), vm.runtime.ToValue(p.Code))
+		ret, err = call(goja.Undefined(), args...)
 		return err
 	})
 
 	return
 }
 
-// RunString the js string
-func (vm *vmImpl) RunString(ctx context.Context, s string) (goja.Value, error) {
-	return vm.Run(ctx, Program{Code: s})
-}
-
-// Runtime the js runtime
+// Runtime return the js runtime
 func (vm *vmImpl) Runtime() *goja.Runtime { return vm.runtime }
 
 // NewPromise returns the new promise with the async function.

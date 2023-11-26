@@ -10,9 +10,6 @@ import (
 	"github.com/spf13/cast"
 )
 
-// vmContextKey the VM current context
-var vmContextKey = goja.NewSymbol("__ctx__")
-
 // Throw js exception
 func Throw(vm *goja.Runtime, err error) {
 	if e, ok := err.(*goja.Exception); ok { //nolint:errorlint
@@ -77,13 +74,12 @@ func Unwrap(value goja.Value) (any, error) {
 
 // VMContext returns the current context of the goja.Runtime
 func VMContext(runtime *goja.Runtime) context.Context {
-	ctx := context.Background()
-	if v := runtime.GlobalObject().GetSymbol(vmContextKey); v != nil {
-		if c, ok := v.Export().(context.Context); ok {
-			ctx = c
+	if v := runtime.GlobalObject().Get("__ctx__"); v != nil {
+		if vc, ok := v.Export().(vmctx); ok {
+			return vc.ctx
 		}
 	}
-	return ctx
+	return context.Background()
 }
 
 // InitGlobalModule init all global modules
