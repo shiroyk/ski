@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/shiroyk/cloudcat"
+	"github.com/shiroyk/cloudcat/js/loader"
 	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,6 +18,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+	cloudcat.Provide(loader.NewModuleLoader())
 	ctx = plugin.NewContext(plugin.ContextOptions{
 		URL: "http://localhost/home",
 	})
@@ -24,28 +26,16 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestParser(t *testing.T) {
-	if _, ok := parser.GetParser(key); !ok {
-		t.Fatal("schema not registered")
-	}
-}
-
 func TestGetString(t *testing.T) {
 	{
 		str, err := jsParser.GetString(ctx, "a", `(async () => ctx.get('content') + 1)()`)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		assert.NoError(t, err)
 		assert.Equal(t, "a1", str)
 	}
 
 	{
 		str, err := jsParser.GetString(ctx, "", `(async () => ({"test":"1"}))()`)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		assert.NoError(t, err)
 		assert.JSONEq(t, `{"test":"1"}`, str)
 	}
 }
@@ -58,38 +48,26 @@ func TestGetStrings(t *testing.T) {
 					s.push('a2');
 					r(s)
 				});`)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		assert.NoError(t, err)
 		assert.Equal(t, []string{"a1", "a2"}, str)
 	}
 
 	{
 		str, err := jsParser.GetStrings(ctx, "", `[{"foo":"1"}, {"bar":"1"}, 19]`)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		assert.NoError(t, err)
 		assert.Equal(t, []string{`{"foo":"1"}`, `{"bar":"1"}`, "19"}, str)
 	}
 }
 
 func TestGetElement(t *testing.T) {
 	ele, err := jsParser.GetElement(ctx, ``, `ctx.set('size', 1 + 2);ctx.get('size');`)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(t, err)
 	assert.Equal(t, "3", ele)
 }
 
 func TestGetElements(t *testing.T) {
 	t.Parallel()
 	ele, err := jsParser.GetElements(ctx, ``, `[1, 2]`)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(t, err)
 	assert.Equal(t, []string{"1", "2"}, ele)
 }

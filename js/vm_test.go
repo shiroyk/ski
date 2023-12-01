@@ -66,6 +66,7 @@ func TestVMRunModule(t *testing.T) {
 			{"export default function () {let a = 1; return a + 1}", 2},
 			//{"export default async () => 3", 3},
 			{"const a = async () => 5; let b = await a(); export default () => b - 1", 4},
+			{"export default 3 + 2", 5},
 		}
 
 		for i, c := range testCases {

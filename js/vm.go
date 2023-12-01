@@ -92,7 +92,7 @@ func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord)
 	value := vm.runtime.GetModuleInstance(module).GetBindingValue("default")
 	fn, ok := goja.AssertFunction(value)
 	if !ok {
-		Throw(vm.runtime, fmt.Errorf("module default exports must be a function"))
+		return value, nil
 	}
 
 	if pc, ok := ctx.(*plugin.Context); ok {

@@ -21,40 +21,46 @@ func init() {
 
 // GetString gets the string of the content with the given arguments.
 // returns the string result.
-func (p *Parser) GetString(ctx *plugin.Context, content any, arg string) (ret string, err error) {
-	return getString(ctx, content, arg)
+func (p *Parser) GetString(ctx *plugin.Context, content any, arg string) (string, error) {
+	v, err := p.run(ctx, content, arg)
+	if err != nil {
+		return "", err
+	}
+	return toString(v)
 }
 
 // GetStrings gets the strings of the content with the given arguments.
 // returns the slice of string result.
-func (p *Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret []string, err error) {
-	return getStrings(ctx, content, arg)
+func (p *Parser) GetStrings(ctx *plugin.Context, content any, arg string) ([]string, error) {
+	v, err := p.run(ctx, content, arg)
+	if err != nil {
+		return nil, err
+	}
+	return toStrings(v)
 }
 
 // GetElement gets the element of the content with the given arguments.
 // returns the string result.
 func (p *Parser) GetElement(ctx *plugin.Context, content any, arg string) (string, error) {
-	return getString(ctx, content, arg)
+	return p.GetString(ctx, content, arg)
 }
 
 // GetElements gets the elements of the content with the given arguments.
 // returns the slice of string result.
 func (p *Parser) GetElements(ctx *plugin.Context, content any, arg string) ([]string, error) {
-	return getStrings(ctx, content, arg)
+	return p.GetStrings(ctx, content, arg)
 }
 
-func getString(ctx *plugin.Context, content any, script string) (ret string, err error) {
+func (p *Parser) run(ctx *plugin.Context, content any, script string) (any, error) {
 	ctx.SetValue("content", content)
 	result, err := js.RunString(ctx, script)
 	if err != nil {
-		return ret, err
+		return nil, err
 	}
+	return js.Unwrap(result)
+}
 
-	value, err := js.Unwrap(result)
-	if err != nil {
-		return ret, err
-	}
-
+func toString(value any) (ret string, err error) {
 	switch value.(type) {
 	case map[string]any, []any:
 		bytes, err := json.Marshal(value)
@@ -69,17 +75,7 @@ func getString(ctx *plugin.Context, content any, script string) (ret string, err
 	}
 }
 
-func getStrings(ctx *plugin.Context, content any, script string) (ret []string, err error) {
-	ctx.SetValue("content", content)
-	result, err := js.RunString(ctx, script)
-	if err != nil {
-		return nil, err
-	}
-
-	value, err := js.Unwrap(result)
-	if err != nil {
-		return nil, err
-	}
+func toStrings(value any) (ret []string, err error) {
 	if value == nil {
 		return nil, nil
 	}
