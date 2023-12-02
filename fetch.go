@@ -16,7 +16,7 @@ type Fetch interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-var requestProxyKey struct{}
+type requestProxyKey struct{}
 
 // WithProxyURL returns a copy of parent context in which the proxy associated with context.
 func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {
@@ -24,19 +24,21 @@ func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {
 		return ctx
 	}
 	if c, ok := ctx.(*plugin.Context); ok {
-		c.SetValue(&requestProxyKey, proxy)
+		c.SetValue(requestProxyKey{}, proxy)
 		return ctx
 	}
-	return context.WithValue(ctx, &requestProxyKey, proxy)
+	return context.WithValue(ctx, requestProxyKey{}, proxy)
 }
 
 // ProxyFromContext returns a proxy URL on context.
-func ProxyFromContext(ctx context.Context) (*url.URL, error) {
-	if proxy := ctx.Value(&requestProxyKey); proxy != nil {
-		return proxy.(*url.URL), nil
+func ProxyFromContext(ctx context.Context) *url.URL {
+	if proxy := ctx.Value(requestProxyKey{}); proxy != nil {
+		return proxy.(*url.URL)
 	}
-	return nil, nil
+	return nil
 }
 
 // ProxyFromRequest returns a proxy URL on request context.
-func ProxyFromRequest(req *http.Request) (*url.URL, error) { return ProxyFromContext(req.Context()) }
+func ProxyFromRequest(req *http.Request) (*url.URL, error) {
+	return ProxyFromContext(req.Context()), nil
+}

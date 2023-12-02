@@ -16,20 +16,20 @@ type Cache interface {
 	Del(ctx context.Context, key string)
 }
 
-var cacheTimeoutKey struct{}
+type cacheTimeoutKey struct{}
 
 // WithCacheTimeout returns the context with the cache timeout.
 func WithCacheTimeout(ctx context.Context, timeout time.Duration) context.Context {
 	if c, ok := ctx.(*plugin.Context); ok {
-		c.SetValue(&cacheTimeoutKey, timeout)
+		c.SetValue(cacheTimeoutKey{}, timeout)
 		return ctx
 	}
-	return context.WithValue(ctx, &cacheTimeoutKey, timeout)
+	return context.WithValue(ctx, cacheTimeoutKey{}, timeout)
 }
 
 // CacheTimeout returns the context cache timeout value.
 func CacheTimeout(ctx context.Context) time.Duration {
-	return cast.ToDuration(ctx.Value(&cacheTimeoutKey))
+	return cast.ToDuration(ctx.Value(cacheTimeoutKey{}))
 }
 
 // memoryCache is an implementation of Cache that stores bytes in in-memory.
