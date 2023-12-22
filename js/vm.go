@@ -80,11 +80,13 @@ type (
 // The module default export must be a function.
 func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error) {
 	if err := module.Link(); err != nil {
+		GetScheduler().Release(vm)
 		return nil, err
 	}
 	promise := vm.runtime.CyclicModuleRecordEvaluate(module, vm.mr.ResolveModule)
 	switch promise.State() {
 	case goja.PromiseStateRejected:
+		GetScheduler().Release(vm)
 		return nil, promise.Result().Export().(error)
 	case goja.PromiseStateFulfilled:
 	default:
@@ -92,6 +94,7 @@ func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord)
 	value := vm.runtime.GetModuleInstance(module).GetBindingValue("default")
 	fn, ok := goja.AssertFunction(value)
 	if !ok {
+		GetScheduler().Release(vm)
 		return value, nil
 	}
 
