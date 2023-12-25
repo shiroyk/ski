@@ -5,12 +5,6 @@ import (
 	"strings"
 )
 
-// Program The js program
-type Program struct {
-	Code string
-	Args map[string]any
-}
-
 // FieldNameMapper provides custom mapping between Go and JavaScript property names.
 type FieldNameMapper struct{}
 

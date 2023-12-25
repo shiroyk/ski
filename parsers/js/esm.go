@@ -8,7 +8,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat"
 	"github.com/shiroyk/cloudcat/js"
-	"github.com/shiroyk/cloudcat/js/loader"
 	"github.com/shiroyk/cloudcat/plugin"
 )
 
@@ -17,7 +16,7 @@ type ESMParser struct {
 	mu    *sync.Mutex
 	cache map[uint64]goja.CyclicModuleRecord
 	hash  *maphash.Hash
-	load  func() loader.ModuleLoader
+	load  func() js.ModuleLoader
 }
 
 // NewESMParser returns a new ESMParser
@@ -26,7 +25,7 @@ func NewESMParser() *ESMParser {
 		new(sync.Mutex),
 		make(map[uint64]goja.CyclicModuleRecord),
 		new(maphash.Hash),
-		cloudcat.MustResolveLazy[loader.ModuleLoader](),
+		cloudcat.MustResolveLazy[js.ModuleLoader](),
 	}
 }
 

@@ -1,4 +1,4 @@
-package loader
+package js
 
 import (
 	"encoding/json"
@@ -34,6 +34,8 @@ type (
 		EnableRequire(rt *goja.Runtime)
 		// ResolveModule resolve the module returns the goja.ModuleRecord.
 		ResolveModule(any, string) (goja.ModuleRecord, error)
+		// ImportModuleDynamically goja runtime SetImportModuleDynamically
+		ImportModuleDynamically(rt *goja.Runtime)
 	}
 
 	// FileLoader is a type alias for a function that returns the contents of the referenced file.
@@ -57,6 +59,13 @@ func WithFileLoader(fileLoader FileLoader) Option {
 	}
 }
 
+// WithSourceMapLoader the source map loader of module loader.
+func WithSourceMapLoader(loader func(path string) ([]byte, error)) Option {
+	return func(o *moduleLoader) {
+		o.sourceLoader = parser.WithSourceMapLoader(loader)
+	}
+}
+
 // NewModuleLoader returns a new module resolver
 // if the fileLoader option not provided, uses the default DefaultFileLoader.
 func NewModuleLoader(opts ...Option) ModuleLoader {
@@ -76,13 +85,9 @@ func NewModuleLoader(opts ...Option) ModuleLoader {
 	if mr.fileLoader == nil {
 		mr.fileLoader = DefaultFileLoader()
 	}
-	mr.parserOption = parser.WithSourceMapLoader(func(path string) ([]byte, error) {
-		uri, err := url.Parse(path)
-		if err != nil {
-			return nil, err
-		}
-		return mr.fileLoader(uri, path)
-	})
+	if mr.sourceLoader == nil {
+		mr.sourceLoader = parser.WithDisableSourceMaps
+	}
 	return mr
 }
 
@@ -122,7 +127,7 @@ type (
 		fileLoader FileLoader
 
 		base         *url.URL
-		parserOption parser.Option
+		sourceLoader parser.Option
 	}
 
 	moduleCache struct {
@@ -137,7 +142,7 @@ func (ml *moduleLoader) EnableRequire(rt *goja.Runtime) { _ = rt.Set("require", 
 // require resolve the module instance.
 func (ml *moduleLoader) require(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
 	name := call.Argument(0).String()
-	module, err := ml.ResolveModule(nil, name)
+	module, err := ml.ResolveModule(ml.getCurrentModuleRecord(rt), name)
 	if err != nil {
 		panic(rt.ToValue(err))
 	}
@@ -152,21 +157,33 @@ func (ml *moduleLoader) require(call goja.FunctionCall, rt *goja.Runtime) goja.V
 		panic(rt.ToValue(ErrInvalidModule))
 	}
 	promise := rt.CyclicModuleRecordEvaluate(cm, ml.ResolveModule)
-	switch promise.State() {
-	case goja.PromiseStateRejected:
+	if promise.State() == goja.PromiseStateRejected {
 		panic(promise.Result())
-	case goja.PromiseStatePending:
-		// TODO TLA
-		println(name, "evaluate pending")
 	}
 	if cjs, ok := module.(*cjsModule); ok {
 		return rt.GetModuleInstance(cjs).(*cjsModuleInstance).exports
 	}
-	obj := rt.NamespaceObjectFor(cm)
-	if d := obj.Get("default"); d != nil {
-		return d
-	}
-	return obj
+	return rt.NamespaceObjectFor(cm)
+}
+
+func (ml *moduleLoader) ImportModuleDynamically(rt *goja.Runtime) {
+	rt.SetImportModuleDynamically(func(referencingScriptOrModule any, specifier goja.Value, promiseCapability any) {
+		NewEnqueueCallback(rt)(func() error {
+			module, err := ml.ResolveModule(referencingScriptOrModule, specifier.String())
+			rt.FinishLoadingImportModule(referencingScriptOrModule, specifier, promiseCapability, module, err)
+			return nil
+		})
+	})
+}
+
+func (ml *moduleLoader) getCurrentModuleRecord(rt *goja.Runtime) goja.ModuleRecord {
+	var parent string
+	var buf [2]goja.StackFrame
+	frames := rt.CaptureCallStack(2, buf[:0])
+	parent = frames[1].SrcName()
+
+	module, _ := ml.ResolveModule(nil, parent)
+	return module
 }
 
 // ResolveModule resolve the module returns the goja.ModuleRecord.
@@ -187,30 +204,26 @@ func (ml *moduleLoader) ResolveModule(referencingScriptOrModule any, name string
 	}
 }
 
-func (ml *moduleLoader) resolve(base *url.URL, modPath string) (goja.ModuleRecord, error) {
-	modName := filepath.Base(modPath)
-	if modName == "" {
+func (ml *moduleLoader) resolve(base *url.URL, specifier string) (goja.ModuleRecord, error) {
+	if specifier == "" {
 		return nil, ErrIllegalModuleName
 	}
 
-	if isBasePath(modPath) {
-		return ml.loadAsFileOrDirectory(base, modName)
+	if isBasePath(specifier) {
+		return ml.loadAsFileOrDirectory(base, specifier)
 	}
 
-	uri, err := url.Parse(modPath)
-	if err != nil {
-		return nil, err
-	}
-	if uri.Scheme != "" && uri.Scheme != "file" {
+	if strings.Contains(specifier, "://") {
+		uri, err := url.Parse(specifier)
+		if err != nil {
+			return nil, err
+		}
 		return ml.loadModule(uri, "")
 	}
 
-	// default scheme file
-	uri.Scheme = "file"
-	uri.Path = strings.TrimSuffix(uri.Path, modName)
-	mod, err := ml.loadNodeModules(uri, modName)
+	mod, err := ml.loadNodeModules(specifier)
 	if err != nil {
-		return nil, fmt.Errorf("module %s not found with error %s", modPath, err)
+		return nil, fmt.Errorf("module %s not found with error %s", specifier, err)
 	}
 	return mod, nil
 }
@@ -271,8 +284,8 @@ func (ml *moduleLoader) loadAsDirectory(modPath *url.URL) (module goja.ModuleRec
 	return ml.loadModule(modPath, "index.js")
 }
 
-func (ml *moduleLoader) loadNodeModules(modPath *url.URL, modName string) (mod goja.ModuleRecord, err error) {
-	start := modPath.Path
+func (ml *moduleLoader) loadNodeModules(modName string) (mod goja.ModuleRecord, err error) {
+	start := ml.base.Path
 	for {
 		var p string
 		if path.Base(start) != "node_modules" {
@@ -280,7 +293,7 @@ func (ml *moduleLoader) loadNodeModules(modPath *url.URL, modName string) (mod g
 		} else {
 			p = start
 		}
-		if mod, err = ml.loadAsFileOrDirectory(modPath.JoinPath(p), modName); mod != nil || err != nil {
+		if mod, err = ml.loadAsFileOrDirectory(ml.base.JoinPath(p), modName); mod != nil || err != nil {
 			return
 		}
 		if start == ".." { // Dir('..') is '.'
@@ -293,7 +306,7 @@ func (ml *moduleLoader) loadNodeModules(modPath *url.URL, modName string) (mod g
 		start = parent
 	}
 
-	return nil, fmt.Errorf("not found module %s", modPath)
+	return nil, fmt.Errorf("not found module %s at %s", modName, ml.base)
 }
 
 func (ml *moduleLoader) loadModule(modPath *url.URL, modName string) (goja.ModuleRecord, error) {
@@ -309,7 +322,10 @@ func (ml *moduleLoader) loadModule(modPath *url.URL, modName string) (goja.Modul
 		return nil, err
 	}
 	mod, err := ml.compileModule(specifier, string(buf))
-	ml.reverse[mod] = modPath
+	if err == nil {
+		file.Path = filepath.Dir(file.Path)
+		ml.reverse[mod] = file
+	}
 	ml.modules[specifier] = moduleCache{mod: mod, err: err}
 	return mod, err
 }
@@ -320,7 +336,7 @@ func (ml *moduleLoader) compileModule(path, source string) (goja.ModuleRecord, e
 		return ml.compileCjsModule(path, source)
 	}
 
-	ast, err := goja.Parse(path, source, parser.IsModule, ml.parserOption)
+	ast, err := goja.Parse(path, source, parser.IsModule, ml.sourceLoader)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +352,7 @@ func (ml *moduleLoader) compileModule(path, source string) (goja.ModuleRecord, e
 func (ml *moduleLoader) compileCjsModule(path, source string) (goja.ModuleRecord, error) {
 	source = "(function(exports, require, module) {" + source + "\n})"
 
-	ast, err := goja.Parse(path, source, ml.parserOption)
+	ast, err := goja.Parse(path, source, ml.sourceLoader)
 	if err != nil {
 		return nil, err
 	}

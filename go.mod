@@ -28,6 +28,6 @@ require (
 )
 
 replace (
-	github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20231115172654-7aaf816c3720
+	github.com/dop251/goja => v0.0.0-20231212144616-08f562ee86d0
 	github.com/shiroyk/cloudcat/plugin => ./plugin
 )

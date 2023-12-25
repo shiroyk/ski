@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/shiroyk/cloudcat"
-	"github.com/shiroyk/cloudcat/js/loader"
+	"github.com/shiroyk/cloudcat/js"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	cloudcat.Provide(loader.NewModuleLoader())
+	cloudcat.Provide(js.NewModuleLoader())
 	ctx = plugin.NewContext(plugin.ContextOptions{
 		URL: "http://localhost/home",
 	})

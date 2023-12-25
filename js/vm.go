@@ -10,7 +10,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat"
-	"github.com/shiroyk/cloudcat/js/loader"
 	"github.com/shiroyk/cloudcat/plugin"
 )
 
@@ -36,15 +35,17 @@ func NewVM() VM {
 	rt := goja.New()
 	rt.SetFieldNameMapper(FieldNameMapper{})
 	InitGlobalModule(rt)
-	mr, err := cloudcat.Resolve[loader.ModuleLoader]()
+	mr, err := cloudcat.Resolve[ModuleLoader]()
 	if err != nil {
 		slog.Warn(fmt.Sprintf("ModuleLoader not declared, using default"))
-		mr = loader.NewModuleLoader()
+		mr = NewModuleLoader()
+		cloudcat.Provide(mr)
 	}
 	mr.EnableRequire(rt)
+	mr.ImportModuleDynamically(rt)
 	EnableConsole(rt)
 
-	eval := `(ctx, code)=>{return eval(code)}`
+	eval := `(ctx, code)=>eval(code)`
 	program := goja.MustCompile("<eval>", eval, false)
 	callable, err := rt.RunProgram(program)
 	if err != nil {
@@ -55,13 +56,22 @@ func NewVM() VM {
 		panic(errInitExecutor)
 	}
 
-	return &vmImpl{
-		rt,
-		NewEventLoop(rt),
-		executor,
-		make(chan struct{}, 1),
-		mr,
+	vm := &vmImpl{
+		runtime:   rt,
+		eventloop: NewEventLoop(rt),
+		executor:  executor,
+		done:      make(chan struct{}, 1),
+		loader:    mr,
 	}
+	scheduler := cloudcat.ResolveLazy[Scheduler]()
+	vm.release = func() {
+		s, err := scheduler()
+		if err != nil {
+			return
+		}
+		s.Release(vm)
+	}
+	return vm
 }
 
 type (
@@ -70,7 +80,8 @@ type (
 		eventloop *EventLoop
 		executor  goja.Callable
 		done      chan struct{}
-		mr        loader.ModuleLoader
+		release   func()
+		loader    ModuleLoader
 	}
 
 	vmctx struct{ ctx context.Context }
@@ -80,13 +91,13 @@ type (
 // The module default export must be a function.
 func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error) {
 	if err := module.Link(); err != nil {
-		GetScheduler().Release(vm)
+		vm.release()
 		return nil, err
 	}
-	promise := vm.runtime.CyclicModuleRecordEvaluate(module, vm.mr.ResolveModule)
+	promise := vm.runtime.CyclicModuleRecordEvaluate(module, vm.loader.ResolveModule)
 	switch promise.State() {
 	case goja.PromiseStateRejected:
-		GetScheduler().Release(vm)
+		vm.release()
 		return nil, promise.Result().Export().(error)
 	case goja.PromiseStateFulfilled:
 	default:
@@ -94,7 +105,7 @@ func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord)
 	value := vm.runtime.GetModuleInstance(module).GetBindingValue("default")
 	fn, ok := goja.AssertFunction(value)
 	if !ok {
-		GetScheduler().Release(vm)
+		vm.release()
 		return value, nil
 	}
 
@@ -138,11 +149,11 @@ func (vm *vmImpl) run(ctx context.Context, call goja.Callable, args ...goja.Valu
 			// Interrupt running JavaScript.
 			vm.runtime.Interrupt(ctx.Err())
 			// Release vm
-			GetScheduler().Release(vm)
+			vm.release()
 			return
 		case <-vm.done:
 			// Release vm
-			GetScheduler().Release(vm)
+			vm.release()
 			return
 		}
 	}()

@@ -23,28 +23,21 @@ const (
 )
 
 var (
-	defaultScheduler atomic.Value
-	once             sync.Once
+	schedulerDefault = sync.OnceValue[Scheduler](func() Scheduler {
+		scheduler, err := cloudcat.Resolve[Scheduler]()
+		if err != nil {
+			scheduler = NewScheduler(Options{InitialVMs: 2, MaxVMs: runtime.GOMAXPROCS(0)})
+			cloudcat.Provide(scheduler)
+		}
+		return scheduler
+	})
 	// ErrSchedulerClosed the scheduler is closed error
 	ErrSchedulerClosed = errors.New("scheduler is closed")
 )
 
-// SetScheduler set the default Scheduler.
-func SetScheduler(scheduler Scheduler) {
-	defaultScheduler.Store(scheduler)
-}
-
-// GetScheduler returns the Scheduler.
-func GetScheduler() Scheduler {
-	once.Do(func() {
-		defaultScheduler.CompareAndSwap(nil, NewScheduler(Options{InitialVMs: 2, MaxVMs: runtime.GOMAXPROCS(0)}))
-	})
-	return defaultScheduler.Load().(Scheduler)
-}
-
 // RunString the js string
 func RunString(ctx context.Context, script string) (goja.Value, error) {
-	tr, err := GetScheduler().Get()
+	tr, err := schedulerDefault().Get()
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +46,7 @@ func RunString(ctx context.Context, script string) (goja.Value, error) {
 
 // RunModule the goja.CyclicModuleRecord
 func RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error) {
-	tr, err := GetScheduler().Get()
+	tr, err := schedulerDefault().Get()
 	if err != nil {
 		return nil, err
 	}
