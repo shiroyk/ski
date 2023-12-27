@@ -435,126 +435,146 @@ func toActionOp(op string, left, right Action) (Action, error) {
 }
 
 // GetString run the action returns a string
-func GetString(act Action, ctx *plugin.Context, content any) (string, error) {
-	return runAction(act, ctx, content,
-		func(p parser.Parser) func(*plugin.Context, any, string) (string, error) {
-			return p.GetString
-		},
-		func(s1, s2 string) string {
-			return s1 + s2
-		})
+func GetString(ctx *plugin.Context, node Action, content any) (string, error) {
+	ret, err := WalkAction(node, func(steps Steps) ([]string, error) {
+		var err error
+		cur := content
+		for _, step := range steps {
+			p, ok := parser.GetParser(step.K)
+			if !ok {
+				return nil, fmt.Errorf("parser %s not found", step.K)
+			}
+			cur, err = p.GetElement(ctx, cur, step.V)
+			if err != nil {
+				return nil, fmt.Errorf("parser %s: %s", step.K, err)
+			}
+		}
+		ret := cur.(string)
+		if len(ret) == 0 {
+			return nil, nil
+		}
+		return []string{ret}, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(ret, ""), nil
 }
 
 // GetStrings run the action returns a slice of string
-func GetStrings(act Action, ctx *plugin.Context, content any) ([]string, error) {
-	return runAction(act, ctx, content,
-		func(p parser.Parser) func(*plugin.Context, any, string) ([]string, error) {
-			return p.GetStrings
-		},
-		func(s1, s2 []string) []string {
-			return append(s1, s2...)
-		})
+func GetStrings(ctx *plugin.Context, node Action, content any) ([]string, error) {
+	return WalkAction(node, func(steps Steps) ([]string, error) {
+		var err error
+		ret := content
+		for _, step := range steps {
+			p, ok := parser.GetParser(step.K)
+			if !ok {
+				return nil, fmt.Errorf("parser %s not found", step.K)
+			}
+			ret, err = p.GetElements(ctx, ret, step.V)
+			if err != nil {
+				return nil, fmt.Errorf("parser %s: %s", step.K, err)
+			}
+		}
+		return ret.([]string), nil
+	})
 }
 
 // GetElement run the action returns an element string
-func GetElement(act Action, ctx *plugin.Context, content any) (string, error) {
-	return runAction(act, ctx, content,
-		func(p parser.Parser) func(*plugin.Context, any, string) (string, error) {
-			return p.GetElement
-		},
-		func(s1, s2 string) string {
-			return s1 + s2
-		})
+func GetElement(ctx *plugin.Context, node Action, content any) (string, error) {
+	ret, err := WalkAction(node, func(steps Steps) ([]string, error) {
+		var err error
+		cur := content
+		for _, step := range steps {
+			p, ok := parser.GetParser(step.K)
+			if !ok {
+				return nil, fmt.Errorf("parser %s not found", step.K)
+			}
+			cur, err = p.GetElement(ctx, cur, step.V)
+			if err != nil {
+				return nil, fmt.Errorf("parser %s: %s", step.K, err)
+			}
+		}
+		ret := cur.(string)
+		if len(ret) == 0 {
+			return nil, nil
+		}
+		return []string{ret}, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(ret, ""), nil
 }
 
 // GetElements run the action returns a slice of element string
-func GetElements(act Action, ctx *plugin.Context, content any) ([]string, error) {
-	return runAction(act, ctx, content,
-		func(p parser.Parser) func(*plugin.Context, any, string) ([]string, error) {
-			return p.GetElements
-		},
-		func(s1, s2 []string) []string {
-			return append(s1, s2...)
-		})
+func GetElements(ctx *plugin.Context, node Action, content any) ([]string, error) {
+	return WalkAction(node, func(steps Steps) ([]string, error) {
+		var err error
+		ret := content
+		for _, step := range steps {
+			p, ok := parser.GetParser(step.K)
+			if !ok {
+				return nil, fmt.Errorf("parser %s not found", step.K)
+			}
+			ret, err = p.GetElements(ctx, ret, step.V)
+			if err != nil {
+				return nil, fmt.Errorf("parser %s: %s", step.K, err)
+			}
+		}
+		return ret.([]string), nil
+	})
 }
 
-// runAction runs the Action
-//
-//nolint:nakedret
-func runAction[T string | []string](
-	node Action,
-	ctx *plugin.Context,
-	content any,
-	runFn func(parser.Parser) func(*plugin.Context, any, string) (T, error),
-	joinFn func(T, T) T,
-) (ret T, err error) {
+// WalkAction preorder traversal of Action.
+func WalkAction(node Action, walk func(Steps) ([]string, error)) (ret []string, err error) {
+	var left []string
 	var stack []Action
-	var left, _empty T
-	var join bool
-
 	for len(stack) > 0 || node != nil {
 		// traverse the left subtree and push the node to the stack
 		for node != nil {
 			stack = append(stack, node)
 			node = node.Left()
 		}
-
-		// pop the stack and process the node
+		// pop the stack and walk the node
 		node = stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-
 		switch node.(type) {
+		case *And:
+			if len(stack) == 0 {
+				// join the left subtree result to ret
+				ret = append(ret, left...)
+				left = nil
+			}
 		case *Or:
 			if len(left) > 0 {
 				// discard right subtree if left subtree result is not empty
 				node = nil
 				if len(stack) == 0 {
-					ret = joinFn(ret, left)
-					left = _empty
+					ret = append(ret, left...)
+					left = nil
 				}
 				continue
 			}
-			join = true
-		case *And:
-			if len(stack) == 0 {
-				// join the left subtree result to ret
-				ret = joinFn(ret, left)
-				left = _empty
-			}
-			join = true
 		case *Not:
 			if len(left) == 0 {
 				// discard right subtree if left subtree result is empty
 				node = nil
 				continue
 			}
-			left = _empty // discard left subtree result
-			join = true
+			left = nil
 		case *Steps:
-			result := content
-			for _, step := range *node.(*Steps) {
-				p, ok := parser.GetParser(step.K)
-				if !ok {
-					return ret, fmt.Errorf("parser %s not found", step.K)
-				}
-				result, err = runFn(p)(ctx, result, step.V)
-				if err != nil {
-					return ret, fmt.Errorf("parser %s: %s", step.K, err)
-				}
+			var cur []string
+			cur, err = walk(*node.(*Steps))
+			if err != nil {
+				return nil, err
 			}
-
-			switch {
-			case len(stack) == 0:
-				ret = joinFn(ret, result.(T))
-				return
-			case join:
-				left = joinFn(left, result.(T))
-				join = false
-			default:
-				left = result.(T)
+			if len(stack) == 0 {
+				ret = append(ret, cur...)
+			} else {
+				left = append(left, cur...)
 			}
 		}
-
 		node = node.Right()
 	}
 	return

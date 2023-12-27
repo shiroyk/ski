@@ -4,78 +4,131 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"testing"
 
+	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
-type analyzerParser struct{}
+func eval() func(any, string) (any, error) {
+	rt := goja.New()
+	program := goja.MustCompile("<eval>", "(c, code)=>eval(code)", false)
+	callable, err := rt.RunProgram(program)
+	if err != nil {
+		panic(err)
+	}
+	call, ok := goja.AssertFunction(callable)
+	if !ok {
+		panic("err init executor")
+	}
+	return func(c any, a string) (any, error) {
+		value, err := call(goja.Undefined(), rt.ToValue(c), rt.ToValue(a))
+		if err != nil {
+			return nil, err
+		}
+		if value == nil {
+			return nil, nil
+		}
+		return value.Export(), nil
+	}
+}
 
-func (analyzerParser) GetString(_ *plugin.Context, c any, a string) (string, error) {
-	if s, ok := c.(string); ok && a == "$" {
+type ap struct {
+	eval func(any, string) (any, error)
+}
+
+func (p *ap) GetString(_ *plugin.Context, c any, a string) (string, error) {
+	v, err := p.eval(c, a)
+	if err != nil {
+		return "", err
+	}
+	if v == nil {
+		return "", nil
+	}
+	if s, ok := v.(string); ok {
 		return s, nil
 	}
-	return a, nil
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
-func (analyzerParser) GetStrings(_ *plugin.Context, _ any, a string) ([]string, error) {
-	return strings.Split(a, ","), nil
+func (p *ap) GetStrings(_ *plugin.Context, c any, a string) ([]string, error) {
+	v, err := p.eval(c, a)
+	if err != nil {
+		return nil, err
+	}
+	slice, ok := v.([]any)
+	if !ok {
+		slice = []any{v}
+	}
+	ret := make([]string, len(slice))
+	for i, v := range slice {
+		if s, ok := v.(string); ok {
+			ret[i] = s
+		} else {
+			bytes, _ := json.Marshal(v)
+			ret[i] = string(bytes)
+		}
+	}
+	return ret, nil
 }
 
-func (p analyzerParser) GetElement(ctx *plugin.Context, c any, a string) (string, error) {
-	return p.GetString(ctx, c, a)
+func (p *ap) GetElement(_ *plugin.Context, c any, a string) (string, error) {
+	return p.GetString(nil, c, a)
 }
 
-func (p analyzerParser) GetElements(ctx *plugin.Context, c any, a string) ([]string, error) {
-	return p.GetStrings(ctx, c, a)
+func (p *ap) GetElements(_ *plugin.Context, c any, a string) ([]string, error) {
+	return p.GetStrings(nil, c, a)
 }
 
 func TestAnalyzer(t *testing.T) {
 	ctx := plugin.NewContext(plugin.ContextOptions{})
-	parser.Register("ap", new(analyzerParser))
+	parser.Register("ap", &ap{eval()})
 	testCases := []struct {
 		schema string
 		want   any
 	}{
 		{
 			`
-{ ap: foo }
+{ ap: '"foo"' }
 `, `"foo"`,
 		},
 		{
 			`
-- ap:
+- ap: "null"
 - or
-- ap: foo
+- ap: '"foo"'
 `, `"foo"`,
 		},
 		{
 			`
-- ap:
+- ap: "null"
 - or
-- ap:
+- ap: "null"
 - or
-- ap: foo
+- ap: '"foo"'
 `, `"foo"`,
 		},
 		{
 			`
-- ap: foo
+- ap: '"foo"'
 - and
-- ap: bar
+- ap: '"bar"'
 `, `"foobar"`,
 		},
 		{
 			`
-- ap: foo
+- ap: '"foo"'
 - and
-- ap: bar
+- ap: '"bar"'
 - and
-- ap: aaa
+- ap: '"aaa"'
 `, `"foobaraaa"`,
 		},
 		{
@@ -109,27 +162,27 @@ rule:
 			`
 type: object
 properties:
- string: { ap: 'str' }
+ string: { ap: '"str"' }
  integer: !integer { ap: '1' }
  number: !number { ap: '1.1' }
  boolean: !boolean { ap: '1' }
- array: !string/array { ap: "[\"i1\", \"i2\"]" }
- object: !object { ap: "{\"foo\":\"bar\"}" }
+ array: !array { ap: "[\"i1\", \"i2\"]" }
+ object: !object { ap: "({\"foo\":\"bar\"})" }
 `, `{"array":["i1","i2"],"boolean":true,"integer":1,"number":1.1,"object":{"foo":"bar"},"string":"str"}`,
 		},
 		{
 			`
 type: object
 format: number
-rule: { ap: "{\"foo\":\"1.1\"}" }
+rule: { ap: '({"foo":"1.1"})' }
 `, `{"foo":1.1}`,
 		},
 		{
 			`
 type: array
 properties:
- n: !number { ap: '1' }
-`, `[{"n":1}]`,
+ n: !number { ap: '12' }
+`, `[{"n":12}]`,
 		},
 		{
 			`
@@ -142,35 +195,44 @@ rule: { ap: "1" }
 			`
 type: object
 properties:
- ? ap: 'k'
- : ap: 'v'
+ ? ap: '"k"'
+ : ap: '"v"'
 `, `{"k":"v"}`,
 		},
 		{
 			`
 type: object
 properties:
- $key: { ap: 'k' }
- $value: { ap: 'v' }
+ $key: { ap: '"k"' }
+ $value: { ap: '"v"' }
 `, `{"k":"v"}`,
 		},
 		{
 			`
 type: object
-init: { ap: "a,b,c,1,2,3" }
+init: { ap: "[1,2,3]" }
 properties:
- ? ap: '$'
- : ap: '$'
+ ? ap: c
+ : ap: c + 1
+`, `{"1":"11", "2":"21", "3":"31"}`,
+		},
+		{
+			`
+type: object
+init: { ap: '["a","b","c",1,2,3]' }
+properties:
+ $key: { ap: c }
+ $value: { ap: c }
 `, `{"1":"1", "2":"2", "3":"3", "a":"a", "b":"b", "c":"c"}`,
 		},
 		{
 			`
 type: object
-init: { ap: "a,b,c,1,2,3" }
 properties:
- $key: { ap: '$' }
- $value: { ap: '$' }
-`, `{"1":"1", "2":"2", "3":"3", "a":"a", "b":"b", "c":"c"}`,
+ num: !integer { ap: '2' }
+ msg: { ap: '"foooo"' }
+ $after: { ap: c.num = c.num + 1; c.msg = "hello"  }
+`, `{"num":3,"msg":"hello"}`,
 		},
 	}
 	for i, testCase := range testCases {

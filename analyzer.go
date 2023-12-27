@@ -88,7 +88,7 @@ func (a *analyzer) string(
 ) (ret any) {
 	var err error
 	if schema.Type == ArrayType { //nolint:nestif
-		ret, err = GetStrings(schema.Rule, ctx, content)
+		ret, err = GetStrings(ctx, schema.Rule, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("failed analyze %s", path), "error", err, attr)
 			return nil
@@ -97,7 +97,7 @@ func (a *analyzer) string(
 			ctx.Logger().Debug("parse", "path", path, "result", ret, attr)
 		}
 	} else {
-		ret, err = GetString(schema.Rule, ctx, content)
+		ret, err = GetString(ctx, schema.Rule, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("failed analyze %s", path), "error", err, attr)
 			return nil
@@ -143,43 +143,7 @@ func (a *analyzer) object(
 	content any,
 	path string, // the path of properties
 ) (ret any) {
-	if schema.Properties != nil {
-		var object map[string]any
-		ks, k := schema.Properties["$key"]
-		vs, v := schema.Properties["$value"]
-		if k && v {
-			elements := a.init(ctx, schema.Init, ArrayType, content, path)
-			if len(elements) == 0 {
-				return
-			}
-			object = make(map[string]any, len(elements))
-			for i, element := range elements {
-				key, err := GetString(ks.Rule, ctx, element)
-				keyPath := fmt.Sprintf("%s.[%v].value", path, i)
-				if a.debug {
-					ctx.Logger().Debug("parse", "path", keyPath, "result", key, attr)
-				}
-				if err != nil {
-					ctx.Logger().Error(fmt.Sprintf("failed to analyze key %v", keyPath), "error", err, attr)
-					return nil
-				}
-				object[key] = a.analyze(ctx, &vs, element, keyPath)
-			}
-			return object
-		}
-
-		element := a.init(ctx, schema.Init, schema.Type, content, path)
-		if len(element) == 0 {
-			return
-		}
-		object = make(map[string]any, len(schema.Properties))
-
-		for field, fieldSchema := range schema.Properties {
-			object[field] = a.analyze(ctx, &fieldSchema, element[0], path+"."+field) //nolint:gosec
-		}
-
-		return object
-	} else if schema.Rule != nil {
+	if schema.Properties == nil {
 		return a.string(ctx, &Schema{
 			Type:   ObjectType,
 			Format: schema.Format,
@@ -187,7 +151,52 @@ func (a *analyzer) object(
 		}, content, path)
 	}
 
-	return
+	var object map[string]any
+	ks, k := schema.Properties["$key"]
+	vs, v := schema.Properties["$value"]
+	if after, ae := schema.Properties["$after"]; ae {
+		defer func() {
+			_, err := GetString(ctx, after.Rule, object)
+			if err != nil {
+				ctx.Logger().Error(fmt.Sprintf("failed to analyze after %v", path), "error", err, attr)
+			}
+		}()
+	}
+	if k && v {
+		elements := a.init(ctx, schema.Init, ArrayType, content, path)
+		if len(elements) == 0 {
+			return
+		}
+		object = make(map[string]any, len(elements))
+		for i, element := range elements {
+			key, err := GetString(ctx, ks.Rule, element)
+			keyPath := fmt.Sprintf("%s.[%v].value", path, i)
+			if a.debug {
+				ctx.Logger().Debug("parse", "path", keyPath, "result", key, attr)
+			}
+			if err != nil {
+				ctx.Logger().Error(fmt.Sprintf("failed to analyze key %v", keyPath), "error", err, attr)
+				return
+			}
+			object[key] = a.analyze(ctx, &vs, element, keyPath)
+		}
+		return object
+	}
+
+	element := a.init(ctx, schema.Init, schema.Type, content, path)
+	if len(element) == 0 {
+		return
+	}
+	object = make(map[string]any, len(schema.Properties))
+
+	for field, fieldSchema := range schema.Properties {
+		if strings.HasPrefix(field, "$") {
+			continue
+		}
+		object[field] = a.analyze(ctx, &fieldSchema, element[0], path+"."+field) //nolint:gosec
+	}
+
+	return object
 }
 
 // array get array.
@@ -209,15 +218,13 @@ func (a *analyzer) array(
 		}
 
 		return array
-	} else if s.Rule != nil {
-		return a.string(ctx, &Schema{
-			Type:   ArrayType,
-			Format: s.Format,
-			Rule:   s.Rule,
-		}, content, path)
 	}
 
-	return nil
+	return a.string(ctx, &Schema{
+		Type:   ArrayType,
+		Format: s.Format,
+		Rule:   s.Rule,
+	}, content, path)
 }
 
 // init get elements
@@ -242,7 +249,7 @@ func (a *analyzer) init(
 	}
 
 	if typ == ArrayType {
-		elements, err := GetElements(init, ctx, content)
+		elements, err := GetElements(ctx, init, content)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("failed analyze init %s", path), "error", err, attr)
 			return
@@ -253,7 +260,7 @@ func (a *analyzer) init(
 		return elements
 	}
 
-	element, err := GetElement(init, ctx, content)
+	element, err := GetElement(ctx, init, content)
 	if err != nil {
 		ctx.Logger().Error(fmt.Sprintf("failed analyze init %s", path), "error", err, attr)
 		return
@@ -274,34 +281,34 @@ type defaultFormatHandler struct{}
 
 // Format the data to the given Type
 func (f defaultFormatHandler) Format(data any, format Type) (ret any, err error) {
-	switch data := data.(type) {
+	switch ori := data.(type) {
 	case string:
-		if data == "" && format != StringType {
+		if ori == "" && format != StringType {
 			return
 		}
 		switch format {
 		case StringType:
-			return data, nil
+			return ori, nil
 		case IntegerType:
-			ret, err = cast.ToIntE(data)
+			ret, err = cast.ToIntE(ori)
 		case NumberType:
-			ret, err = cast.ToFloat64E(data)
+			ret, err = cast.ToFloat64E(ori)
 		case BooleanType:
-			ret, err = cast.ToBoolE(data)
+			ret, err = cast.ToBoolE(ori)
 		case ArrayType:
 			ret = make([]any, 0)
-			err = json.Unmarshal([]byte(data), &ret)
+			err = json.Unmarshal([]byte(ori), &ret)
 		case ObjectType:
-			ret = make(map[string]any, 0)
-			err = json.Unmarshal([]byte(data), &ret)
+			ret = make(map[string]any)
+			err = json.Unmarshal([]byte(ori), &ret)
 		}
 		if err != nil {
 			return nil, err
 		}
 		return
 	case []string:
-		slice := make([]any, len(data))
-		for i, o := range data {
+		slice := make([]any, len(ori))
+		for i, o := range ori {
 			slice[i], err = f.Format(o, format)
 			if err != nil {
 				return nil, err
@@ -309,8 +316,8 @@ func (f defaultFormatHandler) Format(data any, format Type) (ret any, err error)
 		}
 		return slice, nil
 	case map[string]any:
-		maps := make(map[string]any, len(data))
-		for k, v := range data {
+		maps := make(map[string]any, len(ori))
+		for k, v := range ori {
 			maps[k], err = f.Format(v, format)
 			if err != nil {
 				return nil, err
@@ -318,5 +325,5 @@ func (f defaultFormatHandler) Format(data any, format Type) (ret any, err error)
 		}
 		return maps, nil
 	}
-	return nil, fmt.Errorf("failed format type %T to %s", data, format)
+	return nil, fmt.Errorf("unable format type %T to %s", data, format)
 }

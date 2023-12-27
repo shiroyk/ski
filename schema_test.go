@@ -3,7 +3,6 @@ package cloudcat
 import (
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/shiroyk/cloudcat/plugin/parser"
@@ -337,43 +336,43 @@ func TestActions(t *testing.T) {
 	t.Parallel()
 
 	parser.Register("act", new(testParser))
-	ctx := plugin.NewContext(plugin.ContextOptions{Timeout: time.Second})
+	ctx := plugin.NewContext(plugin.ContextOptions{})
 
 	testCases := []struct {
-		acts, content string
-		want          any
-		str           bool
+		acts string
+		want any
+		str  bool
 	}{
 		{
 			`
 - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
 - act: 2
-`, `1`, ``, true,
+`, ``, true,
 		},
 		{
 			`
 - act: 1
 - and
 - act: 1
-`, `1`, `11`, true,
+`, `11`, true,
 		},
 		{
 			`
 - act: 1
 - not
 - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
 - act: 2
 - not
 - act: 1
-`, `1`, ``, true,
+`, ``, true,
 		},
 		{
 			`
@@ -382,21 +381,21 @@ func TestActions(t *testing.T) {
 - act: 1
 - and
 - act: 1
-`, `1`, `111`, true,
+`, `111`, true,
 		},
 		{
 			`
 - act: 1
 - and
 - act: 1
-`, `1`, []string{`1`, `1`}, false,
+`, []string{`1`, `1`}, false,
 		},
 		{
 			`
 - act: 2
 - or
 - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
@@ -405,14 +404,14 @@ func TestActions(t *testing.T) {
 - act: 2
 - or
 - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
 - act: 2
 - or
 - act: 1
-`, `1`, []string{`1`}, false,
+`, []string{`1`}, false,
 		},
 		{
 			`
@@ -421,16 +420,7 @@ func TestActions(t *testing.T) {
 - act: 2
 - and
 - act: 1
-`, `1`, `11`, true,
-		},
-		{
-			`
-- act: 1
-- and
-- act: 2
-- or
-- act: 1
-`, `1`, `1`, true,
+`, `11`, true,
 		},
 		{
 			`
@@ -439,7 +429,16 @@ func TestActions(t *testing.T) {
 - act: 2
 - or
 - act: 1
-`, `1`, []string{`1`}, false,
+`, `1`, true,
+		},
+		{
+			`
+- act: 1
+- and
+- act: 2
+- or
+- act: 1
+`, []string{`1`}, false,
 		},
 		{
 			`
@@ -452,7 +451,7 @@ func TestActions(t *testing.T) {
 - - act: 2
   - or
   - act: 1
-`, `1`, `11`, true,
+`, `11`, true,
 		},
 		{
 			`
@@ -465,7 +464,7 @@ func TestActions(t *testing.T) {
 - - act: 2
   - and
   - act: 1
-`, `1`, `11`, true,
+`, `11`, true,
 		},
 		{
 			`
@@ -476,7 +475,7 @@ func TestActions(t *testing.T) {
 - - act: 1
   - and
   - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
@@ -487,7 +486,7 @@ func TestActions(t *testing.T) {
 - - act: 2
   - or
   - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
@@ -498,7 +497,7 @@ func TestActions(t *testing.T) {
 - - act: 2
   - or
   - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
@@ -509,7 +508,7 @@ func TestActions(t *testing.T) {
 - - act: 2
   - or
   - act: 1
-`, `1`, `11`, true,
+`, `11`, true,
 		},
 		{
 			`
@@ -520,7 +519,7 @@ func TestActions(t *testing.T) {
 - - act: 2
   - or
   - act: 1
-`, `1`, `1`, true,
+`, `1`, true,
 		},
 		{
 			`
@@ -531,7 +530,7 @@ func TestActions(t *testing.T) {
 - - act: 2
   - or
   - act: 1
-`, `1`, ``, true,
+`, ``, true,
 		},
 		{
 			`
@@ -544,7 +543,7 @@ func TestActions(t *testing.T) {
   - act: 2
   - or
   - act: 1
-`, `1`, `111`, true,
+`, `111`, true,
 		},
 		{
 			`
@@ -557,7 +556,7 @@ func TestActions(t *testing.T) {
 - - act: 1
   - and
   - act: 1
-`, `1`, `11111`, true,
+`, `11111`, true,
 		},
 		{
 			`
@@ -570,7 +569,7 @@ func TestActions(t *testing.T) {
 - - act: 1
   - and
   - act: 1
-`, `1`, []string{`1`, `1`, `1`, `1`, `1`}, false,
+`, []string{`1`, `1`, `1`, `1`, `1`}, false,
 		},
 	}
 
@@ -583,17 +582,17 @@ func TestActions(t *testing.T) {
 			}
 			var result any
 			if testCase.str {
-				result, err = GetString(u.act, ctx, testCase.content)
+				result, err = GetString(ctx, u.act, "1")
 				if err != nil {
 					t.Error(err)
 				}
 			} else {
-				result, err = GetStrings(u.act, ctx, testCase.content)
+				result, err = GetStrings(ctx, u.act, "1")
 				if err != nil {
 					t.Error(err)
 				}
 			}
-			assert.Equal(t, testCase.want, result, testCase.acts)
+			assert.EqualValues(t, testCase.want, result, testCase.acts)
 		})
 	}
 }
