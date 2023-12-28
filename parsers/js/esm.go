@@ -8,22 +8,23 @@ import (
 	"github.com/dop251/goja"
 	"github.com/shiroyk/cloudcat"
 	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/cloudcat/parsers/js/lru"
 	"github.com/shiroyk/cloudcat/plugin"
 )
 
 // ESMParser the js parser with es module
 type ESMParser struct {
 	mu    *sync.Mutex
-	cache map[uint64]goja.CyclicModuleRecord
+	cache *lru.Cache[uint64, goja.CyclicModuleRecord]
 	hash  *maphash.Hash
 	load  func() js.ModuleLoader
 }
 
 // NewESMParser returns a new ESMParser
-func NewESMParser() *ESMParser {
+func NewESMParser(maxCache int) *ESMParser {
 	return &ESMParser{
 		new(sync.Mutex),
-		make(map[uint64]goja.CyclicModuleRecord),
+		lru.New[uint64, goja.CyclicModuleRecord](maxCache),
 		new(maphash.Hash),
 		cloudcat.MustResolveLazy[js.ModuleLoader](),
 	}
@@ -65,7 +66,14 @@ func (p *ESMParser) GetElements(ctx *plugin.Context, content any, arg string) ([
 func (p *ESMParser) ClearCache() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	clear(p.cache)
+	p.cache.Clear()
+}
+
+// LenCache size the module cache
+func (p *ESMParser) LenCache() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.cache.Len()
 }
 
 func (p *ESMParser) run(ctx *plugin.Context, content any, script string) (any, error) {
@@ -77,14 +85,14 @@ func (p *ESMParser) run(ctx *plugin.Context, content any, script string) (any, e
 	hash := p.hash.Sum64()
 	p.hash.Reset()
 
-	mod, ok := p.cache[hash]
+	mod, ok := p.cache.Get(hash)
 	if !ok {
 		var err error
 		mod, err = goja.ParseModule("", script, p.load().ResolveModule)
 		if err != nil {
 			return nil, err
 		}
-		p.cache[hash] = mod
+		p.cache.Add(hash, mod)
 	}
 
 	result, err := js.RunModule(ctx, mod)

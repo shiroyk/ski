@@ -6,17 +6,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var esmParser = NewESMParser()
+var esmParser = NewESMParser(1)
 
 func TestESMCache(t *testing.T) {
 	_, err := esmParser.GetString(ctx, ``, `export default 1;`)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(esmParser.cache))
+	assert.Equal(t, 1, esmParser.cache.Len())
 	_, err = esmParser.GetString(ctx, ``, `export default 1;`)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(esmParser.cache))
+	assert.Equal(t, 1, esmParser.cache.Len())
+	_, err = esmParser.GetString(ctx, ``, `export default 2;`)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, esmParser.cache.Len())
 	esmParser.ClearCache()
-	assert.Equal(t, 0, len(esmParser.cache))
+	assert.Equal(t, 0, esmParser.cache.Len())
 }
 
 func TestESMGetString(t *testing.T) {
