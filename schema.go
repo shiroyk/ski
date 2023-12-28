@@ -444,7 +444,7 @@ func GetString(ctx *plugin.Context, node Action, content any) (string, error) {
 			if !ok {
 				return nil, fmt.Errorf("parser %s not found", step.K)
 			}
-			cur, err = p.GetElement(ctx, cur, step.V)
+			cur, err = p.GetString(ctx, cur, step.V)
 			if err != nil {
 				return nil, fmt.Errorf("parser %s: %s", step.K, err)
 			}
@@ -471,7 +471,7 @@ func GetStrings(ctx *plugin.Context, node Action, content any) ([]string, error)
 			if !ok {
 				return nil, fmt.Errorf("parser %s not found", step.K)
 			}
-			ret, err = p.GetElements(ctx, ret, step.V)
+			ret, err = p.GetStrings(ctx, ret, step.V)
 			if err != nil {
 				return nil, fmt.Errorf("parser %s: %s", step.K, err)
 			}
