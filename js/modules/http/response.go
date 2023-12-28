@@ -33,7 +33,7 @@ func NewResponse(vm *goja.Runtime, res *http.Response) goja.Value {
 	defineAccessorProperty(vm, object, "ok", res.StatusCode >= 200 || res.StatusCode < 300)
 	_ = object.Set("text", func(goja.FunctionCall) goja.Value { return vm.ToValue(string(body)) })
 	_ = object.Set("json", func(goja.FunctionCall) goja.Value {
-		j := make(map[string]any)
+		var j any
 		if err = json.Unmarshal(body, &j); err != nil {
 			js.Throw(vm, err)
 		}
@@ -88,7 +88,7 @@ func NewAsyncResponse(vm *goja.Runtime, res *http.Response) goja.Value {
 			if err != nil {
 				return nil, err
 			}
-			j := make(map[string]any)
+			var j any
 			if err = json.Unmarshal(data, &j); err != nil {
 				return nil, err
 			}

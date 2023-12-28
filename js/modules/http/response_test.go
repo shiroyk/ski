@@ -25,6 +25,10 @@ func TestResponse(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_, err := fmt.Fprint(w, `{ "foo": "bar", "test": true }`)
 			assert.NoError(t, err)
+		case "/array":
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `[{ "foo": "bar", "test": true }]`)
+			assert.NoError(t, err)
 		case "/text":
 			w.Header().Set("Content-Type", "text/plain")
 			_, err := fmt.Fprint(w, `foo`)
@@ -38,6 +42,13 @@ func TestResponse(t *testing.T) {
 	testCase := []string{
 		`const res = http.get(url+'/json');
 		 assert.equal(res.json(), { "foo": "bar", "test": true });
+		 assert.true(res.bodyUsed);
+		 assert.true(res.ok);
+		 assert.equal(res.status, 200);
+		 assert.equal(res.statusText, "200 OK");
+		 assert.equal(res.headers["Content-Type"], "application/json");`,
+		`const res = http.get(url+'/array');
+		 assert.equal(res.json(), [{ "foo": "bar", "test": true }]);
 		 assert.true(res.bodyUsed);
 		 assert.true(res.ok);
 		 assert.equal(res.status, 200);
@@ -79,6 +90,10 @@ func TestAsyncResponse(t *testing.T) {
 		case "/json":
 			w.Header().Set("Content-Type", "application/json")
 			_, err := fmt.Fprint(w, `{ "foo": "bar", "test": true }`)
+			assert.NoError(t, err)
+		case "/array":
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `[{ "foo": "bar", "test": true }]`)
 			assert.NoError(t, err)
 		case "/text":
 			w.Header().Set("Content-Type", "text/plain")
@@ -133,6 +148,11 @@ func TestAsyncResponse(t *testing.T) {
 		`(async () => {
 			const res = await fetch(url+'/json');
 			assert.equal(await res.json(), { "foo": "bar", "test": true });
+			assert.true(res.bodyUsed);
+		 })()`,
+		`(async () => {
+			const res = await fetch(url+'/array');
+			assert.equal(await res.json(), [{ "foo": "bar", "test": true }]);
 			assert.true(res.bodyUsed);
 		 })()`,
 		`(async () => {
