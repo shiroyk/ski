@@ -1,6 +1,7 @@
-package cloudcat
+package ski
 
 import (
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -9,17 +10,13 @@ import (
 
 func TestCookie(t *testing.T) {
 	t.Parallel()
-	c := NewCookie()
+	c := NewCookieJar()
 
 	u, _ := url.Parse("https://github.com")
 
-	if len(c.Cookies(u)) > 0 {
-		t.Fatal("retrieved cookie before adding it")
-	}
-
-	raw := "has_recent_activity=1; path=/; secure; HttpOnly; SameSite=Lax"
-	c.SetCookies(u, ParseSetCookie(raw))
-	assert.Equal(t, []string{"has_recent_activity=1"}, c.CookieString(u))
-	c.DeleteCookie(u)
+	cookies := []*http.Cookie{{Name: "has_recent_activity", Value: "1", Path: "/", Secure: true}}
+	c.SetCookies(u, cookies)
+	assert.NotNil(t, c.Cookies(u))
+	c.RemoveCookie(u)
 	assert.Nil(t, c.Cookies(u))
 }

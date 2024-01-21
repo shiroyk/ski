@@ -6,44 +6,43 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/ski/js"
 )
 
-// AbortController interface represents a controller object
+// abortController interface represents a controller object
 // that allows you to abort one or more Web requests as and when desired.
 // https://developer.mozilla.org/en-US/docs/Web/API/AbortController.
-type AbortController struct {
-	Signal  *AbortSignal
+type abortController struct {
+	Signal  *abortSignal
 	Aborted bool
 	Reason  string
 }
 
-func (c *AbortController) Abort() {
+func (c *abortController) Abort() {
 	c.Signal.abort()
 	c.Aborted = c.Signal.Aborted
 	c.Reason = c.Signal.Reason
 }
 
-// AbortControllerConstructor AbortController Constructor
-type AbortControllerConstructor struct{}
+// AbortController Constructor
+type AbortController struct{}
 
-// Exports AbortController Constructor
-func (*AbortControllerConstructor) Exports() any {
-	return func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
-		signal := new(AbortSignal)
-		parent := js.VMContext(vm)
-		signal.ctx, signal.cancel = context.WithCancel(parent)
-		return vm.ToValue(&AbortController{Signal: signal}).ToObject(vm)
-	}
+// Instantiate module
+func (*AbortController) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	return rt.ToValue(func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
+		signal := new(abortSignal)
+		signal.ctx, signal.cancel = context.WithCancel(js.Context(vm))
+		return vm.ToValue(&abortController{Signal: signal}).ToObject(vm)
+	}), nil
 }
 
 // Global it is a global module
-func (*AbortControllerConstructor) Global() {}
+func (*AbortController) Global() {}
 
-// AbortSignal represents a signal object that allows you to communicate
+// abortSignal represents a signal object that allows you to communicate
 // with http request and abort it.
 // https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal
-type AbortSignal struct {
+type abortSignal struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	once    sync.Once
@@ -51,7 +50,7 @@ type AbortSignal struct {
 	Reason  string
 }
 
-func (s *AbortSignal) abort() {
+func (s *abortSignal) abort() {
 	s.once.Do(func() {
 		s.Aborted = true
 		s.cancel()
@@ -61,24 +60,23 @@ func (s *AbortSignal) abort() {
 	})
 }
 
-type AbortSignalModule struct{}
+type AbortSignal struct{}
 
-func (*AbortSignalModule) Exports() any { return new(abortSignalInstance) }
-
-func (*AbortSignalModule) Global() {}
-
-type abortSignalInstance struct{}
-
-func (s *abortSignalInstance) Abort(_ goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	signal := new(AbortSignal)
-	signal.ctx, signal.cancel = context.WithCancel(context.Background())
-	signal.abort()
-	return vm.ToValue(signal).ToObject(vm)
+func (*AbortSignal) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	object := rt.NewObject()
+	_ = object.Set("abort", func(_ goja.FunctionCall) goja.Value {
+		signal := new(abortSignal)
+		signal.ctx, signal.cancel = context.WithCancel(context.Background())
+		signal.abort()
+		return rt.ToValue(signal).ToObject(rt)
+	})
+	_ = object.Set("timeout", func(call goja.FunctionCall) goja.Value {
+		timeout := call.Argument(0).ToInteger()
+		signal := new(abortSignal)
+		signal.ctx, signal.cancel = context.WithTimeout(js.Context(rt), time.Duration(timeout))
+		return rt.ToValue(signal).ToObject(rt)
+	})
+	return object, nil
 }
 
-func (s *abortSignalInstance) Timeout(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-	timeout := call.Argument(0).ToInteger()
-	signal := new(AbortSignal)
-	signal.ctx, signal.cancel = context.WithTimeout(js.VMContext(vm), time.Duration(timeout))
-	return vm.ToValue(signal).ToObject(vm)
-}
+func (*AbortSignal) Global() {}

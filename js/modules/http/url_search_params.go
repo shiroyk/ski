@@ -3,69 +3,88 @@ package http
 import (
 	"fmt"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat"
-	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/ski"
+	"github.com/shiroyk/ski/js"
 	"github.com/spf13/cast"
 )
 
-// The URLSearchParams defines utility methods to work with the query string of a URL,
+// The urlSearchParams defines utility methods to work with the query string of a URL,
 // which can be sent using the http() method and encoding type were set to "application/x-www-form-url".
 // Implement the https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams
-type URLSearchParams struct {
+type urlSearchParams struct {
+	keys []string
 	data map[string][]string
 }
 
-// URLSearchParamsConstructor Constructor
-type URLSearchParamsConstructor struct{}
+// URLSearchParams Constructor
+type URLSearchParams struct{}
 
-// Exports instance URLSearchParams module
-func (*URLSearchParamsConstructor) Exports() any {
-	return func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
-		param := call.Argument(0)
+// Instantiate instance module
+func (*URLSearchParams) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	return rt.ToValue(func(call goja.ConstructorCall) *goja.Object {
+		params := call.Argument(0)
 
-		if goja.IsUndefined(param) {
-			return vm.ToValue(URLSearchParams{data: make(url.Values)}).ToObject(vm)
+		var ret urlSearchParams
+		if goja.IsUndefined(params) {
+			ret.data = make(map[string][]string)
+			return ret.object(rt)
 		}
 
-		var pa map[string]any
-		var ok bool
-		pa, ok = param.Export().(map[string]any)
-		if !ok {
-			js.Throw(vm, fmt.Errorf("unsupported type %T", param.Export()))
-		}
+		object := params.ToObject(rt)
+		keys := object.Keys()
+		ret.keys = make([]string, 0, len(keys))
+		ret.data = make(map[string][]string, len(keys))
 
-		data := make(map[string][]string, len(pa))
-		for k, v := range pa {
-			if s, ok := v.([]any); ok {
-				data[k] = cast.ToStringSlice(s)
+		for _, key := range keys {
+			value, _ := js.Unwrap(object.Get(key))
+			if s, ok := value.([]any); ok {
+				ret.data[key] = cast.ToStringSlice(s)
 			} else {
-				data[k] = []string{fmt.Sprintf("%v", v)}
+				ret.data[key] = []string{fmt.Sprintf("%s", value)}
 			}
+			ret.keys = append(ret.keys, key)
 		}
 
-		return vm.ToValue(URLSearchParams{data: data}).ToObject(vm)
-	}
+		return ret.object(rt)
+	}), nil
 }
 
 // Global it is a global module
-func (*URLSearchParamsConstructor) Global() {}
+func (*URLSearchParams) Global() {}
+
+func (u *urlSearchParams) object(rt *goja.Runtime) *goja.Object {
+	obj := rt.ToValue(u).ToObject(rt)
+
+	_ = obj.SetSymbol(goja.SymIterator, func(goja.ConstructorCall) *goja.Object {
+		var i int
+		it := rt.NewObject()
+		_ = it.Set("next", func(goja.FunctionCall) goja.Value {
+			if i < len(u.keys) {
+				key := u.keys[i]
+				i++
+				return rt.ToValue(iter{Value: rt.ToValue([2]any{key, u.data[key]})})
+			}
+			return rt.ToValue(iter{Done: true})
+		})
+		return it
+	})
+	return obj
+}
 
 // encode encodes the values into “URL encoded” form
 // ("bar=baz&foo=qux") sorted by key.
-func (u *URLSearchParams) encode() string {
+func (u *urlSearchParams) encode() string {
 	if u.data == nil {
 		return ""
 	}
 	var buf strings.Builder
-	keys := cloudcat.MapKeys(u.data)
-	sort.Strings(keys)
-	for _, k := range keys {
-		vs := u.data[k]
-		keyEscaped := url.QueryEscape(k)
+	for _, key := range u.keys {
+		vs := u.data[key]
+		keyEscaped := url.QueryEscape(key)
 		for _, v := range vs {
 			if buf.Len() > 0 {
 				buf.WriteByte('&')
@@ -78,38 +97,41 @@ func (u *URLSearchParams) encode() string {
 	return buf.String()
 }
 
-// Append method of the URLSearchParams interface appends a specified key/value pair as a new search parameter.
-func (u *URLSearchParams) Append(name, value string) {
-	u.data[name] = append(u.data[name], value)
+// Append method of the urlSearchParams interface appends a specified key/value pair as a new search parameter.
+func (u *urlSearchParams) Append(name, value string) {
+	values, ok := u.data[name]
+	if !ok {
+		u.keys = append(u.keys, name)
+	}
+	u.data[name] = append(values, value)
 }
 
-// Delete method of the URLSearchParams interface deletes the given search parameter and all its associated values,
+// Delete method of the urlSearchParams interface deletes the given search parameter and all its associated values,
 // from the list of all search parameters.
-func (u *URLSearchParams) Delete(name string) {
+func (u *urlSearchParams) Delete(name string) {
+	u.keys = slices.DeleteFunc(u.keys, func(k string) bool { return k == name })
 	delete(u.data, name)
 }
 
-// Entries method of the URLSearchParams interface returns an iterator allowing iteration
+// Entries method of the urlSearchParams interface returns an iterator allowing iteration
 // through all key/value pairs contained in this object.
 // The iterator returns key/value pairs in the same order as they appear in the query string.
 // The key and value of each pair are string objects.
-func (u *URLSearchParams) Entries() any {
-	entries := make([][2]string, 0, len(u.data))
-	for k, v := range u.data {
-		for _, ve := range v {
-			entries = append(entries, [2]string{k, ve})
-		}
+func (u *urlSearchParams) Entries() any {
+	entries := make([][2]any, 0, len(u.keys))
+	for _, key := range u.keys {
+		entries = append(entries, [2]any{key, u.data[key]})
 	}
 	return entries
 }
 
-// ForEach method of the URLSearchParams interface allows iteration
+// ForEach method of the urlSearchParams interface allows iteration
 // through all values contained in this object via a callback function.
-func (u *URLSearchParams) ForEach(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (u *urlSearchParams) ForEach(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 	arg := call.Argument(0)
 	if callback, ok := goja.AssertFunction(arg); ok {
-		for k, v := range u.data {
-			if _, err := callback(goja.Undefined(), vm.ToValue(v), vm.ToValue(k), vm.ToValue(u)); err != nil {
+		for _, key := range u.keys {
+			if _, err := callback(goja.Undefined(), vm.ToValue(u.data[key]), vm.ToValue(key), vm.ToValue(u)); err != nil {
 				panic(vm.ToValue(err))
 			}
 		}
@@ -117,56 +139,55 @@ func (u *URLSearchParams) ForEach(call goja.FunctionCall, vm *goja.Runtime) (ret
 	return
 }
 
-// Get method of the URLSearchParams interface returns the first value associated to the given search parameter.
-func (u *URLSearchParams) Get(name string) any {
+// Get method of the urlSearchParams interface returns the first value associated to the given search parameter.
+func (u *urlSearchParams) Get(name string) any {
 	if v, ok := u.data[name]; ok {
 		return v[0]
 	}
 	return nil
 }
 
-// GetAll method of the URLSearchParams interface returns all the values associated
+// GetAll method of the urlSearchParams interface returns all the values associated
 // with a given search parameter as an array.
-func (u *URLSearchParams) GetAll(name string) []string {
+func (u *urlSearchParams) GetAll(name string) []string {
 	if v, ok := u.data[name]; ok {
 		return v
 	}
 	return []string{}
 }
 
-// Has method of the URLSearchParams interface returns a boolean value that indicates whether
+// Has method of the urlSearchParams interface returns a boolean value that indicates whether
 // a parameter with the specified name exists.
-func (u *URLSearchParams) Has(name string) bool {
+func (u *urlSearchParams) Has(name string) bool {
 	_, ok := u.data[name]
 	return ok
 }
 
-// Keys method of the URLSearchParams interface returns an iterator allowing iteration
+// Keys method of the urlSearchParams interface returns an iterator allowing iteration
 // through all keys contained in this object. The keys are string objects.
-func (u *URLSearchParams) Keys() []string {
-	return cloudcat.MapKeys(u.data)
-}
+func (u *urlSearchParams) Keys() []string { return u.keys }
 
-// Set method of the URLSearchParams interface sets the value associated
+// Set method of the urlSearchParams interface sets the value associated
 // with a given search parameter to the given value.
 // If there were several matching values, this method deletes the others.
 // If the search parameter doesn't exist, this method creates it.
-func (u *URLSearchParams) Set(name, value string) {
+func (u *urlSearchParams) Set(name, value string) {
+	if _, ok := u.data[name]; !ok {
+		u.keys = append(u.keys, name)
+	}
 	u.data[name] = []string{value}
 }
 
 // Sort method sorts all key/value pairs contained in this object in place and returns undefined.
-func (u *URLSearchParams) Sort() {
-	// Not implemented
-}
+func (u *urlSearchParams) Sort() { slices.Sort(u.keys) }
 
-// ToString method of the URLSearchParams interface returns a query string suitable for use in a URL.
-func (u *URLSearchParams) ToString() string {
+// ToString method of the urlSearchParams interface returns a query string suitable for use in a URL.
+func (u *urlSearchParams) ToString() string {
 	return u.encode()
 }
 
-// Values method of the URLSearchParams interface returns an iterator allowing iteration through
+// Values method of the urlSearchParams interface returns an iterator allowing iteration through
 // all values contained in this object. The values are string objects.
-func (u *URLSearchParams) Values() [][]string {
-	return cloudcat.MapValues(u.data)
+func (u *urlSearchParams) Values() [][]string {
+	return ski.MapValues(u.data)
 }

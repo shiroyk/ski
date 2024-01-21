@@ -1,598 +1,155 @@
-package cloudcat
+package ski
 
 import (
+	"bytes"
+	"context"
+	"fmt"
+	"log/slog"
 	"strconv"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
+	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
-func TestSchemaYaml(t *testing.T) {
-	t.Parallel()
+type _inc struct{}
 
+func (_inc) Exec(_ context.Context, v any) (ret any, err error) {
+	return cast.ToInt(v) + 1, nil
+}
+
+type _dec struct{}
+
+func (_dec) Exec(_ context.Context, v any) (ret any, err error) {
+	return cast.ToInt(v) - 1, nil
+}
+
+func TestExecutor(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "foo", "bar")
 	testCases := []struct {
-		Yaml   string
-		Schema *Schema
+		e    Executor
+		arg  any
+		want any
 	}{
-		{
-			`
-{ p: foo }`, NewSchema(StringType).
-				SetRule(NewSteps("p", "foo")),
-		},
-		{
-			`
-- p: foo
-  p: bar`, NewSchema(StringType).
-				SetRule(NewSteps("p", "foo", "p", "bar")),
-		},
-		{
-			`
-- p: foo
-- p: bar
-- p: title`, NewSchema(StringType).
-				SetRule(NewSteps("p", "foo", "p", "bar", "p", "title")),
-		},
-		{
-			`
-- p: foo
-- not
-- p: title`, NewSchema(StringType).
-				SetRule(NewNot(NewSteps("p", "foo"), NewSteps("p", "title"))),
-		},
-		{
-			`
-- p: foo
-- or
-- p: title`, NewSchema(StringType).
-				SetRule(NewOr(NewSteps("p", "foo"), NewSteps("p", "title"))),
-		},
-		{
-			`
-- p: foo
-- and
-- p: bar
-- or
-- p: body`, NewSchema(StringType).
-				SetRule(NewOr(
-					NewAnd(NewSteps("p", "foo"), NewSteps("p", "bar")),
-					NewSteps("p", "body"),
-				)),
-		},
-		{
-			`
-- p: foo
-- not
-- p: bar
-- or
-- p: body`, NewSchema(StringType).
-				SetRule(NewOr(
-					NewNot(NewSteps("p", "foo"), NewSteps("p", "bar")),
-					NewSteps("p", "body"),
-				)),
-		},
-		{
-			`
-- - p: foo
-  - p: bar
-- or
-- - p: title
-  - p: body`, NewSchema(StringType).
-				SetRule(NewOr(NewSteps("p", "foo", "p", "bar"), NewSteps("p", "title", "p", "body"))),
-		},
-		{
-			`
-!integer { p: foo }`, NewSchema(IntegerType).
-				SetRule(NewSteps("p", "foo")),
-		},
-		{
-			`
-type: integer
-rule: { p: foo }`, NewSchema(IntegerType).
-				SetRule(NewSteps("p", "foo")),
-		},
-		{
-			`
-type: number
-rule: { p: foo }`, NewSchema(NumberType).
-				SetRule(NewSteps("p", "foo")),
-		},
-		{
-			`
-type: boolean
-rule: { p: foo }`, NewSchema(BooleanType).
-				SetRule(NewSteps("p", "foo")),
-		},
-		{
-			`
-type: object
-properties:
-  context:
-    type: string
-    format: boolean
-    rule: { p: foo }`, NewSchema(ObjectType).
-				AddProperty("context", *NewSchema(StringType, BooleanType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-properties:
-  context: !string/boolean { p: foo }`, NewSchema(ObjectType).
-				AddProperty("context", *NewSchema(StringType, BooleanType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: array
-init: { p: foo }
-properties:
-  context:
-    type: string
-    format: integer
-    rule: { p: foo }`, NewSchema(ArrayType).
-				SetInit(NewSteps("p", "foo")).
-				AddProperty("context", *NewSchema(StringType, IntegerType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-init: { p: foo }
-properties:
-  context:
-    type: number
-    rule: { p: foo }`, NewSchema(ObjectType).
-				SetInit(NewSteps("p", "foo")).
-				AddProperty("context", *NewSchema(NumberType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-init: { p: foo }
-properties:
-  context: !number { p: foo }`, NewSchema(ObjectType).
-				SetInit(NewSteps("p", "foo")).
-				AddProperty("context", *NewSchema(NumberType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-properties:
-  ? p: foo
-  : p: bar`, NewSchema(ObjectType).
-				AddProperty("$key", *NewSchema(StringType).
-					SetRule(NewSteps("p", "foo"))).
-				AddProperty("$value", *NewSchema(StringType).
-					SetRule(NewSteps("p", "bar"))),
-		},
-		{
-			`
-type: object
-properties:
-  ? p: foo
-  : type: integer
-    rule: { p: bar }`, NewSchema(ObjectType).
-				AddProperty("$key", *NewSchema(StringType).
-					SetRule(NewSteps("p", "foo"))).
-				AddProperty("$value", *NewSchema(IntegerType).
-					SetRule(NewSteps("p", "bar"))),
-		},
-		{
-			`
-type: object
-properties:
-  $key: { p: foo }
-  $value: { p: bar }`, NewSchema(ObjectType).
-				AddProperty("$key", *NewSchema(StringType).
-					SetRule(NewSteps("p", "foo"))).
-				AddProperty("$value", *NewSchema(StringType).
-					SetRule(NewSteps("p", "bar"))),
-		},
-		{
-			`
-type: object
-init:
-  - p: foo
-  - not
-  - p: bar
-properties:
-  context:
-    type: number
-    rule: { p: foo }`, NewSchema(ObjectType).
-				SetInit(NewNot(NewSteps("p", "foo"), NewSteps("p", "bar"))).
-				AddProperty("context", *NewSchema(NumberType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-init:
-  - p: foo
-  - or
-  - p: bar
-properties:
-  context:
-    type: number
-    rule: { p: foo }`, NewSchema(ObjectType).
-				SetInit(NewOr(NewSteps("p", "foo"), NewSteps("p", "bar"))).
-				AddProperty("context", *NewSchema(NumberType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-init:
-  - p: foo
-  - or
-  - p: bar
-properties:
-  a: !number { p: foo }
-  b:
-   type: boolean
-   rule: { p: foo }`, NewSchema(ObjectType).
-				SetInit(NewOr(NewSteps("p", "foo"), NewSteps("p", "bar"))).
-				AddProperty("a", *NewSchema(NumberType).
-					SetRule(NewSteps("p", "foo"))).
-				AddProperty("b", *NewSchema(BooleanType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-properties:
-  a: !boolean { p: &p foo }
-  b: { p: *p }`, NewSchema(ObjectType).
-				AddProperty("a", *NewSchema(BooleanType).
-					SetRule(NewSteps("p", "foo"))).
-				AddProperty("b", *NewSchema(StringType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-properties:
-  a: &a
-   type: boolean
-   rule: { p: foo }
-  b: *a`, NewSchema(ObjectType).
-				AddProperty("a", *NewSchema(BooleanType).
-					SetRule(NewSteps("p", "foo"))).
-				AddProperty("b", *NewSchema(BooleanType).
-					SetRule(NewSteps("p", "foo"))),
-		},
-		{
-			`
-type: object
-properties:
-  a:
-   type: array
-   rule: &a
-     - { p: foo }
-     - and
-     - { p: foo }
-  b:
-   type: array
-   rule: *a`, NewSchema(ObjectType).
-				AddProperty("a", *NewSchema(ArrayType).
-					SetRule(NewAnd(NewSteps("p", "foo"), NewSteps("p", "foo")))).
-				AddProperty("b", *NewSchema(ArrayType).
-					SetRule(NewAnd(NewSteps("p", "foo"), NewSteps("p", "foo")))),
-		},
+		{_raw{nil}, 1, nil},
+		{_map{_raw{"k"}, _raw{nil}}, 1, map[string]any{"k": nil}},
+		{_pipe{_inc{}, _inc{}, _dec{}}, 1, 2},
+		{KindInt, "1", int32(1)},
+		{_or{_raw{nil}, _raw{"b"}}, nil, "b"},
+		{_map{_raw{"k"}, _inc{}}, 0, map[string]any{"k": 1}},
+		{_each{_inc{}}, []string{"1", "2", "3"}, []any{2, 3, 4}},
+		{_map{_raw{"k"}, _inc{}}, []any{1}, map[string]any{"k": 2}},
+		{_stringJoin(""), []string{"1", "2", "3"}, "123"},
+		{_pipe{_each{KindString}, _stringJoin("")}, []any{1, 2, 3}, "123"},
+		{_pipe{_each{_inc{}}, _each{_inc{}}}, []any{1, 2, 3}, []any{3, 4, 5}},
+		{_each{_map{_raw{"k"}, _inc{}}}, []any{1}, []any{map[string]any{"k": 2}}},
+		{_map{_raw{"k"}, _jsonParse{}}, `{"foo": "bar"}`, map[string]any{"k": map[string]any{"foo": "bar"}}},
 	}
-
-	for i, test := range testCases {
+	for i, c := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			s := new(Schema)
-			err := yaml.Unmarshal([]byte(test.Yaml), s)
-			if err != nil {
-				t.Fatal(err)
+			v, err := c.e.Exec(ctx, c.arg)
+			if assert.NoError(t, err) {
+				assert.Equal(t, c.want, v)
 			}
-			assert.Equal(t, test.Schema, s)
 		})
 	}
 }
 
-type testParser struct{}
-
-func (t *testParser) GetString(_ *plugin.Context, content any, arg string) (string, error) {
-	if str, ok := content.(string); ok {
-		if str == arg {
-			return str, nil
-		}
+func TestDebug(t *testing.T) {
+	data := new(bytes.Buffer)
+	ctx := WithLogger(context.Background(), slog.New(slog.NewTextHandler(data, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	v, err := _pipe{_debug("before"), _inc{}, _debug("after")}.Exec(ctx, 1)
+	if assert.NoError(t, err) {
+		assert.Equal(t, v, 2)
 	}
-	return "", nil
+	assert.Regexp(t, "msg=before value=1 | msg=after value=2", data.String())
 }
 
-func (t *testParser) GetStrings(_ *plugin.Context, content any, arg string) ([]string, error) {
-	if str, ok := content.(string); ok {
-		if str == arg {
-			return []string{str}, nil
-		}
+type meta struct {
+	exec         Executor
+	line, column int
+}
+
+func (m *meta) Exec(ctx context.Context, arg any) (any, error) {
+	v, err := m.exec.Exec(ctx, arg)
+	if err != nil {
+		return nil, fmt.Errorf("line %d column %d: %s", m.line, m.column, err)
 	}
-	return nil, nil
+	return v, nil
 }
 
-func (t *testParser) GetElement(ctx *plugin.Context, content any, arg string) (string, error) {
-	return t.GetString(ctx, content, arg)
+type errexec struct{}
+
+func (errexec) Exec(context.Context, any) (any, error) {
+	return nil, fmt.Errorf("some error")
 }
 
-func (t *testParser) GetElements(ctx *plugin.Context, content any, arg string) ([]string, error) {
-	return t.GetStrings(ctx, content, arg)
+func TestWithMetaWrap(t *testing.T) {
+	v, err := Compile(`$error: ...`,
+		WithMeta(func(node *yaml.Node, exec Executor, isParser bool) Executor {
+			return &meta{exec, node.Line, node.Column}
+		}),
+		WithExecutorMap(ExecutorMap{"error": func(args ...Executor) (Executor, error) {
+			return errexec{}, nil
+		}}))
+	if assert.NoError(t, err) {
+		_, err = v.Exec(context.Background(), ``)
+		assert.ErrorContains(t, err, "line 1 column 1: some error")
+	}
 }
 
-type unknown struct{ act Action }
+type p struct{}
 
-func (u *unknown) UnmarshalYAML(value *yaml.Node) (err error) {
-	u.act, err = actionDecode(value)
-	return
-}
+func (p) Value(string) (Executor, error)    { return String("p.value"), nil }
+func (p) Element(string) (Executor, error)  { return String("p.element"), nil }
+func (p) Elements(string) (Executor, error) { return String("p.elements"), nil }
 
-func TestActions(t *testing.T) {
-	t.Parallel()
-
-	parser.Register("act", new(testParser))
-	ctx := plugin.NewContext(plugin.ContextOptions{})
-
+func TestCompile(t *testing.T) {
+	Register("p", p{})
 	testCases := []struct {
-		acts string
-		want any
-		str  bool
+		s string
+		e Executor
 	}{
-		{
-			`
-- act: 1
-`, `1`, true,
-		},
-		{
-			`
-- act: 2
-`, ``, true,
-		},
-		{
-			`
-- act: 1
-- and
-- act: 1
-`, `11`, true,
-		},
-		{
-			`
-- act: 1
-- not
-- act: 1
-`, `1`, true,
-		},
-		{
-			`
-- act: 2
-- not
-- act: 1
-`, ``, true,
-		},
-		{
-			`
-- act: 1
-- and
-- act: 1
-- and
-- act: 1
-`, `111`, true,
-		},
-		{
-			`
-- act: 1
-- and
-- act: 1
-`, []string{`1`, `1`}, false,
-		},
-		{
-			`
-- act: 2
-- or
-- act: 1
-`, `1`, true,
-		},
-		{
-			`
-- act: 2
-- or
-- act: 2
-- or
-- act: 1
-`, `1`, true,
-		},
-		{
-			`
-- act: 2
-- or
-- act: 1
-`, []string{`1`}, false,
-		},
-		{
-			`
-- act: 1
-- or
-- act: 2
-- and
-- act: 1
-`, `11`, true,
-		},
-		{
-			`
-- act: 1
-- and
-- act: 2
-- or
-- act: 1
-`, `1`, true,
-		},
-		{
-			`
-- act: 1
-- and
-- act: 2
-- or
-- act: 1
-`, []string{`1`}, false,
-		},
-		{
-			`
-- - act: 1
-  - and
-  - act: 1
-- and
-- act: 2
-- or
-- - act: 2
-  - or
-  - act: 1
-`, `11`, true,
-		},
-		{
-			`
-- - act: 2
-  - or
-  - act: 1
-- and
-- act: 1
-- or
-- - act: 2
-  - and
-  - act: 1
-`, `11`, true,
-		},
-		{
-			`
-- - act: 2
-  - or
-  - act: 1
-- or
-- - act: 1
-  - and
-  - act: 1
-`, `1`, true,
-		},
-		{
-			`
-- - act: 1
-  - or
-  - act: 2
-- or
-- - act: 2
-  - or
-  - act: 1
-`, `1`, true,
-		},
-		{
-			`
-- - act: 2
-  - and
-  - act: 2
-- or
-- - act: 2
-  - or
-  - act: 1
-`, `1`, true,
-		},
-		{
-			`
-- - act: 2
-  - and
-  - act: 1
-- and
-- - act: 2
-  - or
-  - act: 1
-`, `11`, true,
-		},
-		{
-			`
-- - act: 2
-  - or
-  - act: 1
-- not
-- - act: 2
-  - or
-  - act: 1
-`, `1`, true,
-		},
-		{
-			`
-- - act: 2
-  - and
-  - act: 2
-- not
-- - act: 2
-  - or
-  - act: 1
-`, ``, true,
-		},
-		{
-			`
-- - act: 1
-  - and
-  - act: 1
-- and
-- - act: 2
-  - or
-  - act: 2
-  - or
-  - act: 1
-`, `111`, true,
-		},
-		{
-			`
-- - act: 1
-  - and
-  - act: 1
-- and
-- act: 1
-- and
-- - act: 1
-  - and
-  - act: 1
-`, `11111`, true,
-		},
-		{
-			`
-- - act: 1
-  - and
-  - act: 1
-- and
-- act: 1
-- and
-- - act: 1
-  - and
-  - act: 1
-`, []string{`1`, `1`, `1`, `1`, `1`}, false,
-		},
+		{`$p: foo`, String("p.value")},
+		{`$p.value: foo`, String("p.value")},
+		{`
+- $map: &alias
+    title:
+      $p: text
+- $map: *alias`,
+			_pipe{
+				_map{String("title"), String("p.value")},
+				_map{String("title"), String("p.value")}}},
+		{`
+$map:
+  size:
+    $p: text
+    $debug: the size
+    $kind: int64`, _map{String("size"),
+			_pipe{String("p.value"), _debug("the size"), KindInt64}}},
+		{`
+$map:
+  size:
+    - $p: text
+    - $debug: the size
+    - $kind: int64`, _map{String("size"),
+			_pipe{String("p.value"), _debug("the size"), KindInt64}}},
+		{`
+$map:
+  size:
+    $pipe:
+      - $p: text
+      - $debug: the size
+      - $kind: int32`, _map{String("size"),
+			_pipe{String("p.value"), _debug("the size"), KindInt}}},
 	}
-
-	for i, testCase := range testCases {
+	for i, c := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			u := new(unknown)
-			err := yaml.Unmarshal([]byte(testCase.acts), u)
-			if err != nil {
-				t.Fatal(err)
+			v, err := Compile(c.s)
+			if assert.NoError(t, err) {
+				assert.Equal(t, c.e, v)
 			}
-			var result any
-			if testCase.str {
-				result, err = GetString(ctx, u.act, "1")
-				if err != nil {
-					t.Error(err)
-				}
-			} else {
-				result, err = GetStrings(ctx, u.act, "1")
-				if err != nil {
-					t.Error(err)
-				}
-			}
-			assert.EqualValues(t, testCase.want, result, testCase.acts)
 		})
 	}
 }

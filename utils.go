@@ -1,24 +1,37 @@
-package cloudcat
+package ski
 
 import (
-	"net/http"
+	"context"
+	"fmt"
+	"log/slog"
 )
 
-// ZeroOr if value is zero value returns the defaultValue
-func ZeroOr[T comparable](value, defaultValue T) T {
-	var zero T
-	if zero == value {
-		return defaultValue
+var loggerKey byte
+
+// Logger get slog.Logger from the context
+func Logger(ctx context.Context) *slog.Logger {
+	if logger := ctx.Value(&loggerKey); logger != nil {
+		return logger.(*slog.Logger)
 	}
-	return value
+	return slog.Default()
 }
 
-// EmptyOr if slice is empty returns the defaultValue
-func EmptyOr[T any](value, defaultValue []T) []T {
-	if len(value) == 0 {
-		return defaultValue
+// WithLogger set the slog.Logger to context
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+	return WithValue(ctx, &loggerKey, logger)
+}
+
+// ToString convert Executor to string if it implements fmt.Stringer
+func ToString(exec Executor) string {
+	switch t := exec.(type) {
+	case fmt.Stringer:
+		return t.String()
+	case _raw:
+		if s, ok := t.any.(string); ok {
+			return s
+		}
 	}
-	return value
+	return ""
 }
 
 // MapKeys returns the keys of the map m.
@@ -39,38 +52,4 @@ func MapValues[M ~map[K]V, K comparable, V any](m M) []V {
 		r = append(r, v)
 	}
 	return r
-}
-
-// ParseCookie parses the cookie string and return a slice http.Cookie.
-func ParseCookie(cookies string) []*http.Cookie {
-	header := http.Header{}
-	header.Add("Cookie", cookies)
-	req := http.Request{Header: header}
-	return req.Cookies()
-}
-
-// ParseSetCookie parses the set-cookie strings and return a slice http.Cookie.
-func ParseSetCookie(cookies ...string) []*http.Cookie {
-	header := http.Header{}
-	for _, cookie := range cookies {
-		header.Add("Set-Cookie", cookie)
-	}
-	res := http.Response{Header: header}
-	return res.Cookies()
-}
-
-// CookieToString returns the slice string of the slice http.Cookie.
-func CookieToString(cookies []*http.Cookie) []string {
-	switch len(cookies) {
-	case 0:
-		return nil
-	case 1:
-		return []string{cookies[0].String()}
-	}
-
-	ret := make([]string, 0, len(cookies))
-	for _, cookie := range cookies {
-		ret = append(ret, cookie.String())
-	}
-	return ret
 }

@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shiroyk/cloudcat"
-	"github.com/shiroyk/cloudcat/js"
-	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/dop251/goja"
+	"github.com/shiroyk/ski"
+	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHttp(t *testing.T) {
-	cloudcat.Provide[cloudcat.Fetch](&http.Client{Transport: &http.Transport{Proxy: cloudcat.ProxyFromRequest}})
 	vm := createVM(t)
 	testCase := []string{
 		`assert.equal(http.get(url).text(), "");`,
@@ -65,14 +64,22 @@ func TestHttp(t *testing.T) {
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			_, err := vm.RunString(context.Background(), s)
+			_, err := vm.Runtime().RunString(s)
 			assert.NoError(t, err)
 		})
 	}
 }
 
-func createVM(t *testing.T) js.VM {
-	vm := modulestest.New(t)
+var initial = js.WithInitial(func(rt *goja.Runtime) {
+	client := http.Client{Transport: &http.Transport{Proxy: ski.ProxyFromRequest}}
+	instance, _ := (&Http{&client}).Instantiate(rt)
+	_ = rt.Set("http", instance)
+	f, _ := (&Fetch{&client}).Instantiate(rt)
+	_ = rt.Set("fetch", f)
+})
+
+func createVM(t *testing.T) modulestest.VM {
+	vm := modulestest.New(t, initial)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut {
@@ -123,7 +130,6 @@ func createVM(t *testing.T) js.VM {
 	})
 
 	_, _ = vm.Runtime().RunString(fmt.Sprintf(`
-		const http = require('cloudcat/http');
 		const url = "%s";
 		const proxyURL = "%s";
 		const fa = new Uint8Array([226, 153, 130, 239, 184, 142])`, ts.URL, proxy.URL))

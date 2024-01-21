@@ -2,89 +2,94 @@
 package regex
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/dlclark/regexp2"
-	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
-	"github.com/spf13/cast"
+	"github.com/shiroyk/ski"
 )
 
 // Parser the regexp2 parser
 type Parser struct{}
 
-const key string = "regex"
-
 func init() {
-	parser.Register(key, new(Parser))
+	ski.Register("regex", new(Parser))
 }
 
-// GetString gets the string of the content with the given arguments.
-// replace the string with the given regexp.
-func (p Parser) GetString(_ *plugin.Context, content any, arg string) (string, error) {
-	re, replace, start, count, err := parseRegexp(arg)
-	if err != nil {
-		return "", err
-	}
-
-	var str string
-	switch conv := content.(type) {
-	case string:
-		str = conv
-	case []string:
-		str = strings.Join(conv, "")
-	default:
-		str, err = cast.ToStringE(conv)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return re.Replace(str, replace, start, count)
-}
-
-// GetStrings gets the strings of the content with the given arguments.
-// replace each string of the slice with the given regexp.
-func (p Parser) GetStrings(_ *plugin.Context, content any, arg string) ([]string, error) {
-	re, replace, start, count, err := parseRegexp(arg)
+func (p Parser) Value(arg string) (ski.Executor, error) {
+	ret, err := compile(arg)
 	if err != nil {
 		return nil, err
 	}
+	ret.exec = ret.string
+	return ret, nil
+}
 
-	var str []string
-	switch conv := content.(type) {
+func (p Parser) Element(arg string) (ski.Executor, error) { return p.Value(arg) }
+
+func (p Parser) Elements(arg string) (ski.Executor, error) {
+	ret, err := compile(arg)
+	if err != nil {
+		return nil, err
+	}
+	ret.exec = ret.strings
+	return ret, nil
+}
+
+type regexp struct {
+	re           *regexp2.Regexp
+	start, count int
+	replace      string
+	exec         func(any) (any, error)
+}
+
+func (r regexp) Exec(_ context.Context, arg any) (any, error) { return r.exec(arg) }
+
+func (r regexp) string(arg any) (any, error) {
+	switch conv := arg.(type) {
+	case string:
+		return r.re.Replace(conv, r.replace, r.start, r.count)
+	case []string:
+		var err error
+		for i := 0; i < len(conv); i++ {
+			conv[i], err = r.re.Replace(conv[i], r.replace, r.start, r.count)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return conv, nil
+	case fmt.Stringer:
+		return r.re.Replace(conv.String(), r.replace, r.start, r.count)
+	default:
+		return nil, fmt.Errorf("unexpected type %T", arg)
+	}
+}
+
+func (r regexp) strings(arg any) (any, error) {
+	var (
+		str []string
+		err error
+	)
+	switch conv := arg.(type) {
 	case string:
 		str = []string{conv}
 	case []string:
 		str = conv
+	case fmt.Stringer:
+		str = []string{conv.String()}
 	default:
-		str, err = cast.ToStringSliceE(conv)
-		if err != nil {
-			return nil, err
-		}
+		return nil, fmt.Errorf("unexpected type %T", arg)
 	}
 
 	for i := 0; i < len(str); i++ {
-		str[i], err = re.Replace(str[i], replace, start, count)
+		str[i], err = r.re.Replace(str[i], r.replace, r.start, r.count)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return str, nil
-}
-
-// GetElement gets the element of the content with the given arguments.
-// sames as GetString.
-func (p Parser) GetElement(ctx *plugin.Context, content any, arg string) (string, error) {
-	return p.GetString(ctx, content, arg)
-}
-
-// GetElements gets the elements of the content with the given arguments.
-// sames as GetStrings.
-func (p Parser) GetElements(ctx *plugin.Context, content any, arg string) ([]string, error) {
-	return p.GetStrings(ctx, content, arg)
 }
 
 type tokenState int
@@ -109,12 +114,11 @@ var reOptMap = map[string]regexp2.RegexOptions{
 	"u": regexp2.Unicode,
 }
 
-//nolint:gocognit
-func parseRegexp(arg string) (re *regexp2.Regexp, replace string, start, count int, err error) {
+func compile(arg string) (ret regexp, err error) {
 	state := commonState
 	pattern := strings.Builder{}
-	start = -1
-	count = -1
+	ret.start = -1
+	ret.count = -1
 	var offset int
 	var regex string
 	var reOpt int32
@@ -150,25 +154,28 @@ func parseRegexp(arg string) (re *regexp2.Regexp, replace string, start, count i
 				pattern.Reset()
 			case replaceState:
 				state = flagState
-				replace = pattern.String()
+				ret.replace = pattern.String()
 				pattern.Reset()
 			default:
-				return nil, "", start, count, fmt.Errorf("/ character must escaped")
+				return ret, fmt.Errorf("/ character must escaped")
 			}
 		}
 	}
 
 	if pattern.Len() > 0 {
 		s1, s2, _ := strings.Cut(pattern.String(), ",")
-		start, err = strconv.Atoi(s1)
+		ret.start, err = strconv.Atoi(s1)
 		if err != nil {
-			start = -1
+			ret.start = -1
+			err = nil
 		}
-		count, err = strconv.Atoi(s2)
+		ret.count, err = strconv.Atoi(s2)
 		if err != nil {
-			count = -1
+			ret.count = -1
+			err = nil
 		}
 	}
 
-	return regexp2.MustCompile(regex, regexp2.RegexOptions(reOpt)), replace, start, count, nil
+	ret.re, err = regexp2.Compile(regex, regexp2.RegexOptions(reOpt))
+	return
 }

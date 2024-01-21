@@ -8,49 +8,72 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/ski/js"
 )
 
-func defineAccessorProperty(r *goja.Runtime, o *goja.Object, name string, v any) {
-	_ = o.DefineAccessorProperty(name, r.ToValue(func(call goja.FunctionCall) goja.Value { return r.ToValue(v) }), nil, goja.FLAG_FALSE, goja.FLAG_FALSE)
+var errBodyAlreadyRead = errors.New("body stream already read")
+
+func defineGetter(r *goja.Runtime, o *goja.Object, name string, v func() any) {
+	_ = o.DefineAccessorProperty(name, r.ToValue(func(goja.FunctionCall) goja.Value {
+		return r.ToValue(v())
+	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
 }
 
 // NewResponse returns a new Response
-func NewResponse(vm *goja.Runtime, res *http.Response) goja.Value {
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		js.Throw(vm, err)
-	}
-	object := vm.NewObject()
-	_ = object.DefineAccessorProperty("body", vm.ToValue(func(call goja.FunctionCall) goja.Value {
-		return vm.ToValue(vm.NewArrayBuffer(body))
-	}), nil, goja.FLAG_FALSE, goja.FLAG_FALSE)
-	defineAccessorProperty(vm, object, "bodyUsed", true)
-	defineAccessorProperty(vm, object, "headers", joinHeader(res.Header))
-	defineAccessorProperty(vm, object, "status", res.StatusCode)
-	defineAccessorProperty(vm, object, "statusText", res.Status)
-	defineAccessorProperty(vm, object, "ok", res.StatusCode >= 200 || res.StatusCode < 300)
-	_ = object.Set("text", func(goja.FunctionCall) goja.Value { return vm.ToValue(string(body)) })
-	_ = object.Set("json", func(goja.FunctionCall) goja.Value {
-		var j any
-		if err = json.Unmarshal(body, &j); err != nil {
-			js.Throw(vm, err)
+func NewResponse(rt *goja.Runtime, res *http.Response) goja.Value {
+	var bodyUsed bool
+	js.OnDone(rt, func() {
+		if !bodyUsed {
+			res.Body.Close()
 		}
-		return vm.ToValue(j)
 	})
-	_ = object.Set("arrayBuffer", func(goja.FunctionCall) goja.Value { return vm.ToValue(vm.NewArrayBuffer(body)) })
+	readBody := func() []byte {
+		if bodyUsed {
+			js.Throw(rt, errBodyAlreadyRead)
+		}
+		bodyUsed = true
+		defer res.Body.Close()
+		data, err := io.ReadAll(res.Body)
+		if err != nil {
+			js.Throw(rt, err)
+		}
+		return data
+	}
+
+	object := rt.NewObject()
+	defineGetter(rt, object, "body", func() any { return rt.NewArrayBuffer(readBody()) })
+	defineGetter(rt, object, "bodyUsed", func() any { return bodyUsed })
+	defineGetter(rt, object, "headers", func() any { return joinHeader(res.Header) })
+	defineGetter(rt, object, "status", func() any { return res.StatusCode })
+	defineGetter(rt, object, "statusText", func() any { return res.Status })
+	defineGetter(rt, object, "ok", func() any {
+		return res.StatusCode >= 200 && res.StatusCode < 300
+	})
+	_ = object.Set("text", func(goja.FunctionCall) goja.Value { return rt.ToValue(string(readBody())) })
+	_ = object.Set("json", func(call goja.FunctionCall) goja.Value {
+		var data any
+		if err := json.Unmarshal(readBody(), &data); err != nil {
+			js.Throw(rt, err)
+		}
+		return rt.ToValue(data)
+	})
+	_ = object.Set("arrayBuffer", func(goja.FunctionCall) goja.Value { return rt.ToValue(rt.NewArrayBuffer(readBody())) })
 	return object
 }
 
 // NewAsyncResponse returns a new async Response
-func NewAsyncResponse(vm *goja.Runtime, res *http.Response) goja.Value {
+func NewAsyncResponse(rt *goja.Runtime, res *http.Response) goja.Value {
 	var bodyUsed bool
-	object := vm.NewObject()
+	js.OnDone(rt, func() {
+		if !bodyUsed {
+			res.Body.Close()
+		}
+	})
 
+	object := rt.NewObject()
 	readBody := func() ([]byte, error) {
 		if bodyUsed {
-			return nil, errors.New("body used already for")
+			return nil, errBodyAlreadyRead
 		}
 		bodyUsed = true
 		defer res.Body.Close()
@@ -61,20 +84,21 @@ func NewAsyncResponse(vm *goja.Runtime, res *http.Response) goja.Value {
 		return data, nil
 	}
 
-	_ = object.DefineAccessorProperty("body", vm.ToValue(func(call goja.FunctionCall) goja.Value {
+	defineGetter(rt, object, "body", func() any {
 		if bodyUsed {
-			js.Throw(vm, errors.New("body used already for"))
+			js.Throw(rt, errBodyAlreadyRead)
 		}
-		return NewReadableStream(res.Body, vm, &bodyUsed)
-	}), nil, goja.FLAG_FALSE, goja.FLAG_FALSE)
-	defineAccessorProperty(vm, object, "bodyUsed", &bodyUsed)
-	defineAccessorProperty(vm, object, "headers", joinHeader(res.Header))
-	defineAccessorProperty(vm, object, "status", res.StatusCode)
-	defineAccessorProperty(vm, object, "statusText", res.Status)
-	defineAccessorProperty(vm, object, "ok", res.StatusCode >= 200 || res.StatusCode < 300)
-
+		return NewReadableStream(res.Body, rt, &bodyUsed)
+	})
+	defineGetter(rt, object, "bodyUsed", func() any { return bodyUsed })
+	defineGetter(rt, object, "headers", func() any { return joinHeader(res.Header) })
+	defineGetter(rt, object, "status", func() any { return res.StatusCode })
+	defineGetter(rt, object, "statusText", func() any { return res.Status })
+	defineGetter(rt, object, "ok", func() any {
+		return res.StatusCode >= 200 && res.StatusCode < 300
+	})
 	_ = object.Set("text", func(goja.FunctionCall) goja.Value {
-		return vm.ToValue(js.NewPromise(vm, func() (any, error) {
+		return rt.ToValue(js.NewPromise(rt, func() (any, error) {
 			data, err := readBody()
 			if err != nil {
 				return nil, err
@@ -83,7 +107,7 @@ func NewAsyncResponse(vm *goja.Runtime, res *http.Response) goja.Value {
 		}))
 	})
 	_ = object.Set("json", func(goja.FunctionCall) goja.Value {
-		return vm.ToValue(js.NewPromise(vm, func() (any, error) {
+		return rt.ToValue(js.NewPromise(rt, func() (any, error) {
 			data, err := readBody()
 			if err != nil {
 				return nil, err
@@ -96,12 +120,12 @@ func NewAsyncResponse(vm *goja.Runtime, res *http.Response) goja.Value {
 		}))
 	})
 	_ = object.Set("arrayBuffer", func(goja.FunctionCall) goja.Value {
-		return vm.ToValue(js.NewPromise(vm, func() (any, error) {
+		return rt.ToValue(js.NewPromise(rt, func() (any, error) {
 			data, err := readBody()
 			if err != nil {
 				return nil, err
 			}
-			return vm.NewArrayBuffer(data), nil
+			return rt.NewArrayBuffer(data), nil
 		}))
 	})
 	return object
@@ -127,7 +151,7 @@ func NewReadableStream(body io.ReadCloser, vm *goja.Runtime, bodyUsed *bool) *go
 	})
 	_ = object.Set("getReader", func(call goja.FunctionCall) goja.Value {
 		if *bodyUsed {
-			js.Throw(vm, errors.New("body used already for"))
+			js.Throw(vm, errBodyAlreadyRead)
 		}
 		*bodyUsed = true
 		if lock {
@@ -144,7 +168,7 @@ func NewReadableStream(body io.ReadCloser, vm *goja.Runtime, bodyUsed *bool) *go
 	return object
 }
 
-type chunk struct {
+type iter struct {
 	Value goja.Value
 	Done  bool
 }
@@ -154,7 +178,7 @@ type chunk struct {
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamBYOBReader
 func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *bool) *goja.Object {
 	object := vm.NewObject()
-	defineAccessorProperty(vm, object, "locked", &lock)
+	defineGetter(vm, object, "locked", func() any { return &lock })
 	_ = object.Set("cancel", func() {
 		if err := body.Close(); err != nil {
 			js.Throw(vm, err)
@@ -175,11 +199,12 @@ func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *
 			value = call.Argument(0).ToObject(vm)
 		}
 
-		return vm.ToValue(js.NewPromise(vm, func() (int, error) { return body.Read(buffer) },
+		return vm.ToValue(js.NewPromise(vm,
+			func() (int, error) { return body.Read(buffer) },
 			func(n int, err error) (any, error) {
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						return chunk{goja.Undefined(), true}, nil
+						return iter{goja.Undefined(), true}, nil
 					}
 					return nil, err
 				}
@@ -190,7 +215,7 @@ func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *
 						js.Throw(vm, err)
 					}
 				}
-				return chunk{value, false}, nil
+				return iter{value, false}, nil
 			}))
 	})
 

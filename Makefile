@@ -10,7 +10,7 @@ LDFLAGS += -X "main.Version=$(VERSION)" -X "main.CommitSHA=$(VERSION_HASH)"
 all: build
 
 build:
-	cd cmd && go build -ldflags '$(LDFLAGS)' -o ../dist/cloudcat && cd ..
+	go build -ldflags '$(LDFLAGS)' -o ./dist/ski ./ski
 
 format:
 	find . -name '*.go' -exec gofmt -s -w {} +

@@ -4,16 +4,15 @@ import (
 	"testing"
 )
 
-func TestParseRuleFunction(t *testing.T) {
+func TestParseFuncArguments(t *testing.T) {
 	t.Parallel()
 	rules := []string{
-		`-> -> unknown`, `-> text(`, `-> text(")`,
+		`-> text(`, `-> text(")`,
 		`-> text("')`, `-> text('")`, `-> text(' ", ")`,
 		`-> text("\")`, `-> text('\')`, `-> text(" ", ')`,
 	}
-	funcs := builtins()
 	for _, rule := range rules {
-		if _, _, err := parseRuleFunctions(funcs, rule); err == nil {
+		if _, _, err := parseFuncArguments(rule); err == nil {
 			t.Fatalf("Unexpected function and argument parse %s", rule)
 		}
 	}

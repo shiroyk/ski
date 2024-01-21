@@ -1,31 +1,29 @@
 package gq
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/shiroyk/cloudcat/plugin"
 	"github.com/spf13/cast"
 )
 
 type (
-	// GFunc is the type of gq parse function.
-	GFunc func(ctx *plugin.Context, content any, args ...string) (any, error)
+	// Func is the type of gq parse function.
+	Func func(ctx context.Context, content any, args ...string) (any, error)
 	// FuncMap is the type of the map defining the mapping from names to functions.
-	FuncMap map[string]GFunc
+	FuncMap map[string]Func
 )
 
 func builtins() FuncMap {
 	return FuncMap{
-		"get":     Get,
-		"set":     Set,
+		"zip":     Zip,
 		"attr":    Attr,
 		"href":    Href,
 		"html":    Html,
-		"join":    Join,
 		"prev":    Prev,
 		"text":    Text,
 		"next":    Next,
@@ -50,10 +48,14 @@ func contentToString(content any, fn func(*goquery.Selection) (string, error)) (
 			list[i] = result
 			return true
 		})
-		if len(list) == 1 {
+		switch len(list) {
+		case 0:
+			return nil, nil
+		case 1:
 			return list[0], nil
+		default:
+			return list, nil
 		}
-		return list, nil
 	case string:
 		return c, nil
 	case []string:
@@ -61,90 +63,25 @@ func contentToString(content any, fn func(*goquery.Selection) (string, error)) (
 			return c[0], nil
 		}
 		return c, nil
+	case nil:
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected type %T", content)
 	}
 }
 
-// Get returns the value associated with this context for key, or nil
-// if no value is associated with key.
-func Get(ctx *plugin.Context, _ any, args ...string) (any, error) {
-	if len(args) == 0 {
-		return nil, fmt.Errorf("get function must has one argment")
-	}
-
-	key, err := cast.ToStringE(args[0])
-	if err != nil {
-		return nil, err
-	}
-
-	return ctx.Value(key), nil
-}
-
-// Set value associated with key is val.
-// The first argument is the key, and the second argument is value.
-// if the value is present will store the content.
-func Set(ctx *plugin.Context, content any, args ...string) (any, error) {
-	if len(args) == 0 {
-		return nil, fmt.Errorf("set function must has least one argment")
-	}
-
-	key, err := cast.ToStringE(args[0])
-	if err != nil {
-		return nil, err
-	}
-
-	if len(args) > 1 {
-		ctx.SetValue(key, args[1])
-	} else {
-		ctx.SetValue(key, content)
-	}
-
-	return content, nil
-}
-
 // Text gets the combined text contents of each element in the set of matched
 // elements, including their descendants.
-func Text(_ *plugin.Context, content any, _ ...string) (any, error) {
+func Text(_ context.Context, content any, _ ...string) (any, error) {
 	return contentToString(content, func(node *goquery.Selection) (string, error) {
 		return strings.TrimSpace(node.Text()), nil
 	})
 }
 
-// Join the text with the separator, if not present separator uses the default separator ", ".
-func Join(ctx *plugin.Context, content any, args ...string) (any, error) {
-	if str, ok := content.(string); ok {
-		return str, nil
-	}
-
-	if node, ok := content.(*goquery.Selection); ok {
-		text, err := Text(ctx, node)
-		if err != nil {
-			return nil, err
-		}
-		if str, ok := text.(string); ok {
-			return str, nil
-		}
-		content = text
-	}
-
-	list, err := cast.ToStringSliceE(content)
-	if err != nil {
-		return nil, err
-	}
-
-	sep := ", "
-	if len(args) > 0 {
-		sep = args[0]
-	}
-
-	return strings.Join(list, sep), nil
-}
-
 // Attr gets the specified attribute's value for the first element in the
 // Selection.
 // The first argument is the name of the attribute, the second is the default value
-func Attr(_ *plugin.Context, content any, args ...string) (any, error) {
+func Attr(_ context.Context, content any, args ...string) (any, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("attr(name) must has name")
 	}
@@ -161,33 +98,43 @@ func Attr(_ *plugin.Context, content any, args ...string) (any, error) {
 }
 
 // Href gets the href attribute's value, if URL is not absolute returns the absolute URL.
-func Href(ctx *plugin.Context, content any, args ...string) (any, error) {
+func Href(ctx context.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
-		var path string
 		href, exists := node.Attr("href")
 		if !exists {
 			return nil, errors.New("href attribute's value is not exist")
 		}
-		if len(args) > 0 {
-			path = args[0]
-			if !strings.HasSuffix(path, "/") {
-				path = path + "/"
-			}
-			href = strings.TrimPrefix(href, "/")
+		if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
+			return href, nil
 		}
-		hrefURL, err := url.Parse(href)
-		if err != nil {
-			return nil, err
-		}
+		var base string
 
-		baseURL, err := url.Parse(ctx.BaseURL())
-		if err != nil {
-			return nil, err
+		if v := ctx.Value("baseURL"); v != nil {
+			base = v.(string)
+		} else if len(args) > 0 {
+			base = args[0]
 		}
-		return baseURL.JoinPath(path).ResolveReference(hrefURL).String(), nil
+		if len(base) > 0 {
+			if !strings.HasPrefix(href, ".") {
+				if !strings.HasPrefix(href, "/") {
+					href = "/" + href
+				}
+				return strings.TrimSuffix(base, "/") + href, nil
+			}
+			hrefURL, err := url.Parse(href)
+			if err != nil {
+				return nil, err
+			}
+			baseURL, err := url.Parse(base)
+			if err != nil {
+				return nil, err
+			}
+			return baseURL.ResolveReference(hrefURL).String(), nil
+		}
+		return href, nil
 	}
 
-	return nil, fmt.Errorf("unexpected content type %T", content)
+	return nil, fmt.Errorf("href: unexpected content type %T", content)
 }
 
 // Html the first argument is outer.
@@ -195,7 +142,7 @@ func Href(ctx *plugin.Context, content any, args ...string) (any, error) {
 // the selection - that is, the HTML including the first element's
 // tag and attributes, or gets the HTML contents of the first element
 // in the set of matched elements. It includes text and comment nodes;
-func Html(_ *plugin.Context, content any, args ...string) (any, error) { //nolint
+func Html(_ context.Context, content any, args ...string) (any, error) { //nolint
 	var err error
 	var outer bool
 
@@ -229,7 +176,7 @@ func Html(_ *plugin.Context, content any, args ...string) (any, error) { //nolin
 // Selection.
 // If present selector gets all preceding siblings of each element up to but not
 // including the element matched by the selector.
-func Prev(_ *plugin.Context, content any, args ...string) (any, error) {
+func Prev(_ context.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.PrevUntil(args[0]), nil
@@ -237,14 +184,14 @@ func Prev(_ *plugin.Context, content any, args ...string) (any, error) {
 		return node.Prev(), nil
 	}
 
-	return nil, fmt.Errorf("unexpected content type %T", content)
+	return nil, fmt.Errorf("prev: unexpected content type %T", content)
 }
 
 // Next gets the immediately following sibling of each element in the
 // Selection.
 // If present selector gets all following siblings of each element up to but not
 // including the element matched by the selector.
-func Next(_ *plugin.Context, content any, args ...string) (any, error) {
+func Next(_ context.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.NextUntil(args[0]), nil
@@ -252,7 +199,7 @@ func Next(_ *plugin.Context, content any, args ...string) (any, error) {
 		return node.Next(), nil
 	}
 
-	return nil, fmt.Errorf("unexpected type %T", content)
+	return nil, fmt.Errorf("next: unexpected type %T", content)
 }
 
 // Slice reduces the set of matched elements to a subset specified by a range
@@ -265,7 +212,7 @@ func Next(_ *plugin.Context, content any, args ...string) (any, error) {
 //
 // The indices may be negative, in which case they represent an offset from the
 // end of the selection.
-func Slice(_ *plugin.Context, content any, args ...string) (any, error) {
+func Slice(_ context.Context, content any, args ...string) (any, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("slice(start, end) must have at least one int argument")
 	}
@@ -286,12 +233,12 @@ func Slice(_ *plugin.Context, content any, args ...string) (any, error) {
 		return node.Eq(start), nil
 	}
 
-	return nil, fmt.Errorf("unexpected type %T", content)
+	return nil, fmt.Errorf("slice: unexpected type %T", content)
 }
 
 // Child gets the child elements of each element in the Selection.
 // If present the selector will return filtered by the specified selector.
-func Child(_ *plugin.Context, content any, args ...string) (any, error) {
+func Child(_ context.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.ChildrenFiltered(args[0]), nil
@@ -299,12 +246,12 @@ func Child(_ *plugin.Context, content any, args ...string) (any, error) {
 		return node.Children(), nil
 	}
 
-	return nil, fmt.Errorf("unexpected type %T", content)
+	return nil, fmt.Errorf("child: unexpected type %T", content)
 }
 
 // Parent gets the parent of each element in the Selection.
 // if present the selector will return filtered by a selector.
-func Parent(_ *plugin.Context, content any, args ...string) (any, error) {
+func Parent(_ context.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok {
 		if len(args) > 0 {
 			return node.ParentFiltered(args[0]), nil
@@ -312,12 +259,12 @@ func Parent(_ *plugin.Context, content any, args ...string) (any, error) {
 		return node.Parent(), nil
 	}
 
-	return nil, fmt.Errorf("unexpected type %T", content)
+	return nil, fmt.Errorf("parent: unexpected type %T", content)
 }
 
 // Parents gets the ancestors of each element in the current Selection.
 // if present the selector will return filtered by a selector.
-func Parents(_ *plugin.Context, content any, args ...string) (any, error) {
+func Parents(_ context.Context, content any, args ...string) (any, error) {
 	if node, ok := content.(*goquery.Selection); ok { //nolint:nestif
 		if len(args) > 0 {
 			if len(args) > 1 {
@@ -334,10 +281,50 @@ func Parents(_ *plugin.Context, content any, args ...string) (any, error) {
 		return node.Parents(), nil
 	}
 
-	return nil, fmt.Errorf("unexpected type %T", content)
+	return nil, fmt.Errorf("parents: unexpected type %T", content)
 }
 
-func Prefix(_ *plugin.Context, content any, args ...string) (ret any, err error) {
+// Zip returns an element array of first selector element length,
+// the first of which contains the first elements of the given selector,
+// the second of which contains the second elements of the given selector, and so on.
+func Zip(_ context.Context, content any, args ...string) (any, error) {
+	sel, ok := content.(*goquery.Selection)
+	if !ok {
+		return nil, fmt.Errorf("zip: unexpected type %T", content)
+	}
+
+	if len(args) == 0 {
+		return nil, fmt.Errorf("zip(selector) must have at least one string argument")
+	}
+
+	first := sel.Find(args[0])
+	length := first.Length()
+	zip := make([]string, 0, length*len(args))
+	first.Each(func(i int, s *goquery.Selection) {
+		html, _ := goquery.OuterHtml(s)
+		zip = append(zip, html)
+	})
+
+	for _, arg := range args[1:] {
+		sel.Find(arg).Each(func(i int, s *goquery.Selection) {
+			html, _ := goquery.OuterHtml(s)
+			zip = append(zip, html)
+		})
+	}
+
+	ret := make([]string, 0, length)
+	for i := 0; i < length; i++ {
+		var s string
+		for j := 0; j < len(args); j++ {
+			s += zip[i+j*length]
+		}
+		ret = append(ret, s)
+	}
+
+	return ret, nil
+}
+
+func Prefix(_ context.Context, content any, args ...string) (ret any, err error) {
 	if len(args) == 0 {
 		return content, nil
 	}
@@ -356,7 +343,7 @@ func Prefix(_ *plugin.Context, content any, args ...string) (ret any, err error)
 	}
 }
 
-func Suffix(_ *plugin.Context, content any, args ...string) (ret any, err error) {
+func Suffix(_ context.Context, content any, args ...string) (ret any, err error) {
 	if len(args) == 0 {
 		return content, nil
 	}

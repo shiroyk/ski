@@ -2,194 +2,135 @@ package gq
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
-
-func TestBuildInFuncGet(t *testing.T) {
-	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `-> get`); err == nil {
-		t.Error("Unexpected function error")
-	}
-
-	if _, err := gq.GetString(ctx, content, `.body #a1 -> set(key111)`); err != nil {
-		t.Error(err)
-	}
-
-	assertGetString(t, `-> get(key111) -> child`, "Google")
-}
-
-func TestBuildInFuncSet(t *testing.T) {
-	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `-> set`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
-
-	if _, err := gq.GetString(ctx, content, `-> set(v1, '<i>v1</i>')`); err != nil {
-		t.Error(err)
-	}
-
-	if _, err := gq.GetString(ctx, content, `.body #a1 -> text -> set(key222)`); err != nil {
-		t.Error(err)
-	}
-}
 
 func TestBuildInFuncText(t *testing.T) {
 	t.Parallel()
 
-	assertGetString(t, `#main #n1 -> text`, "1")
+	assertValue(t, `#main #n1 -> text`, "1")
 
-	assertGetString(t, `#main #n1`, "1")
+	assertValue(t, `#main #n1`, "1")
 }
 
 func TestBuildInFuncAttr(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `#main #n1 -> text -> attr`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `#main #n1 -> text -> attr`, "attr(name) must has name")
 
-	if _, err := gq.GetString(ctx, content, `-> attr()`); err == nil {
-		t.Fatal("Unexpected null argument")
-	}
+	assertError(t, `#main -> attr()`, "attr(name) must has name")
 
-	assertGetString(t, `#main #n1 -> attr(class)`, "one even row")
+	assertValue(t, `#main #n1 -> attr(class)`, "one even row")
 
-	assertGetString(t, `#main #n1 -> attr(empty, default)`, "default")
-}
-
-func TestBuildInFuncJoin(t *testing.T) {
-	t.Parallel()
-	assertGetString(t, `#main div -> join(' < ')`, "1 < 2 < 3 < 4 < 5 < 6")
-
-	assertGetString(t, `#main div -> join("")`, "123456")
-
-	assertGetString(t, `#main div -> join('')`, "123456")
+	assertValue(t, `#main #n1 -> attr(empty, default)`, "default")
 }
 
 func TestBuildInFuncHref(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `.body ul #a4 -> text -> href`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `.body ul #a4 -> text -> href`, "unexpected content type string")
 
-	assertGetString(t, `.body ul #a4 a -> href`, "https://localhost/home")
+	assertValue(t, `.body ul #a4 a -> href(https://localhost)`, "https://localhost/home")
 
-	assertGetString(t, `.body ul #a4 a -> href(path)`, "https://localhost/path/home")
-
-	assertGetString(t, `.body ul #a4 a -> href(path/)`, "https://localhost/path/home")
-
-	assertGetString(t, `.body ul #a4 a -> href(/path/)`, "https://localhost/path/home")
-
-	_, err := gq.GetString(ctx, content, `#main #n1 -> href`)
-	assert.Error(t, err)
+	assertValue(t, `.body ul #a4 a -> href(https://localhost/path/)`, "https://localhost/path/home")
 }
 
 func TestBuildInFuncHtml(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `-> html(test)`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `.body -> html(test)`, "html(outer) `outer` must bool type value: true/false")
 
-	assertGetString(t, `.body ul a -> html`, "Google\nGithub\nGolang\nHome")
+	assertValue(t, `.body ul a -> html`, []string{"Google", "Github", "Golang", "Home"})
 
-	assertGetString(t, `.body ul a -> slice(0) -> html(true)`,
-		`<a href="https://google.com" title="Google page">Google</a>`)
+	assertValue(t, `.body ul a -> slice(0,2) -> html(true)`,
+		[]string{
+			"<a href=\"https://google.com\" title=\"Google page\">Google</a>",
+			"<a href=\"https://github.com\" title=\"Github page\">Github</a>"})
 }
 
 func TestBuildInFuncPrev(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `#foot #nf3 -> text -> prev`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `#foot #nf3 -> text -> prev`, "unexpected content type string")
 
-	assertGetString(t, `#foot #nf3 -> prev`, "f2")
+	assertValue(t, `#foot #nf3 -> prev`, "f2")
 
-	assertGetString(t, `#foot #nf3 -> prev(#nf1)`, "f2")
+	assertValue(t, `#foot #nf3 -> prev(#nf1)`, "f2")
 }
 
 func TestBuildInFuncNext(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `#foot #nf2 -> text -> next`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `#foot #nf2 -> text -> next`, "unexpected type string")
 
-	assertGetString(t, `#foot #nf2 -> next`, "f3")
+	assertValue(t, `#foot #nf2 -> next`, "f3")
 
-	assertGetString(t, `#foot #nf2 -> next(#nf4)`, "f3")
+	assertValue(t, `#foot #nf2 -> next(#nf4)`, "f3")
 }
 
 func TestBuildInFuncSlice(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `-> slice`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `#main -> slice`, "slice(start, end) must have at least one int argument")
 
-	if _, err := gq.GetString(ctx, content, `#main div -> text -> slice(0)`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `#main div -> text -> slice(0)`, "slice: unexpected type []string")
 
-	assertGetString(t, `#main div -> slice(0)`, "1")
+	assertValue(t, `#main div -> slice(0)`, "1")
 
-	assertGetString(t, `#main div -> slice(-1)`, "6")
+	assertValue(t, `#main div -> slice(-1)`, "6")
 
-	assertGetString(t, `#main div -> slice(0, 3)`, "1\n2\n3")
+	assertValue(t, `#main div -> slice(0, 3)`, []string{"1", "2", "3"})
 
-	assertGetString(t, `#main div -> slice(0, -2)`, "1\n2\n3\n4")
+	assertValue(t, `#main div -> slice(0, -2)`, []string{"1", "2", "3", "4"})
 }
 
 func TestBuildInFuncChild(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `.body ul -> text -> child`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `.body ul -> text -> child`, "unexpected type string")
 
-	assertGetString(t, `.body ul li -> child(a)`, "Google\nGithub\nGolang\nHome")
+	assertValue(t, `.body ul li -> child(a)`, []string{"Google", "Github", "Golang", "Home"})
 
-	assertGetString(t, `.body ul li -> child`, "Google\nGithub\nGolang\nHome")
+	assertValue(t, `.body ul li -> child`, []string{"Google", "Github", "Golang", "Home"})
 }
 
 func TestBuildInFuncParent(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `.body ul -> text -> parent`); err == nil {
-		t.Fatal("Unexpected function error")
-	}
+	assertError(t, `.body ul -> text -> parent`, "unexpected type string")
 
-	assertGetString(t, `.body ul a -> parent(#a1) -> attr(id)`, "a1")
+	assertValue(t, `.body ul a -> parent(#a1) -> attr(id)`, "a1")
 
-	assertGetString(t, `.body ul a -> parent -> attr(id)`, "a1\na2\na3\na4")
+	assertValue(t, `.body ul a -> parent -> attr(id)`, []string{"a1", "a2", "a3", "a4"})
 }
 
 func TestBuildInFuncParents(t *testing.T) {
 	t.Parallel()
-	if _, err := gq.GetString(ctx, content, `.body ul -> text -> parents`); err == nil {
-		t.Fatal("Unexpected type")
-	}
+	assertError(t, `.body ul -> text -> parents`, "unexpected type string")
 
-	if _, err := gq.GetString(ctx, content, `.body ul .selected -> parents(div, test)`); err == nil {
-		t.Fatal("Unexpected argument")
-	}
+	assertError(t, `.body ul .selected -> parents(div, test)`, "parents(selector, until) `until` must bool type value: true/false")
 
-	assertGetString(t, `.body ul .selected -> parents(div, true) -> attr(id)`, "url")
+	assertValue(t, `.body ul .selected -> parents(div, true) -> attr(id)`, "url")
 
-	assertGetString(t, `.body ul .selected -> parents -> slice(0) -> attr(id)`, "url")
+	assertValue(t, `.body ul .selected -> parents -> slice(0) -> attr(id)`, "url")
 }
 
 func TestBuildInFuncPrefix(t *testing.T) {
 	t.Parallel()
 
-	assertGetString(t, `#main #n1 -> text -> prefix(A)`, "A1")
+	assertValue(t, `#main #n1 -> text -> prefix(A)`, "A1")
 
-	assertGetString(t, `#main #n1 -> prefix(B)`, "B1")
-
-	assertGetStrings(t, `#main div -> slice(0, 2) -> text -> prefix(-)`, []string{"-1", "-2"})
+	assertValue(t, `#main #n1 -> prefix(B)`, "B1")
 }
 
 func TestBuildInFuncSuffix(t *testing.T) {
 	t.Parallel()
 
-	assertGetString(t, `#main #n1 -> text -> suffix(A)`, "1A")
+	assertValue(t, `#main #n1 -> text -> suffix(A)`, "1A")
 
-	assertGetString(t, `#main #n1 -> suffix(B)`, "1B")
+	assertValue(t, `#main #n1 -> suffix(B)`, "1B")
+}
 
-	assertGetStrings(t, `.body a -> slice(0, 2) -> text -> suffix(.com)`, []string{"Google.com", "Github.com"})
+func TestBuildInZip(t *testing.T) {
+	t.Parallel()
+
+	assertElements(t, `-> zip('#main div', '#foot div')`, []string{
+		`<div id="n1" class="one even row">1</div><div id="nf1" class="one even row">f1</div>`,
+		`<div id="n2" class="two odd row">2</div><div id="nf2" class="two odd row">f2</div>`,
+		`<div id="n3" class="three even row">3</div><div id="nf3" class="three even row">f3</div>`,
+		`<div id="n4" class="four odd row">4</div><div id="nf4" class="four odd row">f4</div>`,
+		`<div id="n5" class="five even row">5</div><div id="nf5" class="five even row odder">f5</div>`,
+		`<div id="n6" class="six odd row">6</div><div id="nf6" class="six odd row">f6</div>`,
+	})
 }

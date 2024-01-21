@@ -9,15 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shiroyk/cloudcat"
-	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestResponse(t *testing.T) {
-	ctx := context.Background()
-	vm := modulestest.New(t)
-	cloudcat.Provide[cloudcat.Fetch](http.DefaultClient)
+	vm := modulestest.New(t, initial)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -37,9 +34,10 @@ func TestResponse(t *testing.T) {
 	}))
 
 	_ = vm.Runtime().Set("url", ts.URL)
-	_, _ = vm.Runtime().RunString(`const http = require("cloudcat/http");`)
 
 	testCase := []string{
+		`const res = http.get(url+'/array');
+		 assert.true(res.ok);`,
 		`const res = http.get(url+'/json');
 		 assert.equal(res.json(), { "foo": "bar", "test": true });
 		 assert.true(res.bodyUsed);
@@ -55,27 +53,28 @@ func TestResponse(t *testing.T) {
 		 assert.equal(res.statusText, "200 OK");
 		 assert.equal(res.headers["Content-Type"], "application/json");`,
 		`const res = http.get(url+'/text');
-		 assert.true(res.bodyUsed);
+		 assert.true(!res.bodyUsed);
 		 assert.true(res.ok);
 		 assert.equal(res.statusText, "200 OK");
 		 assert.equal(res.text(), "foo");
-		 assert.equal(res.arrayBuffer(), new Uint8Array([102, 111, 111]));
-		 assert.equal(res.arrayBuffer(), res.body);
-		 assert.equal(res.headers["Content-Type"], "text/plain");`,
+		 assert.true(res.bodyUsed);
+		 try {
+			res.text();
+		 } catch (e) {
+		 	assert.true(e && e.toString().includes("body stream already read"));
+		 }`,
 	}
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			_, err := vm.RunString(ctx, s)
+			_, err := vm.Runtime().RunString(fmt.Sprintf(`{%s}`, s))
 			assert.NoError(t, err)
 		})
 	}
 }
 
 func TestAsyncResponse(t *testing.T) {
-	ctx := context.Background()
-	vm := modulestest.New(t)
-	cloudcat.Provide[cloudcat.Fetch](http.DefaultClient)
+	vm := modulestest.New(t, initial)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -169,8 +168,34 @@ func TestAsyncResponse(t *testing.T) {
 
 	for i, s := range testCase {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			_, err := vm.RunString(ctx, s)
+			_, err := vm.RunString(context.Background(), s)
 			assert.NoError(t, err)
 		})
+	}
+}
+
+type testBody struct {
+	closed bool
+}
+
+func (*testBody) Read(p []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (b *testBody) Close() error {
+	b.closed = true
+	return nil
+}
+
+func TestAutoClose(t *testing.T) {
+	vm := modulestest.New(t)
+	body := new(testBody)
+	res := NewResponse(vm.Runtime(), &http.Response{Body: body, StatusCode: http.StatusOK})
+	ctx := context.WithValue(context.Background(), "res", res)
+	assert.False(t, body.closed)
+	v, err := vm.RunModule(ctx, `export default (ctx) => ctx.get('res').ok`)
+	if assert.NoError(t, err) {
+		assert.True(t, v.ToBoolean())
+		assert.True(t, body.closed)
 	}
 }

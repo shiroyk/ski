@@ -1,10 +1,9 @@
-# Cloudcat
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/shiroyk/cloudcat)
-[![Go Report Card](https://goreportcard.com/badge/github.com/shiroyk/cloudcat)](https://goreportcard.com/report/github.com/shiroyk/cloudcat)
-![GitHub](https://img.shields.io/github/license/shiroyk/cloudcat)<br/>
-**Cloudcat** is a tool for extracting structured data from websites using extensible YAML syntax rules.<br/>
-Before v1.0.0 is for initial development. Anything MAY change at any time. The public API SHOULD NOT be considered stable.
+# ski
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/shiroyk/ski)
+[![Go Report Card](https://goreportcard.com/badge/github.com/shiroyk/ski)](https://goreportcard.com/report/github.com/shiroyk/ski)
+![GitHub](https://img.shields.io/github/license/shiroyk/ski)<br/>
+**ski** is a tool written in Golang for extracting structured data.
 ## Documentation
-See [Wiki](https://github.com/shiroyk/cloudcat/wiki)
+See [Wiki](https://github.com/shiroyk/ski/wiki)
 ## License
-cloudcat is distributed under the [AGPL-3.0 license](https://github.com/shiroyk/cloudcat/blob/master/LICENSE.md).
+ski is distributed under the [**MIT license**](https://github.com/shiroyk/ski/blob/master/LICENSE.md).

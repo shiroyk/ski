@@ -2,147 +2,105 @@
 package xpath
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	"github.com/antchfx/htmlquery"
-	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
-	"github.com/spf13/cast"
+	"github.com/antchfx/xpath"
+	"github.com/shiroyk/ski"
 	"golang.org/x/net/html"
 )
 
 // Parser the xpath parser
 type Parser struct{}
 
-const key string = "xpath"
-
 func init() {
-	parser.Register(key, new(Parser))
+	ski.Register("xpath", new(Parser))
 }
 
-// GetString gets the string of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetString(ctx, content, "//li/text()") returns "1\n2"
-func (p Parser) GetString(_ *plugin.Context, content any, arg string) (string, error) {
-	nodes, err := getHTMLNode(content, arg)
-	if err != nil {
-		return "", err
-	}
-
-	if len(nodes) == 0 {
-		return "", nil
-	}
-
-	str := strings.Builder{}
-	str.WriteString(htmlquery.InnerText(nodes[0]))
-	for _, node := range nodes[1:] {
-		str.WriteString("\n")
-		str.WriteString(htmlquery.InnerText(node))
-	}
-
-	return str.String(), nil
-}
-
-// GetStrings gets the strings of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetStrings(ctx, content, "//li/text()") returns []string{"1", "2"}
-func (p Parser) GetStrings(_ *plugin.Context, content any, arg string) ([]string, error) {
-	nodes, err := getHTMLNode(content, arg)
+func (p Parser) Value(arg string) (ski.Executor, error) {
+	ex, err := xpath.Compile(arg)
 	if err != nil {
 		return nil, err
 	}
+	return expr{ex, value}, nil
+}
 
+func (p Parser) Element(arg string) (ski.Executor, error) {
+	ex, err := xpath.Compile(arg)
+	if err != nil {
+		return nil, err
+	}
+	return expr{ex, element}, nil
+}
+func (p Parser) Elements(arg string) (ski.Executor, error) {
+	ex, err := xpath.Compile(arg)
+	if err != nil {
+		return nil, err
+	}
+	return expr{ex, elements}, nil
+}
+
+type expr struct {
+	*xpath.Expr
+	ret func([]*html.Node) (any, error)
+}
+
+func (e expr) Exec(_ context.Context, arg any) (any, error) {
+	node, err := htmlNode(arg)
+	if err != nil {
+		return nil, err
+	}
+	return e.ret(htmlquery.QuerySelectorAll(node, e.Expr))
+}
+
+func value(nodes []*html.Node) (any, error) {
+	switch len(nodes) {
+	case 0:
+		return nil, nil
+	case 1:
+		return htmlquery.InnerText(nodes[0]), nil
+	default:
+		str := make([]string, len(nodes))
+		for i, node := range nodes {
+			str[i] = htmlquery.InnerText(node)
+		}
+		return str, nil
+	}
+}
+
+func element(nodes []*html.Node) (any, error) {
+	if len(nodes) == 0 {
+		return nil, nil
+	}
+	return nodes[0], nil
+}
+
+func elements(nodes []*html.Node) (any, error) {
 	if len(nodes) == 0 {
 		return nil, nil
 	}
 
-	result := make([]string, len(nodes))
+	ret := make([]any, len(nodes))
 	for i, node := range nodes {
-		result[i] = htmlquery.InnerText(node)
+		ret[i] = node
 	}
 
-	return result, err
+	return ret, nil
 }
 
-// GetElement gets the element of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetStrings(ctx, content, "//li..") returns "<li>1</li>\n<li>2</li>"
-func (p Parser) GetElement(_ *plugin.Context, content any, arg string) (string, error) {
-	nodes, err := getHTMLNode(content, arg)
-	if err != nil {
-		return "", err
-	}
-
-	if len(nodes) == 0 {
-		return "", nil
-	}
-
-	str := strings.Builder{}
-	str.WriteString(htmlquery.OutputHTML(nodes[0], true))
-	for _, node := range nodes[1:] {
-		str.WriteString("\n")
-		str.WriteString(htmlquery.OutputHTML(node, true))
-	}
-
-	return str.String(), nil
-}
-
-// GetElements gets the elements of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetStrings(ctx, content, "//li..") returns []string{"<li>1</li>", "<li>2</li>"}
-func (p Parser) GetElements(_ *plugin.Context, content any, arg string) ([]string, error) {
-	nodes, err := getHTMLNode(content, arg)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(nodes) == 0 {
-		return nil, nil
-	}
-
-	str := make([]string, len(nodes))
-	for i, node := range nodes {
-		str[i] = htmlquery.OutputHTML(node, true)
-	}
-
-	return str, nil
-}
-
-func getHTMLNode(content any, arg string) ([]*html.Node, error) {
-	var err error
-	var node *html.Node
+func htmlNode(content any) (node *html.Node, err error) {
 	switch data := content.(type) {
 	default:
-		str, err := cast.ToStringE(content)
-		if err != nil {
-			return nil, err
-		}
-		node, err = html.Parse(strings.NewReader(str))
-		if err != nil {
-			return nil, err
-		}
+		return nil, fmt.Errorf("unexpected type %T", content)
 	case nil:
 		return nil, nil
+	case *html.Node:
+		return data, nil
 	case []string:
-		node, err = html.Parse(strings.NewReader(strings.Join(data, "\n")))
-		if err != nil {
-			return nil, err
-		}
+		return html.Parse(strings.NewReader(strings.Join(data, "\n")))
 	case string:
-		node, err = html.Parse(strings.NewReader(data))
-		if err != nil {
-			return nil, err
-		}
+		return html.Parse(strings.NewReader(data))
 	}
-
-	htmlNode, err := htmlquery.QueryAll(node, arg)
-	if err != nil {
-		return nil, err
-	}
-
-	return htmlNode, nil
 }

@@ -2,20 +2,36 @@
 package modulestest
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/ski/js"
 	"github.com/stretchr/testify/assert"
 )
 
-// New returns a test VM instance
-func New(t *testing.T) js.VM {
-	vm := js.NewVM()
-	runtime := vm.Runtime()
+type VM struct{ js.VM }
 
-	assertObject := runtime.NewObject()
+func (vm *VM) RunString(ctx context.Context, source string) (ret goja.Value, err error) {
+	vm.Run(ctx, func() {
+		ret, err = vm.Runtime().RunString(source)
+	})
+	return
+}
+
+func (vm *VM) RunModule(ctx context.Context, source string) (ret goja.Value, err error) {
+	module, err := vm.Loader().CompileModule("", source)
+	if err != nil {
+		return
+	}
+	return vm.VM.RunModule(ctx, module)
+}
+
+// New returns a test VM instance
+func New(t *testing.T, opts ...js.Option) VM {
+	vm := js.NewVM(append([]js.Option{js.WithModuleLoader(js.NewModuleLoader())}, opts...)...)
+	assertObject := vm.Runtime().NewObject()
 	_ = assertObject.Set("equal", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
 		a, err := js.Unwrap(call.Argument(0))
 		if err != nil {
@@ -45,7 +61,6 @@ func New(t *testing.T) js.VM {
 		return
 	})
 
-	_ = runtime.Set("assert", assertObject)
-
-	return vm
+	_ = vm.Runtime().Set("assert", assertObject)
+	return VM{vm}
 }

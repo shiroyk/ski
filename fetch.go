@@ -1,11 +1,11 @@
-package cloudcat
+package ski
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/url"
-
-	"github.com/shiroyk/cloudcat/plugin"
+	"time"
 )
 
 // Fetch http client interface
@@ -16,23 +16,42 @@ type Fetch interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-type requestProxyKey struct{}
+// NewFetch return the http.Client implementation
+func NewFetch() Fetch {
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy: ProxyFromRequest,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		Jar: NewCookieJar(),
+	}
+}
+
+var requestProxyKey byte
 
 // WithProxyURL returns a copy of parent context in which the proxy associated with context.
 func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {
 	if proxy == nil {
 		return ctx
 	}
-	if c, ok := ctx.(*plugin.Context); ok {
-		c.SetValue(requestProxyKey{}, proxy)
-		return ctx
+	if c, ok := ctx.(Context); ok {
+		c.SetValue(&requestProxyKey, proxy)
+		return c
 	}
-	return context.WithValue(ctx, requestProxyKey{}, proxy)
+	return context.WithValue(ctx, &requestProxyKey, proxy)
 }
 
 // ProxyFromContext returns a proxy URL on context.
 func ProxyFromContext(ctx context.Context) *url.URL {
-	if proxy := ctx.Value(requestProxyKey{}); proxy != nil {
+	if proxy := ctx.Value(&requestProxyKey); proxy != nil {
 		return proxy.(*url.URL)
 	}
 	return nil

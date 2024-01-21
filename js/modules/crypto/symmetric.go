@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/shiroyk/cloudcat/js"
+	"github.com/shiroyk/ski/js"
 )
 
 // Aes returns a new AES cipher

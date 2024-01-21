@@ -1,581 +1,502 @@
-package cloudcat
+package ski
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
+	"log/slog"
+	"maps"
 	"strings"
 
-	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
+	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 )
 
-var (
-	// ErrInvalidSchema invalid schema error
-	ErrInvalidSchema = errors.New("invalid schema")
-	// ErrInvalidAction invalid action error
-	ErrInvalidAction = errors.New("invalid action")
-	// ErrInvalidStep invalid step error
-	ErrInvalidStep = errors.New("invalid step")
-)
-
-// Type The property type.
-type Type string
+type Kind uint
 
 const (
-	// StringType The Type of string.
-	StringType Type = "string"
-	// NumberType The Type of number.
-	NumberType Type = "number"
-	// IntegerType The Type of integer.
-	IntegerType Type = "integer"
-	// BooleanType The Type of boolean.
-	BooleanType Type = "boolean"
-	// ObjectType The Type of object.
-	ObjectType Type = "object"
-	// ArrayType The Type of array.
-	ArrayType Type = "array"
+	KindAny Kind = iota
+	KindBool
+	KindInt // int32
+	KindInt64
+	KindFloat // float 32
+	KindFloat64
+	KindString
 )
 
-// ToType parses the schema type.
-func ToType(s any) (Type, error) {
-	switch s {
+var kindNames = [...]string{
+	KindAny:     "any",
+	KindBool:    "bool",
+	KindInt:     "int",
+	KindInt64:   "int64",
+	KindFloat:   "float",
+	KindFloat64: "float64",
+	KindString:  "string",
+}
+
+func (k Kind) String() string { return kindNames[k] }
+
+func (k Kind) MarshalText() (text []byte, err error) { return []byte(kindNames[k]), nil }
+
+func (k *Kind) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case "", "any":
+		*k = KindAny
+	case "bool":
+		*k = KindBool
+	case "int", "int32":
+		*k = KindInt
+	case "int64":
+		*k = KindInt64
+	case "float", "float32":
+		*k = KindFloat
+	case "float64":
+		*k = KindFloat64
 	case "string":
-		return StringType, nil
-	case "array":
-		return ArrayType, nil
-	case "object":
-		return ObjectType, nil
-	case "number":
-		return NumberType, nil
-	case "integer":
-		return IntegerType, nil
-	case "boolean":
-		return BooleanType, nil
-	}
-	return "", fmt.Errorf("invalid type %s", s)
-}
-
-// Operator The Action operator.
-type Operator string
-
-const (
-	// OperatorAnd The Operator of and.
-	// Action result A, B; Join the A + B.
-	OperatorAnd Operator = "and"
-	// OperatorOr The Operator of or.
-	// Action result A, B; if result A is nil return B else return A.
-	OperatorOr Operator = "or"
-	// OperatorNot The Operator of not.
-	// Action result A, B; if result A is not nil return B else return nil.
-	OperatorNot Operator = "not"
-)
-
-// Schema The schema.
-type Schema struct {
-	Type       Type     `yaml:"type"`
-	Format     Type     `yaml:"format,omitempty"`
-	Init       Action   `yaml:"init,omitempty"`
-	Rule       Action   `yaml:"rule,omitempty"`
-	Properties Property `yaml:"properties,omitempty"`
-}
-
-// Property The Schema property.
-type Property map[string]Schema
-
-// NewSchema returns a new Schema with the given Type.
-// The first argument is the Schema.Type, second is the Schema.Format.
-func NewSchema(types ...Type) *Schema {
-	switch {
-	case len(types) == 0:
-		panic("schema must have type")
-	case len(types) == 1:
-		return &Schema{
-			Type: types[0],
-		}
+		*k = KindString
 	default:
-		return &Schema{
-			Type:   types[0],
-			Format: types[1],
-		}
-	}
-}
-
-// SetProperty set the Property to Schema.Properties.
-func (schema *Schema) SetProperty(m Property) *Schema {
-	schema.Properties = m
-	return schema
-}
-
-// AddProperty append a field string with Schema to Schema.Properties.
-func (schema *Schema) AddProperty(field string, s Schema) *Schema {
-	if schema.Properties == nil {
-		property := make(map[string]Schema)
-		schema.Properties = property
-	}
-
-	schema.Properties[field] = s
-
-	return schema
-}
-
-// SetInit set the Init Action to Schema.Init.
-func (schema *Schema) SetInit(action Action) *Schema {
-	schema.Init = action
-	return schema
-}
-
-// SetRule set the Init Action to Schema.Rule.
-func (schema *Schema) SetRule(action Action) *Schema {
-	schema.Rule = action
-	return schema
-}
-
-// UnmarshalYAML decodes the Schema from yaml
-func (schema *Schema) UnmarshalYAML(node *yaml.Node) (err error) {
-	*schema, err = buildSchema(node)
-	return
-}
-
-// buildSchema builds a Schema
-func buildSchema(node *yaml.Node) (schema Schema, err error) {
-	switch node.Kind {
-	case yaml.SequenceNode:
-		return buildStringSchema(node)
-	case yaml.MappingNode:
-		typed := slices.ContainsFunc(node.Content,
-			func(node *yaml.Node) bool {
-				return node.Value == "type"
-			})
-		if typed {
-			return buildTypedSchema(node)
-		}
-		return buildStringSchema(node)
-	case yaml.AliasNode:
-		return buildSchema(node.Alias)
-	default:
-		err = ErrInvalidSchema
-	}
-	return
-}
-
-// buildStringSchema builds a StringType Schema
-func buildStringSchema(node *yaml.Node) (schema Schema, err error) {
-	schema.Type = StringType
-	schema.Rule, err = actionDecode(node)
-	if err != nil {
-		return
-	}
-	if len(node.Tag) > 2 && node.Tag[0] == '!' && node.Tag[1] != '!' {
-		tags := strings.Split(node.Tag[1:], "/")
-		schema.Type, err = ToType(tags[0])
-		if len(tags) > 1 {
-			schema.Format, err = ToType(tags[1])
-		}
-		if err != nil {
-			return schema, fmt.Errorf("invalid tag %s", node.Tag)
-		}
-	}
-	return
-}
-
-// buildTypedSchema builds a specific Type Schema
-//
-//nolint:nakedret
-func buildTypedSchema(node *yaml.Node) (schema Schema, err error) {
-	for i := 0; i < len(node.Content); i += 2 {
-		field, value := node.Content[i], node.Content[i+1]
-		switch field.Value {
-		case "type":
-			schema.Type, err = ToType(value.Value)
-		case "format":
-			schema.Format, err = ToType(value.Value)
-		case "init":
-			schema.Init, err = actionDecode(value)
-		case "rule":
-			schema.Rule, err = actionDecode(value)
-		case "properties":
-			if len(value.Content) == 2 {
-				schema.Properties = make(Property, 2)
-				k, v := value.Content[0], value.Content[1]
-				if k.Kind == yaml.MappingNode {
-					schema.Properties["$key"], err = buildSchema(k)
-					schema.Properties["$value"], err = buildSchema(v)
-					return
-				}
-				schema.Properties[k.Value], err = buildSchema(v)
-				return
-			}
-			schema.Properties = make(Property, len(value.Content)/2)
-			for j := 0; j < len(value.Content); j += 2 {
-				k, v := value.Content[j], value.Content[j+1]
-				schema.Properties[k.Value], err = buildSchema(v)
-				if err != nil {
-					return
-				}
-			}
-		}
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-// MarshalYAML encodes the Schema
-func (schema Schema) MarshalYAML() (any, error) {
-	if schema.Type == StringType &&
-		schema.Init == nil {
-		return schema.Rule, nil
-	}
-	s := make(map[string]any, 5)
-	s["type"] = schema.Type
-	if schema.Format != "" {
-		s["format"] = schema.Format
-	}
-	if schema.Init != nil {
-		s["init"] = schema.Init
-	}
-	if schema.Rule != nil {
-		s["rule"] = schema.Rule
-	}
-	if len(schema.Properties) > 0 {
-		s["properties"] = schema.Properties
-	}
-	return s, nil
-}
-
-// MarshalText encodes the receiver into UTF-8-encoded text and returns the result.
-func (schema Schema) MarshalText() ([]byte, error) {
-	if schema.Type == "" {
-		return nil, nil
-	}
-	return yaml.Marshal(schema)
-}
-
-// UnmarshalText must be able to decode the form generated by MarshalText.
-func (schema *Schema) UnmarshalText(text []byte) error {
-	return yaml.Unmarshal(text, schema)
-}
-
-// Action The Schema Action
-type Action interface {
-	// Left returns the left Action
-	Left() Action
-	// Right returns the right Action
-	Right() Action
-}
-
-// Step The Action of step
-type Step struct{ K, V string }
-
-// MarshalYAML encodes to yaml
-func (s Step) MarshalYAML() (any, error) {
-	return map[string]string{s.K: s.V}, nil
-}
-
-// Steps slice of Step
-type Steps []Step
-
-// NewSteps return new Steps
-func NewSteps(str ...string) *Steps {
-	if len(str)%2 != 0 {
-		panic(ErrInvalidStep)
-	}
-	steps := make(Steps, 0, len(str)/2)
-	for i := 0; i < len(str); i += 2 {
-		steps = append(steps, Step{str[i], str[i+1]})
-	}
-	return &steps
-}
-
-// Left returns the left Action
-func (s *Steps) Left() Action { return nil }
-
-// Right returns the right Action
-func (s *Steps) Right() Action { return nil }
-
-func (s *Steps) UnmarshalYAML(value *yaml.Node) error {
-	switch value.Kind {
-	case yaml.MappingNode:
-		*s = make(Steps, 0, len(value.Content)/2)
-		for i := 0; i < len(value.Content); i += 2 {
-			k, v := value.Content[i], value.Content[i+1]
-			if v.Kind == yaml.AliasNode {
-				v = v.Alias
-			}
-			if k.Kind != yaml.ScalarNode || v.Kind != yaml.ScalarNode {
-				return ErrInvalidStep
-			}
-			*s = append(*s, Step{k.Value, v.Value})
-		}
-	case yaml.SequenceNode:
-		*s = make(Steps, 0, len(value.Content))
-		for _, node := range value.Content {
-			if node.Kind != yaml.MappingNode {
-				return ErrInvalidStep
-			}
-			steps := new(Steps)
-			if err := node.Decode(steps); err != nil {
-				return err
-			}
-			*s = append(*s, *steps...)
-		}
-	default:
-		return ErrInvalidStep
+		return fmt.Errorf("unknown kind %s", text)
 	}
 	return nil
 }
 
-func (s Steps) MarshalYAML() (any, error) {
-	if len(s) == 1 {
-		return s[0], nil
-	}
-	return s, nil
-}
-
-// And Action node of Operator and
-type And struct{ l, r Action }
-
-// NewAnd create new And action with left and right Action
-func NewAnd(left, right Action) *And    { return &And{left, right} }
-func (a And) Left() Action              { return a.l }
-func (a And) Right() Action             { return a.r }
-func (a And) String() string            { return string(OperatorAnd) }
-func (a And) MarshalYAML() (any, error) { return [...]any{a.l, a.String(), a.r}, nil }
-
-// Or Action node of Operator or
-type Or struct{ l, r Action }
-
-// NewOr create new Or action with left and right Action
-func NewOr(left, right Action) *Or     { return &Or{left, right} }
-func (a Or) Left() Action              { return a.l }
-func (a Or) Right() Action             { return a.r }
-func (a Or) String() string            { return string(OperatorOr) }
-func (a Or) MarshalYAML() (any, error) { return [...]any{a.l, a.String(), a.r}, nil }
-
-// Not Action node of Operator not
-type Not struct{ l, r Action }
-
-// NewNot create new Not action with left and right Action
-func NewNot(left, right Action) *Not    { return &Not{left, right} }
-func (a Not) Left() Action              { return a.l }
-func (a Not) Right() Action             { return a.r }
-func (a Not) String() string            { return string(OperatorNot) }
-func (a Not) MarshalYAML() (any, error) { return [...]any{a.l, a.String(), a.r}, nil }
-
-// actionDecode decodes the Action from yaml.node
-func actionDecode(value *yaml.Node) (ret Action, err error) {
-	if value.Kind == yaml.DocumentNode {
-		return nil, ErrInvalidAction
-	}
-	if value.Kind == yaml.AliasNode {
-		value = value.Alias
-	}
-	multiStep := value.Kind == yaml.SequenceNode &&
-		!slices.ContainsFunc(value.Content, func(e *yaml.Node) bool {
-			return e.Kind == yaml.ScalarNode
-		})
-	if value.Kind == yaml.MappingNode || multiStep {
-		steps := new(Steps)
-		if err = value.Decode(steps); err != nil {
-			return
-		}
-		return steps, nil
-	}
-
-	var op string
-	var left Action
-	for _, node := range value.Content {
-		switch node.Kind {
-		case yaml.MappingNode, yaml.SequenceNode:
-			var leaf Action
-			leaf, err = actionDecode(node)
-			if err != nil {
-				return
-			}
-			if left == nil {
-				left = leaf
-				continue
-			}
-			ret, err = toActionOp(op, left, leaf)
-			left = nil
-		case yaml.ScalarNode:
-			op = node.Value
-		default:
-			continue
-		}
-
-		if err != nil {
-			return
-		}
-	}
-
-	if left != nil {
-		return toActionOp(op, ret, left)
-	}
-
-	return
-}
-
-// toActionOp parser the Operator string returns an operator Action
-func toActionOp(op string, left, right Action) (Action, error) {
-	switch Operator(strings.ToLower(op)) {
-	case OperatorAnd:
-		return NewAnd(left, right), nil
-	case OperatorOr:
-		return NewOr(left, right), nil
-	case OperatorNot:
-		return NewNot(left, right), nil
+func (k Kind) Exec(_ context.Context, v any) (any, error) {
+	switch k {
+	case KindBool:
+		return cast.ToBoolE(v)
+	case KindInt:
+		return cast.ToInt32E(v)
+	case KindInt64:
+		return cast.ToInt64E(v)
+	case KindFloat:
+		return cast.ToFloat32E(v)
+	case KindFloat64:
+		return cast.ToFloat64E(v)
+	case KindString:
+		return cast.ToStringE(v)
 	default:
-		return nil, fmt.Errorf("invalid operator %v", op)
+		return v, nil
 	}
 }
 
-// GetString run the action returns a string
-func GetString(ctx *plugin.Context, node Action, content any) (string, error) {
-	ret, err := WalkAction(node, func(steps Steps) ([]string, error) {
-		var err error
-		cur := content
-		for _, step := range steps {
-			p, ok := parser.GetParser(step.K)
-			if !ok {
-				return nil, fmt.Errorf("parser %s not found", step.K)
-			}
-			cur, err = p.GetString(ctx, cur, step.V)
-			if err != nil {
-				return nil, fmt.Errorf("parser %s: %s", step.K, err)
-			}
-		}
-		ret := cur.(string)
-		if len(ret) == 0 {
-			return nil, nil
-		}
-		return []string{ret}, nil
-	})
+type (
+	// Executor accept the argument and output result
+	Executor interface {
+		Exec(context.Context, any) (any, error)
+	}
+
+	// ExecutorMap map of the Executor init function
+	ExecutorMap map[string]func(args ...Executor) (Executor, error)
+)
+
+type compiler struct {
+	funcs ExecutorMap
+	meta  func(node *yaml.Node, exec Executor, isParser bool) Executor
+}
+
+func (c compiler) newError(message string, node *yaml.Node, err error) error {
 	if err != nil {
-		return "", err
+		message = fmt.Sprintf("%s: %s", message, err)
 	}
-	return strings.Join(ret, ""), nil
+	return fmt.Errorf("line %d column %d %s", node.Line, node.Column, message)
 }
 
-// GetStrings run the action returns a slice of string
-func GetStrings(ctx *plugin.Context, node Action, content any) ([]string, error) {
-	return WalkAction(node, func(steps Steps) ([]string, error) {
-		var err error
-		ret := content
-		for _, step := range steps {
-			p, ok := parser.GetParser(step.K)
-			if !ok {
-				return nil, fmt.Errorf("parser %s not found", step.K)
-			}
-			ret, err = p.GetStrings(ctx, ret, step.V)
-			if err != nil {
-				return nil, fmt.Errorf("parser %s: %s", step.K, err)
-			}
-		}
-		return ret.([]string), nil
-	})
-}
-
-// GetElement run the action returns an element string
-func GetElement(ctx *plugin.Context, node Action, content any) (string, error) {
-	ret, err := WalkAction(node, func(steps Steps) ([]string, error) {
-		var err error
-		cur := content
-		for _, step := range steps {
-			p, ok := parser.GetParser(step.K)
-			if !ok {
-				return nil, fmt.Errorf("parser %s not found", step.K)
-			}
-			cur, err = p.GetElement(ctx, cur, step.V)
-			if err != nil {
-				return nil, fmt.Errorf("parser %s: %s", step.K, err)
-			}
-		}
-		ret := cur.(string)
-		if len(ret) == 0 {
-			return nil, nil
-		}
-		return []string{ret}, nil
-	})
+// compile the Executor from the YAML string.
+func (c compiler) compile(str string) (Executor, error) {
+	node := new(yaml.Node)
+	if err := yaml.Unmarshal([]byte(str), node); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal YAML: %s", err)
+	}
+	if node.Kind != yaml.DocumentNode || len(node.Content) != 1 {
+		return nil, errors.New("invalid YAML schema: document node is missing or incorrect")
+	}
+	exec, err := c.compileNode(node.Content[0])
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return strings.Join(ret, ""), nil
+	if len(exec) == 1 {
+		return exec[0], nil
+	}
+	return c.piping(exec), nil
 }
 
-// GetElements run the action returns a slice of element string
-func GetElements(ctx *plugin.Context, node Action, content any) ([]string, error) {
-	return WalkAction(node, func(steps Steps) ([]string, error) {
-		var err error
-		ret := content
-		for _, step := range steps {
-			p, ok := parser.GetParser(step.K)
-			if !ok {
-				return nil, fmt.Errorf("parser %s not found", step.K)
-			}
-			ret, err = p.GetElements(ctx, ret, step.V)
-			if err != nil {
-				return nil, fmt.Errorf("parser %s: %s", step.K, err)
-			}
-		}
-		return ret.([]string), nil
-	})
+// piping return the first arg if the length is 1, else return _pipe
+func (c compiler) piping(args []Executor) Executor {
+	if len(args) == 1 {
+		return args[0]
+	}
+	return _pipe(args)
 }
 
-// WalkAction preorder traversal of Action.
-func WalkAction(node Action, walk func(Steps) ([]string, error)) (ret []string, err error) {
-	var left []string
-	var stack []Action
-	for len(stack) > 0 || node != nil {
-		// traverse the left subtree and push the node to the stack
-		for node != nil {
-			stack = append(stack, node)
-			node = node.Left()
+// compileExecutor return the Executor with the key and values
+func (c compiler) compileExecutor(k, v *yaml.Node) (Executor, error) {
+	key := strings.TrimPrefix(k.Value, "$")
+	init, ok := c.funcs[key]
+	if ok {
+		args, err := c.compileNode(v)
+		if err != nil {
+			return nil, err
 		}
-		// pop the stack and walk the node
-		node = stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		switch node.(type) {
-		case *And:
-			if len(stack) == 0 {
-				// join the left subtree result to ret
-				ret = append(ret, left...)
-				left = nil
-			}
-		case *Or:
-			if len(left) > 0 {
-				// discard right subtree if left subtree result is not empty
-				node = nil
-				if len(stack) == 0 {
-					ret = append(ret, left...)
-					left = nil
-				}
-				continue
-			}
-		case *Not:
-			if len(left) == 0 {
-				// discard right subtree if left subtree result is empty
-				node = nil
-				continue
-			}
-			left = nil
-		case *Steps:
-			var cur []string
-			cur, err = walk(*node.(*Steps))
+		exec, err := init(args...)
+		if err != nil {
+			return nil, c.newError(key, k, err)
+		}
+		if c.meta != nil {
+			return c.meta(k, exec, false), nil
+		}
+		return exec, nil
+	}
+
+	name, method, found := strings.Cut(key, ".")
+	parser, ok := GetParser(name)
+	if !ok {
+		return nil, c.newError("function or parser not found", k, errors.New(key))
+	}
+
+	var (
+		exec Executor
+		err  error
+	)
+
+	if found && method != "value" {
+		parser, ok := parser.(ElementParser)
+		if !ok {
+			return nil, c.newError("method not found", k, errors.New(key))
+		}
+		switch method {
+		case "element":
+			exec, err = parser.Element(v.Value)
+		case "elements":
+			exec, err = parser.Elements(v.Value)
+		default:
+			return nil, c.newError("method not found", k, errors.New(key))
+		}
+	} else {
+		exec, err = parser.Value(v.Value)
+	}
+
+	if err != nil {
+		return nil, c.newError(key, k, err)
+	}
+	if c.meta != nil {
+		return c.meta(k, exec, true), nil
+	}
+	return exec, nil
+}
+
+func (c compiler) compileNode(node *yaml.Node) ([]Executor, error) {
+	switch node.Kind {
+	case yaml.MappingNode:
+		return c.compileMapping(node)
+	case yaml.SequenceNode:
+		return c.compileSequence(node)
+	case yaml.ScalarNode:
+		return []Executor{String(node.Value)}, nil
+	case yaml.AliasNode:
+		return c.compileNode(node.Alias)
+	default:
+		return nil, c.newError("invalid node type", node, nil)
+	}
+}
+
+func (c compiler) compileSequence(node *yaml.Node) ([]Executor, error) {
+	args := make([]Executor, 0, len(node.Content))
+	for _, item := range node.Content {
+		items, err := c.compileNode(item)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, c.piping(items))
+	}
+	return args, nil
+}
+
+func (c compiler) compileMapping(node *yaml.Node) ([]Executor, error) {
+	if len(node.Content) == 0 || len(node.Content)%2 != 0 {
+		return nil, c.newError("mapping node requires at least two elements", node, nil)
+	}
+
+	if strings.HasPrefix(node.Content[0].Value, "$") {
+		ret := make([]Executor, 0, len(node.Content)/2)
+		for i := 0; i < len(node.Content); i += 2 {
+			exec, err := c.compileExecutor(node.Content[i], node.Content[i+1])
 			if err != nil {
 				return nil, err
 			}
-			if len(stack) == 0 {
-				ret = append(ret, cur...)
-			} else {
-				left = append(left, cur...)
+			ret = append(ret, exec)
+		}
+		return ret, nil
+	}
+
+	ret := make([]Executor, 0, len(node.Content)/2)
+	for i := 0; i < len(node.Content); i += 2 {
+		keyNode, valueNode := node.Content[i], node.Content[i+1]
+		key := String(keyNode.Value)
+
+		if valueNode.Kind != yaml.MappingNode {
+			child, err := c.compileNode(valueNode)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, key, c.piping(child))
+			continue
+		}
+
+		if len(valueNode.Content) == 2 {
+			exec, err := c.compileExecutor(valueNode.Content[0], valueNode.Content[1])
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, key, exec)
+			continue
+		}
+
+		pipe := make(_pipe, 0, len(valueNode.Content)/2)
+		for j := 0; j < len(valueNode.Content); j += 2 {
+			exec, err := c.compileExecutor(valueNode.Content[j], valueNode.Content[j+1])
+			if err != nil {
+				return nil, err
+			}
+			pipe = append(pipe, exec)
+		}
+		ret = append(ret, key, pipe)
+	}
+	return ret, nil
+}
+
+type Option func(*compiler)
+
+// WithExecutorMap external ExecutorMap
+func WithExecutorMap(fn ExecutorMap) Option {
+	return func(parser *compiler) {
+		funcs := maps.Clone(buildInExecutor)
+		maps.Copy(funcs, fn)
+		parser.funcs = funcs
+	}
+}
+
+type Meta = func(node *yaml.Node, exec Executor, isParser bool) Executor
+
+// WithMeta with the meta message
+func WithMeta(meta Meta) Option {
+	return func(parser *compiler) { parser.meta = meta }
+}
+
+// Compile the Executor with the Option.
+func Compile(str string, opts ...Option) (Executor, error) {
+	c := new(compiler)
+	for _, opt := range opts {
+		opt(c)
+	}
+	if c.funcs == nil {
+		c.funcs = buildInExecutor
+	}
+	return c.compile(str)
+}
+
+var buildInExecutor = ExecutorMap{
+	"debug": func(args ...Executor) (Executor, error) {
+		if len(args) > 0 {
+			return _debug(ToString(args[0])), nil
+		}
+		return _debug(""), nil
+	},
+	"kind": func(args ...Executor) (Executor, error) {
+		if len(args) != 1 {
+			return nil, errors.New("kind needs 1 parameter")
+		}
+		var k Kind
+		return k, k.UnmarshalText([]byte(ToString(args[0])))
+	},
+	"each": func(args ...Executor) (Executor, error) {
+		if len(args) != 1 {
+			return nil, errors.New("each needs 1 parameter")
+		}
+		return _each{args[0]}, nil
+	},
+	"json.parse":  func(args ...Executor) (Executor, error) { return _jsonParse{}, nil },
+	"json.string": func(args ...Executor) (Executor, error) { return _jsonString{}, nil },
+	"map": func(args ...Executor) (Executor, error) {
+		kv := _map(args)
+		if len(kv)%2 != 0 {
+			kv = append(kv, Raw(nil))
+		}
+		return kv, nil
+	},
+	"or": func(args ...Executor) (Executor, error) { return _or(args), nil },
+	"string.join": func(args ...Executor) (Executor, error) {
+		if len(args) > 0 {
+			return _stringJoin(ToString(args[0])), nil
+		}
+		return _stringJoin(""), nil
+	},
+	"pipe": func(args ...Executor) (Executor, error) { return _pipe(args), nil },
+}
+
+// String the Executor for string value
+type String string
+
+func (k String) Exec(_ context.Context, _ any) (any, error) { return k.String(), nil }
+
+func (k String) String() string { return string(k) }
+
+type _map []Executor
+
+func (m _map) Exec(ctx context.Context, arg any) (any, error) {
+	var ret map[string]any
+
+	exec := func(a any) {
+		for i := 0; i < len(m); i += 2 {
+			k, err := m[i].Exec(ctx, a)
+			if err != nil {
+				continue
+			}
+			ks, err := cast.ToStringE(k)
+			if err != nil {
+				continue
+			}
+			v, _ := m[i+1].Exec(ctx, a)
+			ret[ks] = v
+		}
+	}
+
+	switch s := arg.(type) {
+	case []any:
+		ret = make(map[string]any, len(s))
+		for _, a := range s {
+			exec(a)
+		}
+		return ret, nil
+	case []string:
+		ret = make(map[string]any, len(s))
+		for _, a := range s {
+			exec(a)
+		}
+		return ret, nil
+	default:
+		ret = make(map[string]any, len(m)/2)
+		exec(arg)
+		return ret, nil
+	}
+}
+
+type _each struct{ Executor }
+
+func (each _each) Exec(ctx context.Context, arg any) (any, error) {
+	switch s := arg.(type) {
+	case []any:
+		ret := make([]any, 0, len(s))
+		for _, i := range s {
+			v, _ := each.Executor.Exec(ctx, i)
+			ret = append(ret, v)
+		}
+		return ret, nil
+	case []string:
+		ret := make([]any, 0, len(s))
+		for _, i := range s {
+			v, _ := each.Executor.Exec(ctx, i)
+			ret = append(ret, v)
+		}
+		return ret, nil
+	default:
+		v, err := each.Executor.Exec(ctx, arg)
+		if err != nil {
+			return []any{}, nil
+		}
+		return []any{v}, nil
+	}
+}
+
+// Raw the Executor for raw value, return the original value
+func Raw(arg any) Executor { return _raw{arg} }
+
+type _raw struct{ any }
+
+func (raw _raw) Exec(context.Context, any) (any, error) { return raw.any, nil }
+
+type _pipe []Executor
+
+func (pipe _pipe) Exec(ctx context.Context, v any) (any, error) {
+	switch len(pipe) {
+	case 0:
+		return nil, nil
+	case 1:
+		return pipe[0].Exec(ctx, v)
+	default:
+		ret, err := pipe[0].Exec(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range pipe[1:] {
+			ret, err = s.Exec(ctx, ret)
+			if err != nil {
+				return nil, err
 			}
 		}
-		node = node.Right()
+		return ret, nil
 	}
-	return
+}
+
+type _or []Executor
+
+func (or _or) Exec(ctx context.Context, arg any) (any, error) {
+	for _, exec := range or {
+		v, err := exec.Exec(ctx, arg)
+		if err != nil {
+			continue
+		}
+		if v != nil {
+			return v, nil
+		}
+	}
+	return nil, nil
+}
+
+type _debug string
+
+func (debug _debug) Exec(ctx context.Context, v any) (any, error) {
+	Logger(ctx).LogAttrs(ctx, slog.LevelDebug, string(debug), slog.Any("value", v))
+	return v, nil
+}
+
+type _stringJoin string
+
+func (sep _stringJoin) Exec(_ context.Context, arg any) (any, error) {
+	switch s := arg.(type) {
+	case []any:
+		str, err := cast.ToStringSliceE(s)
+		if err != nil {
+			return nil, fmt.Errorf("expected string or []string, but got type %T", arg)
+		}
+		return strings.Join(str, string(sep)), nil
+	case []string:
+		return strings.Join(s, string(sep)), nil
+	case string:
+		return s, nil
+	default:
+		return nil, fmt.Errorf("expected string or []string, but got type %T", arg)
+	}
+}
+
+type _jsonParse struct{}
+
+func (_jsonParse) Exec(_ context.Context, v any) (any, error) {
+	s, err := cast.ToStringE(v)
+	if err != nil {
+		return nil, err
+	}
+	var ret any
+	err = json.Unmarshal([]byte(s), &ret)
+	return ret, err
+}
+
+type _jsonString struct{}
+
+func (_jsonString) Exec(_ context.Context, v any) (any, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	return string(data), nil
 }

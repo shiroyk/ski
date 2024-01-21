@@ -1,21 +1,20 @@
 package gq
 
 import (
-	"flag"
+	"bytes"
+	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"log/slog"
 
-	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/html"
 )
 
 var (
-	gq      Parser
-	ctx     *plugin.Context
+	gq      = parser{funcs: builtins()}
+	ctx     = context.Background()
 	content = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -58,134 +57,122 @@ var (
 `
 )
 
-func TestMain(m *testing.M) {
-	flag.Parse()
-	ctx = plugin.NewContext(plugin.ContextOptions{
-		URL: "https://localhost",
-	})
-	gq = Parser{parseFuncs: builtins()}
-	code := m.Run()
-	os.Exit(code)
-}
-
-func assertGetString(t *testing.T, arg string, expected string) {
-	str, err := gq.GetString(ctx, content, arg)
-	if err != nil {
-		t.Error(err)
+func assertError(t *testing.T, arg string, contains string) {
+	executor, err := gq.Value(arg)
+	if assert.NoError(t, err) {
+		_, err = executor.Exec(ctx, content)
+		assert.ErrorContains(t, err, contains)
 	}
-
-	assert.Equal(t, expected, str)
 }
 
-func assertGetStrings(t *testing.T, arg string, expected []string) {
-	str, err := gq.GetStrings(ctx, content, arg)
-	if err != nil {
-		t.Fatal(err)
+func assertValue(t *testing.T, arg string, expected any) {
+	executor, err := gq.Value(arg)
+	if assert.NoError(t, err) {
+		v, err := executor.Exec(ctx, content)
+		if assert.NoError(t, err) {
+			assert.Equal(t, expected, v)
+		}
 	}
-
-	assert.Equal(t, expected, str)
 }
 
-func assertGetElement(t *testing.T, arg string, expected string) {
-	ele, err := gq.GetElement(ctx, content, arg)
-	if err != nil {
-		t.Fatal(err)
+func assertElement(t *testing.T, arg string, expected string) {
+	executor, err := gq.Element(arg)
+	if assert.NoError(t, err) {
+		v, err := executor.Exec(ctx, content)
+		if assert.NoError(t, err) {
+			switch c := v.(type) {
+			case *html.Node:
+				b := new(bytes.Buffer)
+				if assert.NoError(t, html.Render(b, c)) {
+					assert.Equal(t, expected, b.String())
+				}
+			default:
+				assert.Equal(t, expected, v)
+			}
+		}
 	}
-
-	assert.Equal(t, expected, ele)
 }
 
-func assertGetElements(t *testing.T, arg string, expected []string) {
-	objs, err := gq.GetElements(ctx, content, arg)
-	if err != nil {
-		t.Fatal(err)
+func assertElements(t *testing.T, arg string, expected []string) {
+	executor, err := gq.Elements(arg)
+	if assert.NoError(t, err) {
+		v, err := executor.Exec(ctx, content)
+		if assert.NoError(t, err) {
+			switch c := v.(type) {
+			case []any:
+				ele := make([]string, len(c))
+				for i, v := range c {
+					var b bytes.Buffer
+					if assert.NoError(t, html.Render(&b, v.(*html.Node))) {
+						ele[i] = b.String()
+					}
+				}
+				assert.Equal(t, expected, ele)
+			default:
+				assert.Equal(t, expected, v)
+			}
+		}
 	}
-
-	assert.Equal(t, expected, objs)
 }
 
-func TestParser(t *testing.T) {
+func TestValue(t *testing.T) {
 	t.Parallel()
-	if _, ok := parser.GetParser(Key); !ok {
-		t.Fatal("schema not registered")
-	}
+	assertValue(t, `#main .row -> text`, []string{"1", "2", "3", "4", "5", "6"})
 
-	_, err := gq.GetString(ctx, 0x11, `0x11`)
-	assert.NoError(t, err)
+	assertValue(t, `.body ul a -> parent(li) -> attr(id)`, []string{"a1", "a2", "a3", "a4"})
 
-	_, err = gq.GetString(ctx, nil, ``)
-	assert.NoError(t, err)
-
-	_, err = gq.GetString(ctx, []string{"<br>"}, ``)
-	assert.NoError(t, err)
-
-	_, err = gq.GetString(ctx, `<a href="https://go.dev" title="Golang page">Golang</a>`, ``)
-	assert.NoError(t, err)
-
-	sel, _ := gq.GetElement(ctx, content, `#main .row`)
-	_, err = gq.GetString(ctx, sel, ``)
-	assert.NoError(t, err)
+	assertValue(t, `script -> slice(0) -> attr(type)`, "text/javascript")
 }
 
-func TestGetString(t *testing.T) {
+func TestElement(t *testing.T) {
 	t.Parallel()
-	assertGetString(t, `#main .row -> text`, "1\n2\n3\n4\n5\n6")
+	assertElement(t, `.body ul a -> parents(li)`, `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>`)
 
-	assertGetString(t, `.body ul a -> parent(li) -> attr(id) -> join(-)`, "a1-a2-a3-a4")
-
-	assertGetString(t, `script -> slice(0) -> attr(type)`, "text/javascript")
+	assertElement(t, `.body ul a -> slice(1) -> text`, `Github`)
 }
 
-func TestGetStrings(t *testing.T) {
+func TestElements(t *testing.T) {
 	t.Parallel()
-	assertGetStrings(t, `.body ul li -> child(a) -> attr(title)`, []string{"Google page", "Github page", "Golang page", "Home page"})
-
-	assertGetStrings(t, `.body ul a`, []string{"Google", "Github", "Golang", "Home"})
-}
-
-func TestGetElement(t *testing.T) {
-	t.Parallel()
-	assertGetElement(t, `.body ul a -> parents(li)`, `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>`)
-
-	assertGetElement(t, `.body ul a -> slice(1) -> text`, `Github`)
-}
-
-func TestGetElements(t *testing.T) {
-	t.Parallel()
-	assertGetElements(t, `#foot div -> slice(0, 3)`, []string{
+	assertElements(t, `#foot div -> slice(0, 3)`, []string{
 		`<div id="nf1" class="one even row">f1</div>`,
 		`<div id="nf2" class="two odd row">f2</div>`,
 		`<div id="nf3" class="three even row">f3</div>`,
 	})
 
-	assertGetElements(t, `#foot div -> slice(0, 3) -> text`, []string{"f1", "f2", "f3"})
+	assertElements(t, `#foot div -> slice(0, 3) -> text`, []string{"f1", "f2", "f3"})
 }
 
 func TestExternalFunc(t *testing.T) {
 	{
-		fun := func(logger *slog.Logger) GFunc {
-			return func(_ *plugin.Context, content any, args ...string) (any, error) {
+		fun := func(logger *slog.Logger) Func {
+			return func(_ context.Context, content any, args ...string) (any, error) {
 				logger.Info(fmt.Sprintf("result type was %T", content))
 				return content, nil
 			}
 		}
-		p := NewParser(FuncMap{"logger": fun(slog.Default())})
-		_, err := p.GetString(ctx, content, ".body ul a -> logger -> text")
-		assert.NoError(t, err)
+		data := new(bytes.Buffer)
+		p := NewParser(FuncMap{"logger": fun(slog.New(slog.NewTextHandler(data, nil)))})
+		executor, err := p.Value(".body ul a -> logger -> text")
+		if assert.NoError(t, err) {
+			v, err := executor.Exec(ctx, content)
+			if assert.NoError(t, err) {
+				assert.Equal(t, []string{"Google", "Github", "Golang", "Home"}, v)
+			}
+		}
+		assert.Contains(t, data.String(), `result type was *goquery.Selection`)
 	}
 
 	{
-		fun := func(_ *plugin.Context, content any, args ...string) (any, error) {
+		fun := func(_ context.Context, content any, args ...string) (any, error) {
 			return nil, nil
 		}
 		p := NewParser(FuncMap{"nil": fun})
-		_, err := p.GetString(ctx, content, ".body ul a -> nil -> text")
-		assert.NoError(t, err)
-		_, err = p.GetStrings(ctx, content, ".body ul a -> nil -> text")
-		assert.NoError(t, err)
-		_, err = p.GetElement(ctx, content, ".body ul a -> nil -> text")
-		assert.NoError(t, err)
-		_, err = p.GetElements(ctx, content, ".body ul a -> nil -> text")
-		assert.NoError(t, err)
+		executor, err := p.Value(".body ul a -> nil -> text")
+		if assert.NoError(t, err) {
+			v, err := executor.Exec(ctx, content)
+			if assert.NoError(t, err) {
+				assert.Equal(t, nil, v)
+			}
+		}
 	}
 }

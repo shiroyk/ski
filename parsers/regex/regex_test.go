@@ -1,9 +1,9 @@
 package regex
 
 import (
+	"context"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,34 +25,32 @@ var (
 	}
 )
 
-func TestParser(t *testing.T) {
-	if _, ok := parser.GetParser(key); !ok {
-		t.Fatal("parser not registered")
-	}
-}
-
-func TestGetString(t *testing.T) {
+func TestValue(t *testing.T) {
 	t.Parallel()
 	for _, s := range testCase {
 		t.Run(s.re, func(t *testing.T) {
-			str, err := re.GetString(nil, s.str, s.re)
-			if err != nil {
-				t.Error(err)
+			executor, err := re.Value(s.re)
+			if assert.NoError(t, err) {
+				v, err := executor.Exec(context.Background(), s.str)
+				if assert.NoError(t, err) {
+					assert.Equal(t, s.want, v)
+				}
 			}
-			assert.Equal(t, s.want, str)
 		})
 	}
 }
 
-func TestGetStrings(t *testing.T) {
+func TestElements(t *testing.T) {
 	t.Parallel()
 	for _, s := range testCase {
 		t.Run(s.re, func(t *testing.T) {
-			str, err := re.GetStrings(nil, []string{s.str}, s.re)
-			if err != nil {
-				t.Error(err)
+			executor, err := re.Elements(s.re)
+			if assert.NoError(t, err) {
+				v, err := executor.Exec(context.Background(), s.str)
+				if assert.NoError(t, err) {
+					assert.Equal(t, s.want, v.([]string)[0])
+				}
 			}
-			assert.Equal(t, s.want, str[0])
 		})
 	}
 }

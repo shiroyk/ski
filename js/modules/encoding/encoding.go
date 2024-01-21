@@ -6,22 +6,21 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/js"
-	"github.com/shiroyk/cloudcat/plugin/jsmodule"
+	"github.com/shiroyk/ski/js"
 )
 
-// Module js module
-type Module struct{}
-
-// Exports returns module instance
-func (*Module) Exports() any {
-	return map[string]any{
-		"base64": &Base64{},
-	}
+func init() {
+	js.Register("encoding", new(Encoding))
 }
 
-func init() {
-	jsmodule.Register("encoding", new(Module))
+// Encoding js module
+type Encoding struct{}
+
+// Instantiate returns Encoding module instance
+func (*Encoding) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	return rt.ToValue(map[string]any{
+		"base64": new(Base64),
+	}), nil
 }
 
 // Base64 encoding and decoding

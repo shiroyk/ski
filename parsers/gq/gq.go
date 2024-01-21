@@ -2,189 +2,199 @@
 package gq
 
 import (
+	"context"
+	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
-	"github.com/spf13/cast"
+	"github.com/andybalholm/cascadia"
+	"github.com/shiroyk/ski"
+	"golang.org/x/net/html"
 )
 
-// Key the gq parser register key.
-const Key string = "gq"
+// parser the goquery parser
+type parser struct{ funcs FuncMap }
 
-// Parser the goquery parser
-type Parser struct {
-	parseFuncs FuncMap
+// NewParser creates a new goquery parser with the given FuncMap.
+func NewParser(m FuncMap) ski.ElementParser {
+	funcs := maps.Clone(builtins())
+	maps.Copy(funcs, m)
+	return &parser{funcs}
 }
 
-// NewParser creates a new goquery Parser with the given FuncMap.
-func NewParser(funcs FuncMap) parser.Parser {
-	p := &Parser{parseFuncs: builtins()}
-	for k, v := range funcs {
-		p.parseFuncs[k] = v
-	}
-	return p
-}
-
-// init register the goquery Parser with default builtins funcs.
 func init() {
-	parser.Register(Key, &Parser{parseFuncs: builtins()})
+	ski.Register("gq", NewParser(nil))
 }
 
-// GetString gets the string of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetString(ctx, content, "ul li") returns "1\n2"
-func (p *Parser) GetString(ctx *plugin.Context, content any, arg string) (ret string, err error) {
-	nodes, err := getSelection(content)
+func (p *parser) Value(arg string) (ski.Executor, error) {
+	ret, err := p.compile(arg)
 	if err != nil {
-		return
+		return nil, err
 	}
-
-	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
-	if err != nil {
-		return
-	}
-
-	var node any = nodes.Find(rule)
-
-	for _, fun := range funcs {
-		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
-		if err != nil || node == nil {
-			return ret, err
-		}
-	}
-
-	node, err = Join(ctx, node, "\n")
-	if err != nil {
-		return
-	}
-
-	return node.(string), nil
+	ret.calls = append(ret.calls, call{fn: value})
+	return ret, nil
 }
 
-// GetStrings gets the strings of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetStrings(ctx, content, "ul li") returns []string{"1", "2"}
-func (p *Parser) GetStrings(ctx *plugin.Context, content any, arg string) (ret []string, err error) {
-	nodes, err := getSelection(content)
+func (p *parser) Element(arg string) (ski.Executor, error) {
+	ret, err := p.compile(arg)
 	if err != nil {
-		return
+		return nil, err
 	}
-
-	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
-	if err != nil {
-		return
-	}
-
-	var node any = nodes.Find(rule)
-
-	for _, fun := range funcs {
-		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
-		if err != nil || node == nil {
-			return nil, err
-		}
-	}
-
-	if sel, ok := node.(*goquery.Selection); ok {
-		str := make([]string, sel.Length())
-		sel.EachWithBreak(func(i int, sel *goquery.Selection) bool {
-			str[i] = strings.TrimSpace(sel.Text())
-			return true
-		})
-		return str, nil
-	}
-	return cast.ToStringSliceE(node)
+	ret.calls = append(ret.calls, call{fn: element})
+	return ret, nil
 }
 
-// GetElement gets the element of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetElement(ctx, content, "ul li") returns "<li>1</li>\n<li>2</li>"
-func (p *Parser) GetElement(ctx *plugin.Context, content any, arg string) (ret string, err error) {
-	nodes, err := getSelection(content)
+func (p *parser) Elements(arg string) (ski.Executor, error) {
+	ret, err := p.compile(arg)
 	if err != nil {
-		return
+		return nil, err
 	}
-
-	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
-	if err != nil {
-		return
-	}
-
-	var node any = nodes.Find(rule)
-
-	for _, fun := range funcs {
-		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
-		if err != nil || node == nil {
-			return ret, err
-		}
-	}
-
-	if sel, ok := node.(*goquery.Selection); ok {
-		return goquery.OuterHtml(sel)
-	}
-
-	return cast.ToStringE(node)
+	ret.calls = append(ret.calls, call{fn: elements})
+	return ret, nil
 }
 
-// GetElements gets the elements of the content with the given arguments.
-//
-// content := `<ul><li>1</li><li>2</li></ul>`
-// GetElements(ctx, content, "ul li") returns []string{"<li>1</li>", "<li>2</li>"}
-func (p *Parser) GetElements(ctx *plugin.Context, content any, arg string) (ret []string, err error) {
-	nodes, err := getSelection(content)
-	if err != nil {
+func (p *parser) compile(raw string) (ret matcher, err error) {
+	funcs := strings.Split(raw, "->")
+	if len(funcs) == 1 {
+		ret.Matcher, err = cascadia.Compile(funcs[0])
 		return
 	}
-
-	rule, funcs, err := parseRuleFunctions(p.parseFuncs, arg)
-	if err != nil {
-		return
-	}
-
-	var node any = nodes.Find(rule)
-
-	for _, fun := range funcs {
-		node, err = p.parseFuncs[fun.name](ctx, node, fun.args...)
-		if err != nil || node == nil {
-			return nil, err
-		}
-	}
-
-	if sel, ok := node.(*goquery.Selection); ok {
-		objs := make([]string, sel.Length())
-		sel.EachWithBreak(func(i int, sel *goquery.Selection) bool {
-			if objs[i], err = goquery.OuterHtml(sel); err != nil {
-				return false
-			}
-			return true
-		})
+	selector := strings.TrimSpace(funcs[0])
+	if len(selector) == 0 {
+		ret.Matcher = new(emptyMatcher)
+	} else {
+		ret.Matcher, err = cascadia.Compile(selector)
 		if err != nil {
 			return
 		}
-		return objs, nil
 	}
-	return cast.ToStringSliceE(node)
+
+	ret.calls = make([]call, 0, len(funcs)-1)
+
+	for _, function := range funcs[1:] {
+		function = strings.TrimSpace(function)
+		if function == "" {
+			continue
+		}
+		name, args, err := parseFuncArguments(function)
+		if err != nil {
+			return ret, err
+		}
+		fn, ok := p.funcs[name]
+		if !ok {
+			return ret, fmt.Errorf("function %s not exists", name)
+		}
+		ret.calls = append(ret.calls, call{fn, args})
+	}
+
+	return
 }
 
-// getSelection converts content to goquery.Selection
-func getSelection(content any) (*goquery.Selection, error) {
+type call struct {
+	fn   Func
+	args []string
+}
+
+type matcher struct {
+	goquery.Matcher
+	calls []call
+}
+
+func (f matcher) Exec(ctx context.Context, arg any) (any, error) {
+	nodes, err := selection(arg)
+	if err != nil {
+		return nil, err
+	}
+
+	var node any = nodes.FindMatcher(f)
+
+	for _, c := range f.calls {
+		node, err = c.fn(ctx, node, c.args...)
+		if err != nil || node == nil {
+			return nil, err
+		}
+	}
+
+	return node, nil
+}
+
+func value(ctx context.Context, node any, _ ...string) (any, error) {
+	v, err := Text(ctx, node)
+	if node == nil || err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func element(_ context.Context, node any, _ ...string) (any, error) {
+	switch t := node.(type) {
+	default:
+		return nil, fmt.Errorf("unexpected type %T", node)
+	case string, []string, *html.Node, nil:
+		return t, nil
+	case *goquery.Selection:
+		if len(t.Nodes) == 0 {
+			return nil, nil
+		}
+		return t.Nodes[0], nil
+	case []*html.Node:
+		if len(t) == 0 {
+			return nil, nil
+		}
+		return t[0], nil
+	}
+}
+
+func elements(_ context.Context, node any, _ ...string) (any, error) {
+	switch t := node.(type) {
+	default:
+		return nil, fmt.Errorf("unexpected type %T", node)
+	case string, []string, *html.Node, nil:
+		return t, nil
+	case *goquery.Selection:
+		ele := make([]any, t.Length())
+		for i, n := range t.Nodes {
+			ele[i] = n
+		}
+		return ele, nil
+	case []*html.Node:
+		ele := make([]any, len(t))
+		for i, n := range t {
+			ele[i] = n
+		}
+		return ele, nil
+	}
+}
+
+// selection converts content to goquery.Selection
+func selection(content any) (*goquery.Selection, error) {
 	switch data := content.(type) {
 	default:
-		str, err := cast.ToStringE(content)
-		if err != nil {
-			return nil, err
-		}
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(str))
-		if err != nil {
-			return nil, err
-		}
-		return doc.Selection, nil
+		return nil, fmt.Errorf("unexpected type %T", content)
 	case nil:
 		return new(goquery.Selection), nil
+	case *html.Node:
+		return goquery.NewDocumentFromNode(data).Selection, nil
+	case []any:
+		if len(data) == 0 {
+			return nil, nil
+		}
+		root := &html.Node{Type: html.DocumentNode}
+		doc := goquery.NewDocumentFromNode(root)
+		doc.Selection.Nodes = make([]*html.Node, len(data))
+		for i, v := range data {
+			n, ok := v.(*html.Node)
+			if !ok {
+				return nil, fmt.Errorf("expected type *html.Node, but got %T", v)
+			}
+			n.Parent = nil
+			n.PrevSibling = nil
+			n.NextSibling = nil
+			root.AppendChild(n)
+			doc.Selection.Nodes[i] = n
+		}
+		return doc.Selection, nil
 	case []string:
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(strings.Join(data, "\n")))
 		if err != nil {
@@ -199,3 +209,11 @@ func getSelection(content any) (*goquery.Selection, error) {
 		return doc.Selection, nil
 	}
 }
+
+type emptyMatcher struct{}
+
+func (emptyMatcher) Match(*html.Node) bool { return true }
+
+func (emptyMatcher) MatchAll(node *html.Node) []*html.Node { return []*html.Node{node} }
+
+func (emptyMatcher) Filter(nodes []*html.Node) []*html.Node { return nodes }

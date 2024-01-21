@@ -1,18 +1,17 @@
 package xpath
 
 import (
-	"flag"
-	"os"
+	"bytes"
+	"context"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/plugin"
-	"github.com/shiroyk/cloudcat/plugin/parser"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/html"
 )
 
 var (
-	xpath   Parser
-	ctx     *plugin.Context
+	p       Parser
+	ctx     = context.Background()
 	content = `
 <!DOCTYPE html>
 <html lang="en">
@@ -43,120 +42,90 @@ var (
       <div id="nf5" class="five even row odder">f5</div>
       <div id="nf6" class="six odd row">f6</div>
     </div>
-	<script type="text/javascript">
-		(function() {
-		  const ga = document.createElement("script"); ga.type = "text/javascript"; ga.async = true;
-		  ga.src = ("https:" === document.location.protocol ? "https://ssl" : "http://www") + ".google-analytics.com/ga.js";
-		  const s = document.getElementsByTagName("script")[0]; s.parentNode.insertBefore(ga, s);
-		})();
-	</script>
+	<script type="text/javascript">(function() {})();</script>
   </body>
 </html>
 `
 )
 
-func TestMain(m *testing.M) {
-	flag.Parse()
-	ctx = plugin.NewContext(plugin.ContextOptions{})
-	code := m.Run()
-	os.Exit(code)
+func assertError(t *testing.T, arg string, contains string) {
+	_, err := p.Value(arg)
+	assert.ErrorContains(t, err, contains)
 }
 
-func TestParser(t *testing.T) {
-	t.Parallel()
-	if _, ok := parser.GetParser(key); !ok {
-		t.Fatal("schema not registered")
-	}
-
-	_, err := xpath.GetString(ctx, 1, ``)
-	if err == nil {
-		t.Fatal("error should not be nil")
-	}
-
-	_, err = xpath.GetString(ctx, `<a href="https://go.dev" title="Golang page">Golang</a>`, `//a`)
-	if err != nil {
-		t.Error(err)
-	}
-
-	sel, _ := xpath.GetElement(ctx, content, `//div[@class="body"]`)
-	_, err = xpath.GetString(ctx, sel, `//a/text()`)
-	if err != nil {
-		t.Error(err)
+func assertValue(t *testing.T, arg string, expected any) {
+	executor, err := p.Value(arg)
+	if assert.NoError(t, err) {
+		v, err := executor.Exec(ctx, content)
+		if assert.NoError(t, err) {
+			assert.Equal(t, expected, v)
+		}
 	}
 }
 
-func TestGetString(t *testing.T) {
-	t.Parallel()
-	if o, _ := xpath.GetStrings(ctx, content, `///`); o != nil {
-		t.Fatal("Unexpected type")
+func assertElement(t *testing.T, arg string, expected string) {
+	executor, err := p.Element(arg)
+	if assert.NoError(t, err) {
+		v, err := executor.Exec(ctx, content)
+		if assert.NoError(t, err) {
+			switch c := v.(type) {
+			case *html.Node:
+				b := new(bytes.Buffer)
+				if assert.NoError(t, html.Render(b, c)) {
+					assert.Equal(t, expected, b.String())
+				}
+			default:
+				assert.Equal(t, expected, v)
+			}
+		}
 	}
-
-	str1, err := xpath.GetString(ctx, content, `//div[@id="main"]/div[contains(@class, "row")]/text()`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "1\n2\n3\n4\n5\n6", str1)
-
-	str2, err := xpath.GetString(ctx, content, `//div[@class="body"]/ul/li/@id`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "a1\na2\na3", str2)
-
-	js, err := xpath.GetString(ctx, content, `//script[1]`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.NotEmpty(t, js)
 }
 
-func TestGetStrings(t *testing.T) {
-	t.Parallel()
-	if o, _ := xpath.GetStrings(ctx, content, `//unknown`); o != nil {
-		t.Fatal("Unexpected type")
+func assertElements(t *testing.T, arg string, expected []string) {
+	executor, err := p.Elements(arg)
+	if assert.NoError(t, err) {
+		v, err := executor.Exec(ctx, content)
+		if assert.NoError(t, err) {
+			switch c := v.(type) {
+			case []any:
+				ele := make([]string, len(c))
+				for i, v := range c {
+					var b bytes.Buffer
+					if assert.NoError(t, html.Render(&b, v.(*html.Node))) {
+						ele[i] = b.String()
+					}
+				}
+				assert.Equal(t, expected, ele)
+			default:
+				assert.Equal(t, expected, v)
+			}
+		}
 	}
-
-	str1, err := xpath.GetStrings(ctx, content, `//div[@class="body"]/ul//a/@title`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, []string{"Google page", "Github page", "Golang page"}, str1)
-
-	str2, err := xpath.GetStrings(ctx, content, `//div[@class="body"]/ul//a`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, []string{"Google", "Github", "Golang"}, str2)
 }
 
-func TestGetElement(t *testing.T) {
+func TestValue(t *testing.T) {
 	t.Parallel()
-	if o, _ := xpath.GetElement(ctx, content, `//unknown`); o != "" {
-		t.Fatal("Unexpected type")
-	}
+	assertError(t, `///`, "expression must evaluate to a node-set")
 
-	object, err := xpath.GetElement(ctx, content, `//div[@class="body"]/ul//a/..`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>
-<li id="a2"><a href="https://github.com" title="Github page">Github</a></li>
-<li id="a3" class="selected"><a href="https://go.dev" title="Golang page">Golang</a></li>`, object)
+	assertValue(t, `//div[@id="main"]/div[contains(@class, "row")]/text()`, []string{"1", "2", "3", "4", "5", "6"})
+
+	assertValue(t, `//div[@class="body"]/ul/li/@id`, []string{"a1", "a2", "a3"})
+
+	assertValue(t, `//script[1]`, `(function() {})();`)
 }
 
-func TestGetElements(t *testing.T) {
+func TestElement(t *testing.T) {
 	t.Parallel()
-	if o, _ := xpath.GetElements(ctx, content, `//unknown`); o != nil {
-		t.Fatal("Unexpected type")
-	}
 
-	objects, err := xpath.GetElements(ctx, content, `//div[@id="foot"]/div/@class`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, []string{
+	assertElement(t, `//div[@class="body"]/ul//a/..`, `<li id="a1"><a href="https://google.com" title="Google page">Google</a></li>`)
+}
+
+func TestElements(t *testing.T) {
+	t.Parallel()
+
+	assertElements(t, `//div[@id="foot"]/div/@class`, []string{
 		"<class>one even row</class>", "<class>two odd row</class>",
 		"<class>three even row</class>", "<class>four odd row</class>",
 		"<class>five even row odder</class>", "<class>six odd row</class>",
-	}, objects)
+	})
 }

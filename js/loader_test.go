@@ -7,22 +7,25 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
+	_ "unsafe"
 
 	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/plugin/jsmodule"
+	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 )
 
-type testModuleFetch struct{}
+type fetch struct{}
 
-func (*testModuleFetch) Do(req *http.Request) (*http.Response, error) {
-	source := `module.exports = { foo: 'bar' + require('cloudcat/gomod1').key }`
+func (*fetch) Do(req *http.Request) (*http.Response, error) {
+	source := `module.exports = { foo: 'bar' + require('ski/gomod1').key }`
 	if req.URL.Query().Get("type") == "esm" {
 		source = `
-import gomod1 from "cloudcat/gomod1";
+import gomod1 from "ski/gomod1";
 const a = async () => 4;
 export default async () => gomod1.key + 1 + (await a())`
 	}
@@ -31,28 +34,32 @@ export default async () => gomod1.key + 1 + (await a())`
 
 type gomod1 struct{}
 
-func (gomod1) Exports() any { return map[string]string{"key": "gomod1"} }
+func (gomod1) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	return rt.ToValue(map[string]string{"key": "gomod1"}), nil
+}
 
 type gomod2 struct{}
 
-func (gomod2) Exports() any {
-	return struct {
+func (gomod2) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	return rt.ToValue(struct {
 		Key string `js:"key"`
-	}{Key: "gomod2"}
+	}{Key: "gomod2"}), nil
 }
 
 type gomod3 struct{}
 
-func (gomod3) Exports() any { return map[string]string{"key": "gomod3"} }
+func (gomod3) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	return rt.ToValue(map[string]string{"key": "gomod3"}), nil
+}
 
 func (gomod3) Global() {}
 
-func TestModule(t *testing.T) {
+func TestModuleLoader(t *testing.T) {
 	t.Parallel()
-	fetch := new(testModuleFetch)
+	fetch := new(fetch)
 	mfs := fstest.MapFS{
 		"node_modules/module1/index.js": &fstest.MapFile{
-			Data: []byte(`export default function() { return "module1" };`),
+			Data: []byte(`module.exports = function() { return "module1" };`),
 		},
 		"node_modules/module2/index.js": &fstest.MapFile{
 			Data: []byte(`
@@ -107,7 +114,7 @@ func TestModule(t *testing.T) {
 			Data: []byte(`export const value = () => 555;`),
 		},
 		"cjs_script1.js": &fstest.MapFile{
-			Data: []byte(`exports.default = () => { return require('module4').default() + "/cjs_script1" };`),
+			Data: []byte(`module.exports = () => { return require('module4')() + "/cjs_script1" };`),
 		},
 		"cjs_script2.js": &fstest.MapFile{
 			Data: []byte(`
@@ -119,7 +126,7 @@ func TestModule(t *testing.T) {
 			Data: []byte(`{"key": "json1"}`),
 		},
 	}
-	resolver := NewModuleLoader(WithFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
+	loader := NewModuleLoader(WithFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
 		switch specifier.Scheme {
 		case "http", "https":
 			res, err := fetch.Do(&http.Request{URL: specifier})
@@ -129,54 +136,56 @@ func TestModule(t *testing.T) {
 			body, err := io.ReadAll(res.Body)
 			return body, err
 		case "file":
-			return fs.ReadFile(mfs, specifier.Path)
+			return mfs.ReadFile(specifier.Path)
 		default:
 			return nil, fmt.Errorf("unexpected scheme %s", specifier.Scheme)
 		}
 	}))
-	jsmodule.Register("gomod1", new(gomod1))
-	jsmodule.Register("gomod2", new(gomod2))
-	jsmodule.Register("gomod3", new(gomod3))
-	vm := NewTestVM(t, resolver)
+	Register("gomod1", new(gomod1))
+	Register("gomod2", new(gomod2))
+	Register("gomod3", new(gomod3))
+	vm := NewTestVM(t, WithModuleLoader(loader))
 
 	{
 		scriptCases := []struct{ name, s string }{
-			{"gomod1", `assert.equal(require("cloudcat/gomod1").key, "gomod1")`},
-			{"gomod2", `assert.equal(require("cloudcat/gomod2").key, "gomod2")`},
+			{"gomod1", `assert.equal(require("ski/gomod1").key, "gomod1")`},
+			{"gomod2", `assert.equal(require("ski/gomod2").key, "gomod2")`},
 			{"gomod3", `assert.equal(gomod3.key, "gomod3")`},
-			{"remote cjs", `assert.equal(require("https://foo.com/foo.min.js?type=cjs").foo, "bargomod1")`},
-			{"remote esm", `async () => assert.equal(await require("https://foo.com/foo.min.js?type=esm").default(), "gomod114")`},
-			{"module1", `assert.equal(require("module1").default(), "module1")`},
-			{"module2", `assert.equal(require("module2").default(), "module1/module2")`},
-			{"module3", `assert.equal(require("module3").default(), "module1/module2/module3")`},
-			{"module4", `assert.equal(require("module4").default(), "/module4")`},
-			{"module5", `assert.equal(require("module5").default(), "/module5/module6")`},
-			{"module6", `assert.equal(require("module6").default(), "/module6/module5")`},
-			{"module7", `async () => assert.equal(await require("module7").default(), "dynamic import /module6")`},
-			{"es_script1", `assert.equal(require("./es_script1").default(), "module1/module2/module3/es_script1")`},
+			{"remote cjs", `assert.equal(require("http://foo.com/foo.min.js?type=cjs").foo, "bargomod1")`},
+			{"remote esm", `(async () => assert.equal(await require("http://foo.com/foo.min.js?type=esm")(), "gomod114"))()`},
+			{"module1", `assert.equal(require("module1")(), "module1")`},
+			{"module2", `assert.equal(require("module2")(), "module1/module2")`},
+			{"module3", `assert.equal(require("module3")(), "module1/module2/module3")`},
+			{"module4", `assert.equal(require("module4")(), "/module4")`},
+			{"module5", `assert.equal(require("module5")(), "/module5/module6")`},
+			{"module6", `assert.equal(require("module6")(), "/module6/module5")`},
+			{"module7", `(async () => assert.equal(await require("module7")(), "dynamic import /module6"))()`},
+			{"es_script1", `assert.equal(require("./es_script1")(), "module1/module2/module3/es_script1")`},
 			{"es_script2", `assert.equal(require("./es_script2").value(), 555)`},
-			{"cjs_script1", `assert.equal(require("./cjs_script1").default(), "/module4/cjs_script1")`},
+			{"cjs_script1", `assert.equal(require("./cjs_script1")(), "/module4/cjs_script1")`},
 			{"cjs_script2", `assert.equal(require("./cjs_script2").value(), 555)`},
 			{"json1", `assert.equal(require("./json1.json").key, "json1")`},
 		}
 
 		for _, script := range scriptCases {
 			t.Run(fmt.Sprintf("script %s", script.name), func(t *testing.T) {
-				_, err := vm.RunString(context.Background(), script.s)
-				assert.NoError(t, err)
+				vm.Run(context.Background(), func() {
+					_, err := vm.Runtime().RunString(script.s)
+					assert.NoError(t, err)
+				})
 			})
 		}
 	}
 	{
 		moduleCases := []struct{ name, s string }{
-			{"gomod1", `import gomod1 from "cloudcat/gomod1";
+			{"gomod1", `import gomod1 from "ski/gomod1";
 			 export default () => assert.equal(gomod1.key, "gomod1")`},
-			{"gomod2", `import gomod2 from "cloudcat/gomod2";
+			{"gomod2", `import gomod2 from "ski/gomod2";
 			 export default () => assert.equal(gomod2.key, "gomod2")`},
 			{"gomod3", `export default () => assert.equal(gomod3.key, "gomod3")`},
-			{"remote cjs", `import foo from "https://foo.com/foo.min.js?type=cjs";
+			{"remote cjs", `import foo from "http://foo.com/foo.min.js?type=cjs";
 			 export default () => assert.equal(foo.foo, "bargomod1")`},
-			{"remote esm", `import foo from "https://foo.com/foo.min.js?type=esm";
+			{"remote esm", `import foo from "http://foo.com/foo.min.js?type=esm";
 			 export default async () => assert.equal(await foo(), "gomod114")`},
 			{"module1", `import module1 from "module1";
 			 export default () => assert.equal(module1(), "module1");`},
@@ -206,12 +215,96 @@ func TestModule(t *testing.T) {
 
 		for _, script := range moduleCases {
 			t.Run(fmt.Sprintf("module %v", script.name), func(t *testing.T) {
-				module, err := goja.ParseModule("", script.s, resolver.ResolveModule)
+				mod, err := loader.CompileModule("", script.s)
 				if assert.NoError(t, err) {
-					_, err = vm.RunModule(context.Background(), module)
+					_, err = vm.RunModule(context.Background(), mod)
 					assert.NoError(t, err)
 				}
 			})
 		}
 	}
+}
+
+func TestConcurrentLoader(t *testing.T) {
+	t.Parallel()
+	num := 8
+
+	mfs := make(fstest.MapFS, num)
+	for i := 0; i < num; i++ {
+		mfs[fmt.Sprintf("module%d.js", i)] = &fstest.MapFile{Data: []byte(`export default () => ` + strconv.Itoa(i))}
+	}
+
+	fileLoader := WithFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
+		return fs.ReadFile(mfs, specifier.Path)
+	})
+	scheduler := NewScheduler(SchedulerOptions{
+		InitialVMs: 2,
+		Loader:     NewModuleLoader(fileLoader),
+	})
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < num; i++ {
+		wg.Add(1)
+		go func(j int) {
+			defer wg.Done()
+
+			vm, err := scheduler.Get()
+			if assert.NoError(t, err) {
+				vm.Run(context.Background(), func() {
+					v, err := vm.Runtime().RunString(fmt.Sprintf("require('./module%d.js')()", j))
+					if assert.NoError(t, err) {
+						assert.Equal(t, int64(j), v.ToInteger())
+					}
+				})
+			}
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+type testParser struct{}
+
+func (testParser) Value(s string) (ski.Executor, error)    { return ski.Raw(s), nil }
+func (testParser) Element(s string) (ski.Executor, error)  { return ski.Raw(s), nil }
+func (testParser) Elements(s string) (ski.Executor, error) { return ski.Raw([]string{s}), nil }
+
+func TestParser(t *testing.T) {
+	ski.Register("loader_parser", new(testParser))
+	vm := NewTestVM(t, WithModuleLoader(NewModuleLoader()))
+
+	for i, s := range []string{
+		`assert.equal(require("parser/loader_parser")('foo').exec(''), 'foo');`,
+		`assert.equal(require("parser/loader_parser").value('foo').exec(''), 'foo');`,
+		`assert.equal(require("parser/loader_parser").element('bar').exec(''), 'bar');`,
+		`assert.equal(require("parser/loader_parser").elements('bar').exec('')[0], 'bar');`,
+	} {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			_, err := vm.Runtime().RunString(s)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestESMParserValue(t *testing.T) {
+	p := Parser{NewModuleLoader()}
+	executor, err := p.Value(`export default (ctx) => ctx.get('content') + 1`)
+	if assert.NoError(t, err) {
+		v, err := executor.Exec(context.Background(), "a")
+		if assert.NoError(t, err) {
+			assert.Equal(t, "a1", v)
+		}
+	}
+}
+
+func NewTestVM(t *testing.T, opts ...Option) VM {
+	vm := NewVM(opts...)
+	p := vm.Runtime().NewObject()
+	_ = p.Set("equal", func(call goja.FunctionCall) goja.Value {
+		assert.Equal(t, call.Argument(1).Export(), call.Argument(0).Export(), call.Argument(2).String())
+		return goja.Undefined()
+	})
+	_ = vm.Runtime().Set("assert", p)
+	return vm
 }
