@@ -3,7 +3,7 @@ module github.com/shiroyk/cloudcat
 go 1.21
 
 require (
-	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/PuerkitoBio/goquery v1.9.0
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/dop251/goja v0.0.0-20231027120936-b396bb4c349d
@@ -11,8 +11,8 @@ require (
 	github.com/shiroyk/cloudcat/plugin v0.4.0
 	github.com/spf13/cast v1.6.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/crypto v0.18.0
-	golang.org/x/net v0.20.0
+	golang.org/x/crypto v0.19.0
+	golang.org/x/net v0.21.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
