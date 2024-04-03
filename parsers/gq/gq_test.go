@@ -142,6 +142,70 @@ func TestElements(t *testing.T) {
 	assertElements(t, `#foot div -> slice(0, 3) -> text`, []string{"f1", "f2", "f3"})
 }
 
+func TestNodeSelect(t *testing.T) {
+	t.Run("single", func(t *testing.T) {
+		exec, err := gq.Element(`script -> slice(0)`)
+		if !assert.NoError(t, err) {
+			return
+		}
+		v, err := exec.Exec(ctx, content)
+		if !assert.NoError(t, err) {
+			return
+		}
+		{
+			exec, err = gq.Value(`-> attr(type)`)
+			if !assert.NoError(t, err) {
+				return
+			}
+			v1, err := exec.Exec(ctx, v)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "text/javascript", v1)
+			}
+		}
+		{
+			exec, err = gq.Value(`script -> attr(type)`)
+			if !assert.NoError(t, err) {
+				return
+			}
+			v2, err := exec.Exec(ctx, v)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "text/javascript", v2)
+			}
+		}
+	})
+
+	t.Run("multiple", func(t *testing.T) {
+		exec, err := gq.Elements(`#foot div -> slice(0, 3)`)
+		if !assert.NoError(t, err) {
+			return
+		}
+		v, err := exec.Exec(ctx, content)
+		if !assert.NoError(t, err) {
+			return
+		}
+		{
+			exec, err = gq.Value(`-> text`)
+			if !assert.NoError(t, err) {
+				return
+			}
+			v1, err := exec.Exec(ctx, v)
+			if assert.NoError(t, err) {
+				assert.Equal(t, []string{"f1", "f2", "f3"}, v1)
+			}
+		}
+		{
+			exec, err = gq.Value(`div -> text`)
+			if !assert.NoError(t, err) {
+				return
+			}
+			v2, err := exec.Exec(ctx, v)
+			if assert.NoError(t, err) {
+				assert.Equal(t, []string{"f1", "f2", "f3"}, v2)
+			}
+		}
+	})
+}
+
 func TestExternalFunc(t *testing.T) {
 	{
 		fun := func(logger *slog.Logger) Func {

@@ -167,6 +167,19 @@ func elements(_ context.Context, node any, _ ...string) (any, error) {
 	}
 }
 
+func cloneNode(n *html.Node) *html.Node {
+	m := &html.Node{
+		Type:       n.Type,
+		DataAtom:   n.DataAtom,
+		Data:       n.Data,
+		Attr:       make([]html.Attribute, len(n.Attr)),
+		FirstChild: n.FirstChild,
+		LastChild:  n.LastChild,
+	}
+	copy(m.Attr, n.Attr)
+	return m
+}
+
 // selection converts content to goquery.Selection
 func selection(content any) (*goquery.Selection, error) {
 	switch data := content.(type) {
@@ -175,24 +188,21 @@ func selection(content any) (*goquery.Selection, error) {
 	case nil:
 		return new(goquery.Selection), nil
 	case *html.Node:
-		return goquery.NewDocumentFromNode(data).Selection, nil
+		root := &html.Node{Type: html.DocumentNode}
+		root.AppendChild(cloneNode(data))
+		return goquery.NewDocumentFromNode(root).Selection, nil
 	case []any:
 		if len(data) == 0 {
 			return nil, nil
 		}
 		root := &html.Node{Type: html.DocumentNode}
 		doc := goquery.NewDocumentFromNode(root)
-		doc.Selection.Nodes = make([]*html.Node, len(data))
-		for i, v := range data {
+		for _, v := range data {
 			n, ok := v.(*html.Node)
 			if !ok {
 				return nil, fmt.Errorf("expected type *html.Node, but got %T", v)
 			}
-			n.Parent = nil
-			n.PrevSibling = nil
-			n.NextSibling = nil
-			root.AppendChild(n)
-			doc.Selection.Nodes[i] = n
+			root.AppendChild(cloneNode(n))
 		}
 		return doc.Selection, nil
 	case []string:
