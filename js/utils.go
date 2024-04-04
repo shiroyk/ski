@@ -56,7 +56,7 @@ func Unwrap(value goja.Value) (any, error) {
 	}
 }
 
-// ModuleCallable run the goja.CyclicModuleRecord default export as goja.Callable.
+// ModuleCallable return the goja.CyclicModuleRecord default export as goja.Callable.
 func ModuleCallable(rt *goja.Runtime, resolve goja.HostResolveImportedModuleFunc, module goja.CyclicModuleRecord) (goja.Callable, error) {
 	instance := rt.GetModuleInstance(module)
 	if instance == nil {

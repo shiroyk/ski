@@ -8,12 +8,12 @@ import (
 
 	"log/slog"
 
+	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/html"
 )
 
 var (
-	gq      = parser{funcs: builtins()}
 	ctx     = context.Background()
 	content = `<!DOCTYPE html>
 <html lang="en">
@@ -58,17 +58,17 @@ var (
 )
 
 func assertError(t *testing.T, arg string, contains string) {
-	executor, err := gq.Value(arg)
+	exec, err := new_value()(ski.String(arg))
 	if assert.NoError(t, err) {
-		_, err = executor.Exec(ctx, content)
+		_, err = exec.Exec(ctx, content)
 		assert.ErrorContains(t, err, contains)
 	}
 }
 
 func assertValue(t *testing.T, arg string, expected any) {
-	executor, err := gq.Value(arg)
+	exec, err := new_value()(ski.String(arg))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(ctx, content)
+		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			assert.Equal(t, expected, v)
 		}
@@ -76,9 +76,9 @@ func assertValue(t *testing.T, arg string, expected any) {
 }
 
 func assertElement(t *testing.T, arg string, expected string) {
-	executor, err := gq.Element(arg)
+	exec, err := new_element()(ski.String(arg))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(ctx, content)
+		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
 			case *html.Node:
@@ -94,9 +94,9 @@ func assertElement(t *testing.T, arg string, expected string) {
 }
 
 func assertElements(t *testing.T, arg string, expected []string) {
-	executor, err := gq.Elements(arg)
+	exec, err := new_elements()(ski.String(arg))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(ctx, content)
+		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
 			case []any:
@@ -139,12 +139,18 @@ func TestElements(t *testing.T) {
 		`<div id="nf3" class="three even row">f3</div>`,
 	})
 
+	assertElements(t, `#foot div -> slice(0, 3) -> html(true)`, []string{
+		`<div id="nf1" class="one even row">f1</div>`,
+		`<div id="nf2" class="two odd row">f2</div>`,
+		`<div id="nf3" class="three even row">f3</div>`,
+	})
+
 	assertElements(t, `#foot div -> slice(0, 3) -> text`, []string{"f1", "f2", "f3"})
 }
 
 func TestNodeSelect(t *testing.T) {
 	t.Run("single", func(t *testing.T) {
-		exec, err := gq.Element(`script -> slice(0)`)
+		exec, err := new_element()(ski.String(`script -> slice(0)`))
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -153,7 +159,7 @@ func TestNodeSelect(t *testing.T) {
 			return
 		}
 		{
-			exec, err = gq.Value(`-> attr(type)`)
+			exec, err = new_value()(ski.String(`-> attr(type)`))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -163,7 +169,7 @@ func TestNodeSelect(t *testing.T) {
 			}
 		}
 		{
-			exec, err = gq.Value(`script -> attr(type)`)
+			exec, err = new_value()(ski.String(`script -> attr(type)`))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -175,7 +181,7 @@ func TestNodeSelect(t *testing.T) {
 	})
 
 	t.Run("multiple", func(t *testing.T) {
-		exec, err := gq.Elements(`#foot div -> slice(0, 3)`)
+		exec, err := new_elements()(ski.String(`#foot div -> slice(0, 3)`))
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -184,7 +190,7 @@ func TestNodeSelect(t *testing.T) {
 			return
 		}
 		{
-			exec, err = gq.Value(`-> text`)
+			exec, err = new_value()(ski.String(`-> text`))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -194,7 +200,7 @@ func TestNodeSelect(t *testing.T) {
 			}
 		}
 		{
-			exec, err = gq.Value(`div -> text`)
+			exec, err = new_value()(ski.String(`div -> text`))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -215,10 +221,10 @@ func TestExternalFunc(t *testing.T) {
 			}
 		}
 		data := new(bytes.Buffer)
-		p := NewParser(FuncMap{"logger": fun(slog.New(slog.NewTextHandler(data, nil)))})
-		executor, err := p.Value(".body ul a -> logger -> text")
+		SetFuncs(FuncMap{"logger": fun(slog.New(slog.NewTextHandler(data, nil)))})
+		exec, err := new_value()(ski.String(".body ul a -> logger -> text"))
 		if assert.NoError(t, err) {
-			v, err := executor.Exec(ctx, content)
+			v, err := exec.Exec(ctx, content)
 			if assert.NoError(t, err) {
 				assert.Equal(t, []string{"Google", "Github", "Golang", "Home"}, v)
 			}
@@ -230,10 +236,10 @@ func TestExternalFunc(t *testing.T) {
 		fun := func(_ context.Context, content any, args ...string) (any, error) {
 			return nil, nil
 		}
-		p := NewParser(FuncMap{"nil": fun})
-		executor, err := p.Value(".body ul a -> nil -> text")
+		SetFuncs(FuncMap{"nil": fun})
+		exec, err := new_value()(ski.String(".body ul a -> nil -> text"))
 		if assert.NoError(t, err) {
-			v, err := executor.Exec(ctx, content)
+			v, err := exec.Exec(ctx, content)
 			if assert.NoError(t, err) {
 				assert.Equal(t, nil, v)
 			}

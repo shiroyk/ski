@@ -5,7 +5,7 @@
 go install github.com/shiroyk/ski/ski
 ```
 
-## Run model
+## Run executor
 ```shell
 cat << 'EOF' | ski -m -
 $fetch: https://news.ycombinator.com/best
@@ -34,7 +34,7 @@ EOF
 ```shell
 cat << EOF | ski -s -
 import http from "ski/http";
-import gq from "parser/gq";
+import gq from "executor/gq";
 
 export default () => {
     let res = http.get('https://news.ycombinator.com/best');

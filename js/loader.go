@@ -228,15 +228,15 @@ func (ml *moduleLoader) ResolveModule(referencingScriptOrModule any, name string
 			return mod, nil
 		}
 		return nil, ErrNotFoundModule
-	case strings.HasPrefix(name, parserPrefix):
+	case strings.HasPrefix(name, _js_executor_prefix):
 		ml.Lock()
 		defer ml.Unlock()
-		name = strings.TrimPrefix(name, parserPrefix)
+		name = strings.TrimPrefix(name, _js_executor_prefix)
 		if mod, ok := ml.parsers[name]; ok {
 			return mod, nil
 		}
-		if p, ok := ski.GetParser(name); ok {
-			mod := &goModule{mod: &jsParser{p}}
+		if e, ok := ski.GetExecutors(name); ok {
+			mod := &goModule{mod: _js_executor(e)}
 			ml.parsers[name] = mod
 			return mod, nil
 		}

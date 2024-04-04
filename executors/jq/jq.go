@@ -1,4 +1,4 @@
-// Package jq the json path parser
+// Package jq the json path executor
 package jq
 
 import (
@@ -11,24 +11,23 @@ import (
 	"github.com/shiroyk/ski"
 )
 
-// Parser the json path parser
-type Parser struct{}
-
 func init() {
-	ski.Register("jq", new(Parser))
-}
-
-func (p Parser) Value(arg string) (ski.Executor, error) {
-	x, err := jp.ParseString(arg)
-	if err != nil {
-		return nil, err
-	}
-	return expr{x, x.Normal()}, nil
+	ski.Register("jq", new_expr())
 }
 
 type expr struct {
 	jp.Expr
 	normal bool
+}
+
+func new_expr() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		x, err := jp.ParseString(str)
+		if err != nil {
+			return nil, err
+		}
+		return expr{x, x.Normal()}, nil
+	})
 }
 
 func (e expr) Exec(_ context.Context, arg any) (any, error) {

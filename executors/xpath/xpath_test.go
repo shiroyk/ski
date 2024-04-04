@@ -5,12 +5,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/html"
 )
 
 var (
-	p       Parser
 	ctx     = context.Background()
 	content = `
 <!DOCTYPE html>
@@ -49,14 +49,14 @@ var (
 )
 
 func assertError(t *testing.T, arg string, contains string) {
-	_, err := p.Value(arg)
+	_, err := new_value()(ski.String(arg))
 	assert.ErrorContains(t, err, contains)
 }
 
 func assertValue(t *testing.T, arg string, expected any) {
-	executor, err := p.Value(arg)
+	exec, err := new_value()(ski.String(arg))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(ctx, content)
+		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			assert.Equal(t, expected, v)
 		}
@@ -64,9 +64,9 @@ func assertValue(t *testing.T, arg string, expected any) {
 }
 
 func assertElement(t *testing.T, arg string, expected string) {
-	executor, err := p.Element(arg)
+	exec, err := new_element()(ski.String(arg))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(ctx, content)
+		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
 			case *html.Node:
@@ -82,9 +82,9 @@ func assertElement(t *testing.T, arg string, expected string) {
 }
 
 func assertElements(t *testing.T, arg string, expected []string) {
-	executor, err := p.Elements(arg)
+	exec, err := new_elements()(ski.String(arg))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(ctx, content)
+		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
 			case []any:

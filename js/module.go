@@ -2,7 +2,6 @@ package js
 
 import (
 	"context"
-	"errors"
 	"maps"
 	"sync"
 
@@ -195,15 +194,33 @@ func (gmi *goModuleInstance) ExecuteModule(_ *goja.Runtime, _, _ func(any)) (goj
 	return gmi, nil
 }
 
-const parserPrefix = "parser/"
+const _js_executor_prefix = "executor/"
 
-type jsParser struct{ ski.Parser }
+type _js_executor map[string]ski.NewExecutor
 
-type exec struct {
+func (m _js_executor) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+	var object *goja.Object
+	main, ok := m[""]
+	if ok {
+		object = rt.ToValue(toJSExec(main)).ToObject(rt)
+	} else {
+		object = rt.NewObject()
+	}
+	proto := object.Prototype()
+	for k, v := range m {
+		if k == "" {
+			continue
+		}
+		_ = proto.Set(k, toJSExec(v))
+	}
+	return object, nil
+}
+
+type _js_exec struct {
 	e ski.Executor
 }
 
-func (e exec) Exec(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (e _js_exec) Exec(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
 	v, err := e.e.Exec(Context(rt), call.Argument(0).Export())
 	if err != nil {
 		return goja.Null()
@@ -211,69 +228,35 @@ func (e exec) Exec(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
 	return rt.ToValue(v)
 }
 
-func (m *jsParser) Instantiate(rt *goja.Runtime) (goja.Value, error) {
-	object := rt.ToValue(m.Value).ToObject(rt)
-	_ = object.SetPrototype(rt.ToValue(map[string]func(call goja.FunctionCall, rt *goja.Runtime) goja.Value{
-		"value":    m.Value,
-		"element":  m.Element,
-		"elements": m.Elements,
-	}).ToObject(rt))
-	return object, nil
+func toJSExec(init ski.NewExecutor) func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+	return func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+		args := make([]ski.Executor, 0, len(call.Arguments))
+		for _, arg := range call.Arguments {
+			args = append(args, ski.Raw(arg.Export()))
+		}
+		exec, err := init(args...)
+		if err != nil {
+			Throw(rt, err)
+		}
+		return rt.ToValue(_js_exec{exec})
+	}
 }
 
-func (m *jsParser) Value(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
-	executor, err := m.Parser.Value(call.Argument(0).String())
-	if err != nil {
-		Throw(rt, err)
-	}
-	return rt.ToValue(exec{executor})
+// Executor the ski.Executor
+type Executor struct{ goja.CyclicModuleRecord }
+
+func new_executor() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		module, err := GetScheduler().Loader().CompileModule("", str)
+		if err != nil {
+			return nil, err
+		}
+		return Executor{module}, nil
+	})
 }
 
-func (m *jsParser) Element(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
-	p, ok := m.Parser.(ski.ElementParser)
-	if !ok {
-		return goja.Null()
-	}
-	executor, err := p.Element(call.Argument(0).String())
-	if err != nil {
-		Throw(rt, err)
-	}
-	return rt.ToValue(exec{executor})
-}
-
-func (m *jsParser) Elements(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
-	p, ok := m.Parser.(ski.ElementParser)
-	if !ok {
-		return goja.Null()
-	}
-	executor, err := p.Elements(call.Argument(0).String())
-	if err != nil {
-		Throw(rt, err)
-	}
-	return rt.ToValue(exec{executor})
-}
-
-// Parser the esm parser of ski.Parser
-type Parser struct{ ModuleLoader }
-
-func (p Parser) Value(arg string) (ski.Executor, error) {
-	if p.ModuleLoader == nil {
-		return nil, errors.New("ModuleLoader can not be nil")
-	}
-	module, err := p.CompileModule("", arg)
-	if err != nil {
-		return nil, err
-	}
-	return _mod{module}, nil
-}
-
-// ModExec return a ski.Executor
-func ModExec(cm goja.CyclicModuleRecord) ski.Executor { return _mod{cm} }
-
-type _mod struct{ goja.CyclicModuleRecord }
-
-func (m _mod) Exec(ctx context.Context, arg any) (any, error) {
-	value, err := RunModule(ski.WithValue(ctx, "content", arg), m)
+func (p Executor) Exec(ctx context.Context, arg any) (any, error) {
+	value, err := RunModule(ski.WithValue(ctx, "content", arg), p)
 	if err != nil {
 		return nil, err
 	}

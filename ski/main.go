@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -22,10 +21,10 @@ import (
 	_ "github.com/shiroyk/ski/js/modules/encoding"
 	_ "github.com/shiroyk/ski/js/modules/http"
 
-	_ "github.com/shiroyk/ski/parsers/gq"
-	_ "github.com/shiroyk/ski/parsers/jq"
-	_ "github.com/shiroyk/ski/parsers/regex"
-	_ "github.com/shiroyk/ski/parsers/xpath"
+	_ "github.com/shiroyk/ski/executors/gq"
+	_ "github.com/shiroyk/ski/executors/jq"
+	_ "github.com/shiroyk/ski/executors/regex"
+	_ "github.com/shiroyk/ski/executors/xpath"
 )
 
 const defaultTimeout = time.Minute
@@ -39,6 +38,12 @@ var (
 )
 
 type _fetch string
+
+func new_fetch() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		return _fetch(str), nil
+	})
+}
 
 func (f _fetch) Exec(ctx context.Context, _ any) (any, error) {
 	method, url, found := strings.Cut(string(f), " ")
@@ -78,15 +83,9 @@ func runModel() (err error) {
 	}
 	fmt.Println(string(bytes))
 
-	executor, err := ski.Compile(string(bytes),
-		ski.WithExecutorMap(ski.ExecutorMap{
-			"fetch": func(args ...ski.Executor) (ski.Executor, error) {
-				if len(args) != 1 {
-					return nil, errors.New("fetch needs 1 parameter")
-				}
-				return _fetch(ski.ToString(args[0])), nil
-			},
-		}))
+	ski.Register("fetch", new_fetch())
+
+	executor, err := ski.Compile(string(bytes))
 	if err != nil {
 		return err
 	}

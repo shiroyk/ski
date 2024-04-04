@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	jq      Parser
 	content = `
 {
     "store": {
@@ -50,9 +50,9 @@ var (
 )
 
 func assertValue(t *testing.T, arg string, expected any) {
-	executor, err := jq.Value(arg)
+	exec, err := new_expr()(ski.String(arg))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(context.Background(), content)
+		v, err := exec.Exec(context.Background(), content)
 		if assert.NoError(t, err) {
 			assert.Equal(t, expected, v)
 		}

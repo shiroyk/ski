@@ -65,7 +65,7 @@ type VM interface {
 	//		fmt.Println(run(ctx, scheduler))
 	//	}
 	Run(context.Context, func())
-	// Context return the js context of NewContext
+	// Context return the ja context object of NewContext
 	Context() goja.Value
 	// Loader return the ModuleLoader
 	Loader() ModuleLoader
@@ -117,7 +117,6 @@ type (
 	vmImpl struct {
 		runtime   *goja.Runtime
 		eventloop *EventLoop
-		executor  goja.Callable
 		ctx       goja.Value
 		release   func()
 		loader    ModuleLoader
@@ -261,7 +260,7 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 //
 //		start := time.Now()
 //
-//		result, err := vm.RunString(ctx, fmt.Sprintf(`fetch("%s")`, server.URL))
+//		result, err := vm.Runtime().RunString(ctx, fmt.Sprintf(`fetch("%s")`, server.URL))
 //		if err != nil {
 //			panic(err)
 //		}
@@ -308,7 +307,7 @@ var (
 	symbolVM          = goja.NewSymbol("Symbol.__vm__")
 )
 
-// NewContext create the context object
+// NewContext create the js context object
 func NewContext(ctx context.Context, rt *goja.Runtime) *goja.Object {
 	ret := rt.ToValue(&vmctx{ctx}).ToObject(rt)
 	proto := rt.NewObject()

@@ -1,4 +1,4 @@
-// Package xpath the xpath parser
+// Package xpath the xpath executor
 package xpath
 
 import (
@@ -12,34 +12,40 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Parser the xpath parser
-type Parser struct{}
-
 func init() {
-	ski.Register("xpath", new(Parser))
+	ski.Register("xpath", new_value())
+	ski.Register("xpath.element", new_element())
+	ski.Register("xpath.elements", new_elements())
 }
 
-func (p Parser) Value(arg string) (ski.Executor, error) {
-	ex, err := xpath.Compile(arg)
-	if err != nil {
-		return nil, err
-	}
-	return expr{ex, value}, nil
+func new_value() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		ex, err := xpath.Compile(str)
+		if err != nil {
+			return nil, err
+		}
+		return expr{ex, value}, nil
+	})
 }
 
-func (p Parser) Element(arg string) (ski.Executor, error) {
-	ex, err := xpath.Compile(arg)
-	if err != nil {
-		return nil, err
-	}
-	return expr{ex, element}, nil
+func new_element() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		ex, err := xpath.Compile(str)
+		if err != nil {
+			return nil, err
+		}
+		return expr{ex, element}, nil
+	})
 }
-func (p Parser) Elements(arg string) (ski.Executor, error) {
-	ex, err := xpath.Compile(arg)
-	if err != nil {
-		return nil, err
-	}
-	return expr{ex, elements}, nil
+
+func new_elements() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		ex, err := xpath.Compile(str)
+		if err != nil {
+			return nil, err
+		}
+		return expr{ex, elements}, nil
+	})
 }
 
 type expr struct {
@@ -95,7 +101,7 @@ func htmlNode(content any) (node *html.Node, err error) {
 	default:
 		return nil, fmt.Errorf("unexpected type %T", content)
 	case nil:
-		return nil, nil
+		return &html.Node{Type: html.DocumentNode}, nil
 	case *html.Node:
 		return data, nil
 	case []string:

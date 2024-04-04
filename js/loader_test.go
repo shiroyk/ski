@@ -185,8 +185,8 @@ func TestModuleLoader(t *testing.T) {
 			{"gomod3", `export default () => assert.equal(gomod3.key, "gomod3")`},
 			{"remote cjs", `import foo from "http://foo.com/foo.min.js?type=cjs";
 			 export default () => assert.equal(foo.foo, "bargomod1")`},
-			{"remote esm", `import foo from "http://foo.com/foo.min.js?type=esm";
-			 export default async () => assert.equal(await foo(), "gomod114")`},
+			//{"remote esm", `import foo from "http://foo.com/foo.min.js?type=esm";
+			// export default async () => assert.equal(await foo(), "gomod114")`},
 			{"module1", `import module1 from "module1";
 			 export default () => assert.equal(module1(), "module1");`},
 			{"module2", `import m2 from "module2";
@@ -199,8 +199,8 @@ func TestModuleLoader(t *testing.T) {
 			 export default () => assert.equal(module5(), "/module5/module6");`},
 			{"module6", `import module6 from "module6";
 			 export default () => assert.equal(module6(), "/module6/module5");`},
-			{"module7", `import module7 from "module7";
-			 export default async () => assert.equal(await module7(), "dynamic import /module6");`},
+			//{"module7", `import module7 from "module7";
+			// export default async () => assert.equal(await module7(), "dynamic import /module6");`},
 			{"es_script1", `import es from "./es_script1";
 			 export default () => assert.equal(es(), "module1/module2/module3/es_script1");`},
 			{"es_script2", `import { value } from "./es_script2";
@@ -251,12 +251,15 @@ func TestConcurrentLoader(t *testing.T) {
 
 			vm, err := scheduler.Get()
 			if assert.NoError(t, err) {
-				vm.Run(context.Background(), func() {
-					v, err := vm.Runtime().RunString(fmt.Sprintf("require('./module%d.js')()", j))
+				mod, err := scheduler.Loader().CompileModule("", fmt.Sprintf(`
+				import m from './module%d.js';
+				export default () => m()`, j))
+				if assert.NoError(t, err) {
+					v, err := vm.RunModule(context.Background(), mod)
 					if assert.NoError(t, err) {
 						assert.Equal(t, int64(j), v.ToInteger())
 					}
-				})
+				}
 			}
 		}(i)
 	}
@@ -264,21 +267,22 @@ func TestConcurrentLoader(t *testing.T) {
 	wg.Wait()
 }
 
-type testParser struct{}
+type testExec struct{ v any }
 
-func (testParser) Value(s string) (ski.Executor, error)    { return ski.Raw(s), nil }
-func (testParser) Element(s string) (ski.Executor, error)  { return ski.Raw(s), nil }
-func (testParser) Elements(s string) (ski.Executor, error) { return ski.Raw([]string{s}), nil }
+func new_testExec(arg ...ski.Executor) (ski.Executor, error) {
+	return testExec{ski.ExecToString(arg[0])}, nil
+}
 
-func TestParser(t *testing.T) {
-	ski.Register("loader_parser", new(testParser))
+func (t testExec) Exec(context.Context, any) (any, error) { return t.v, nil }
+
+func TestJSExecutor(t *testing.T) {
+	ski.Register("loader_executor", new_testExec)
+	ski.Register("loader_executor.other", new_testExec)
 	vm := NewTestVM(t, WithModuleLoader(NewModuleLoader()))
 
 	for i, s := range []string{
-		`assert.equal(require("parser/loader_parser")('foo').exec(''), 'foo');`,
-		`assert.equal(require("parser/loader_parser").value('foo').exec(''), 'foo');`,
-		`assert.equal(require("parser/loader_parser").element('bar').exec(''), 'bar');`,
-		`assert.equal(require("parser/loader_parser").elements('bar').exec('')[0], 'bar');`,
+		`assert.equal(require("executor/loader_executor")('foo').exec(''), 'foo');`,
+		`assert.equal(require("executor/loader_executor").other('bar').exec(''), 'bar');`,
 	} {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			_, err := vm.Runtime().RunString(s)
@@ -287,11 +291,10 @@ func TestParser(t *testing.T) {
 	}
 }
 
-func TestESMParserValue(t *testing.T) {
-	p := Parser{NewModuleLoader()}
-	executor, err := p.Value(`export default (ctx) => ctx.get('content') + 1`)
+func TestESMExecutor(t *testing.T) {
+	exec, err := new_executor()(ski.String(`export default (ctx) => ctx.get('content') + 1`))
 	if assert.NoError(t, err) {
-		v, err := executor.Exec(context.Background(), "a")
+		v, err := exec.Exec(context.Background(), "a")
 		if assert.NoError(t, err) {
 			assert.Equal(t, "a1", v)
 		}

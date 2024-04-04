@@ -1,4 +1,4 @@
-// Package gq the goquery parser
+// Package gq the goquery executor
 package gq
 
 import (
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"sync/atomic"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/andybalholm/cascadia"
@@ -13,48 +14,56 @@ import (
 	"golang.org/x/net/html"
 )
 
-// parser the goquery parser
-type parser struct{ funcs FuncMap }
-
-// NewParser creates a new goquery parser with the given FuncMap.
-func NewParser(m FuncMap) ski.ElementParser {
-	funcs := maps.Clone(builtins())
-	maps.Copy(funcs, m)
-	return &parser{funcs}
-}
+var buildInFuncs atomic.Value
 
 func init() {
-	ski.Register("gq", NewParser(nil))
+	buildInFuncs.Store(builtins())
+	ski.Register("gq", new_value())
+	ski.Register("gq.element", new_element())
+	ski.Register("gq.elements", new_elements())
 }
 
-func (p *parser) Value(arg string) (ski.Executor, error) {
-	ret, err := p.compile(arg)
-	if err != nil {
-		return nil, err
-	}
-	ret.calls = append(ret.calls, call{fn: value})
-	return ret, nil
+// SetFuncs set external FuncMap
+func SetFuncs(m FuncMap) {
+	funcs := maps.Clone(builtins())
+	maps.Copy(funcs, m)
+	buildInFuncs.Store(funcs)
 }
 
-func (p *parser) Element(arg string) (ski.Executor, error) {
-	ret, err := p.compile(arg)
-	if err != nil {
-		return nil, err
-	}
-	ret.calls = append(ret.calls, call{fn: element})
-	return ret, nil
+func new_value() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		ret, err := compile(str)
+		if err != nil {
+			return nil, err
+		}
+		ret.calls = append(ret.calls, call{fn: value})
+		return ret, nil
+	})
 }
 
-func (p *parser) Elements(arg string) (ski.Executor, error) {
-	ret, err := p.compile(arg)
-	if err != nil {
-		return nil, err
-	}
-	ret.calls = append(ret.calls, call{fn: elements})
-	return ret, nil
+func new_element() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		ret, err := compile(str)
+		if err != nil {
+			return nil, err
+		}
+		ret.calls = append(ret.calls, call{fn: element})
+		return ret, nil
+	})
 }
 
-func (p *parser) compile(raw string) (ret matcher, err error) {
+func new_elements() ski.NewExecutor {
+	return ski.StringExecutor(func(str string) (ski.Executor, error) {
+		ret, err := compile(str)
+		if err != nil {
+			return nil, err
+		}
+		ret.calls = append(ret.calls, call{fn: elements})
+		return ret, nil
+	})
+}
+
+func compile(raw string) (ret matcher, err error) {
 	funcs := strings.Split(raw, "->")
 	if len(funcs) == 1 {
 		ret.Matcher, err = cascadia.Compile(funcs[0])
@@ -81,7 +90,7 @@ func (p *parser) compile(raw string) (ret matcher, err error) {
 		if err != nil {
 			return ret, err
 		}
-		fn, ok := p.funcs[name]
+		fn, ok := buildInFuncs.Load().(FuncMap)[name]
 		if !ok {
 			return ret, fmt.Errorf("function %s not exists", name)
 		}

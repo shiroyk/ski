@@ -6,12 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
 	"strings"
 
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 )
+
+func init() {
+	Register("kind", new_kind())
+	Register("map", new_map)
+	Register("each", new_each)
+	Register("pipe", new_pipe)
+	Register("or", new_or)
+	Register("debug", new_debug)
+	Register("string.join", new_string_join)
+	Register("json.parse", new_json_parse)
+	Register("json.string", new_json_string)
+}
 
 type Kind uint
 
@@ -24,6 +35,16 @@ const (
 	KindFloat64
 	KindString
 )
+
+func new_kind() NewExecutor {
+	return StringExecutor(func(str string) (Executor, error) {
+		var k Kind
+		if err := k.UnmarshalText([]byte(str)); err != nil {
+			return nil, err
+		}
+		return k, nil
+	})
+}
 
 var kindNames = [...]string{
 	KindAny:     "any",
@@ -80,19 +101,8 @@ func (k Kind) Exec(_ context.Context, v any) (any, error) {
 	}
 }
 
-type (
-	// Executor accept the argument and output result
-	Executor interface {
-		Exec(context.Context, any) (any, error)
-	}
-
-	// ExecutorMap map of the Executor init function
-	ExecutorMap map[string]func(args ...Executor) (Executor, error)
-)
-
 type compiler struct {
-	funcs ExecutorMap
-	meta  func(node *yaml.Node, exec Executor, isParser bool) Executor
+	meta func(node *yaml.Node, exec Executor, isParser bool) Executor
 }
 
 func (c compiler) newError(message string, node *yaml.Node, err error) error {
@@ -132,55 +142,20 @@ func (c compiler) piping(args []Executor) Executor {
 // compileExecutor return the Executor with the key and values
 func (c compiler) compileExecutor(k, v *yaml.Node) (Executor, error) {
 	key := strings.TrimPrefix(k.Value, "$")
-	init, ok := c.funcs[key]
-	if ok {
-		args, err := c.compileNode(v)
-		if err != nil {
-			return nil, err
-		}
-		exec, err := init(args...)
-		if err != nil {
-			return nil, c.newError(key, k, err)
-		}
-		if c.meta != nil {
-			return c.meta(k, exec, false), nil
-		}
-		return exec, nil
-	}
-
-	name, method, found := strings.Cut(key, ".")
-	parser, ok := GetParser(name)
+	init, ok := GetExecutor(key)
 	if !ok {
-		return nil, c.newError("function or parser not found", k, errors.New(key))
+		return nil, c.newError("executor not found", k, errors.New(key))
 	}
-
-	var (
-		exec Executor
-		err  error
-	)
-
-	if found && method != "value" {
-		parser, ok := parser.(ElementParser)
-		if !ok {
-			return nil, c.newError("method not found", k, errors.New(key))
-		}
-		switch method {
-		case "element":
-			exec, err = parser.Element(v.Value)
-		case "elements":
-			exec, err = parser.Elements(v.Value)
-		default:
-			return nil, c.newError("method not found", k, errors.New(key))
-		}
-	} else {
-		exec, err = parser.Value(v.Value)
+	args, err := c.compileNode(v)
+	if err != nil {
+		return nil, err
 	}
-
+	exec, err := init(args...)
 	if err != nil {
 		return nil, c.newError(key, k, err)
 	}
 	if c.meta != nil {
-		return c.meta(k, exec, true), nil
+		return c.meta(k, exec, false), nil
 	}
 	return exec, nil
 }
@@ -267,15 +242,6 @@ func (c compiler) compileMapping(node *yaml.Node) ([]Executor, error) {
 
 type Option func(*compiler)
 
-// WithExecutorMap external ExecutorMap
-func WithExecutorMap(fn ExecutorMap) Option {
-	return func(parser *compiler) {
-		funcs := maps.Clone(buildInExecutor)
-		maps.Copy(funcs, fn)
-		parser.funcs = funcs
-	}
-}
-
 type Meta = func(node *yaml.Node, exec Executor, isParser bool) Executor
 
 // WithMeta with the meta message
@@ -289,49 +255,7 @@ func Compile(str string, opts ...Option) (Executor, error) {
 	for _, opt := range opts {
 		opt(c)
 	}
-	if c.funcs == nil {
-		c.funcs = buildInExecutor
-	}
 	return c.compile(str)
-}
-
-var buildInExecutor = ExecutorMap{
-	"debug": func(args ...Executor) (Executor, error) {
-		if len(args) > 0 {
-			return _debug(ToString(args[0])), nil
-		}
-		return _debug(""), nil
-	},
-	"kind": func(args ...Executor) (Executor, error) {
-		if len(args) != 1 {
-			return nil, errors.New("kind needs 1 parameter")
-		}
-		var k Kind
-		return k, k.UnmarshalText([]byte(ToString(args[0])))
-	},
-	"each": func(args ...Executor) (Executor, error) {
-		if len(args) != 1 {
-			return nil, errors.New("each needs 1 parameter")
-		}
-		return _each{args[0]}, nil
-	},
-	"json.parse":  func(args ...Executor) (Executor, error) { return _jsonParse{}, nil },
-	"json.string": func(args ...Executor) (Executor, error) { return _jsonString{}, nil },
-	"map": func(args ...Executor) (Executor, error) {
-		kv := _map(args)
-		if len(kv)%2 != 0 {
-			kv = append(kv, Raw(nil))
-		}
-		return kv, nil
-	},
-	"or": func(args ...Executor) (Executor, error) { return _or(args), nil },
-	"string.join": func(args ...Executor) (Executor, error) {
-		if len(args) > 0 {
-			return _stringJoin(ToString(args[0])), nil
-		}
-		return _stringJoin(""), nil
-	},
-	"pipe": func(args ...Executor) (Executor, error) { return _pipe(args), nil },
 }
 
 // String the Executor for string value
@@ -342,6 +266,14 @@ func (k String) Exec(_ context.Context, _ any) (any, error) { return k.String(),
 func (k String) String() string { return string(k) }
 
 type _map []Executor
+
+func new_map(args ...Executor) (Executor, error) {
+	m := _map(args)
+	if len(m)%2 != 0 {
+		m = append(m, Raw(nil))
+	}
+	return m, nil
+}
 
 func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 	var ret map[string]any
@@ -383,6 +315,13 @@ func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 
 type _each struct{ Executor }
 
+func new_each(args ...Executor) (Executor, error) {
+	if len(args) != 1 {
+		return nil, errors.New("each needs 1 parameter")
+	}
+	return _each{args[0]}, nil
+}
+
 func (each _each) Exec(ctx context.Context, arg any) (any, error) {
 	switch s := arg.(type) {
 	case []any:
@@ -417,6 +356,8 @@ func (raw _raw) Exec(context.Context, any) (any, error) { return raw.any, nil }
 
 type _pipe []Executor
 
+func new_pipe(args ...Executor) (Executor, error) { return _pipe(args), nil }
+
 func (pipe _pipe) Exec(ctx context.Context, v any) (any, error) {
 	switch len(pipe) {
 	case 0:
@@ -440,6 +381,8 @@ func (pipe _pipe) Exec(ctx context.Context, v any) (any, error) {
 
 type _or []Executor
 
+func new_or(args ...Executor) (Executor, error) { return _or(args), nil }
+
 func (or _or) Exec(ctx context.Context, arg any) (any, error) {
 	for _, exec := range or {
 		v, err := exec.Exec(ctx, arg)
@@ -455,14 +398,28 @@ func (or _or) Exec(ctx context.Context, arg any) (any, error) {
 
 type _debug string
 
+func new_debug(args ...Executor) (Executor, error) {
+	if len(args) > 0 {
+		return _debug(ExecToString(args[0])), nil
+	}
+	return _debug(""), nil
+}
+
 func (debug _debug) Exec(ctx context.Context, v any) (any, error) {
 	Logger(ctx).LogAttrs(ctx, slog.LevelDebug, string(debug), slog.Any("value", v))
 	return v, nil
 }
 
-type _stringJoin string
+type _string_join string
 
-func (sep _stringJoin) Exec(_ context.Context, arg any) (any, error) {
+func new_string_join(args ...Executor) (Executor, error) {
+	if len(args) > 0 {
+		return _string_join(ExecToString(args[0])), nil
+	}
+	return _string_join(""), nil
+}
+
+func (sep _string_join) Exec(_ context.Context, arg any) (any, error) {
 	switch s := arg.(type) {
 	case []any:
 		str, err := cast.ToStringSliceE(s)
@@ -479,9 +436,11 @@ func (sep _stringJoin) Exec(_ context.Context, arg any) (any, error) {
 	}
 }
 
-type _jsonParse struct{}
+type _json_parse struct{}
 
-func (_jsonParse) Exec(_ context.Context, v any) (any, error) {
+func new_json_parse(_ ...Executor) (Executor, error) { return _json_parse{}, nil }
+
+func (_json_parse) Exec(_ context.Context, v any) (any, error) {
 	s, err := cast.ToStringE(v)
 	if err != nil {
 		return nil, err
@@ -491,9 +450,11 @@ func (_jsonParse) Exec(_ context.Context, v any) (any, error) {
 	return ret, err
 }
 
-type _jsonString struct{}
+type _json_string struct{}
 
-func (_jsonString) Exec(_ context.Context, v any) (any, error) {
+func new_json_string(_ ...Executor) (Executor, error) { return _json_string{}, nil }
+
+func (_json_string) Exec(_ context.Context, v any) (any, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return nil, err

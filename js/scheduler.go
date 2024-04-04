@@ -29,11 +29,10 @@ var (
 )
 
 func init() {
-	loader := NewModuleLoader()
-	ski.Register("js", Parser{loader})
+	ski.Register("js", new_executor())
 	_scheduler.Store(NewScheduler(SchedulerOptions{
 		MaxVMs: uint(runtime.GOMAXPROCS(0)),
-		Loader: loader,
+		Loader: NewModuleLoader(),
 	}))
 }
 

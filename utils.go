@@ -2,6 +2,7 @@ package ski
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -21,8 +22,8 @@ func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
 	return WithValue(ctx, &loggerKey, logger)
 }
 
-// ToString convert Executor to string if it implements fmt.Stringer
-func ToString(exec Executor) string {
+// ExecToString convert Executor to string if it implements fmt.Stringer
+func ExecToString(exec Executor) string {
 	switch t := exec.(type) {
 	case fmt.Stringer:
 		return t.String()
@@ -32,6 +33,16 @@ func ToString(exec Executor) string {
 		}
 	}
 	return ""
+}
+
+// StringExecutor to create a new Executor with string argument
+func StringExecutor(fn func(str string) (Executor, error)) NewExecutor {
+	return func(args ...Executor) (Executor, error) {
+		if len(args) == 0 {
+			return nil, errors.New("needs 1 string argument")
+		}
+		return fn(ExecToString(args[0]))
+	}
 }
 
 // MapKeys returns the keys of the map m.
