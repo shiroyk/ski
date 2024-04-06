@@ -1,6 +1,7 @@
 package js
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -63,7 +64,6 @@ func TestEventLoopAllJobCalled(t *testing.T) {
 		start := time.Now()
 		loop.Start(f)
 		took := time.Since(start)
-		loop.Wait()
 		took2 := time.Since(start)
 		assert.Less(t, time.Millisecond*500, took)
 		assert.Less(t, sleepTime, took2)
@@ -96,11 +96,30 @@ func TestEventLoopPanicOnDoubleEnqueue(t *testing.T) {
 	assert.Greater(t, time.Second+time.Millisecond*100, took)
 }
 
+func TestEventLoopStop(t *testing.T) {
+	t.Parallel()
+	loop := NewEventLoop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
+	defer cancel()
+
+	go func() {
+		<-ctx.Done()
+		loop.Stop()
+	}()
+
+	start := time.Now()
+	loop.Start(func() { loop.EnqueueJob() })
+	<-ctx.Done()
+
+	took := time.Since(start)
+	assert.Less(t, time.Millisecond*500, took)
+}
+
 func TestEventLoopOnDone(t *testing.T) {
 	t.Parallel()
 	loop := NewEventLoop()
 	var i int
 	loop.Start(func() { loop.OnDone(func() { i++ }) })
-	loop.Wait()
 	assert.Equal(t, 1, i)
 }

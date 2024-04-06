@@ -140,14 +140,15 @@ func (e *EventLoop) EnqueueJob() Enqueue {
 	}
 }
 
-// Wait until all queue in the event loop are completed
-func (e *EventLoop) Wait() {
+// Stop the eventloop
+func (e *EventLoop) Stop() {
 	e.cond.L.Lock()
 	defer e.cond.L.Unlock()
-
-	for e.enqueue > 0 {
-		e.cond.Wait()
-	}
+	// clean the queue
+	e.queue = e.queue[:0]
+	e.enqueue = 0
+	e.doneJobs = e.doneJobs[:0]
+	e.cond.Signal()
 }
 
 // OnDone add a function to execute when done.

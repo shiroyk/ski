@@ -219,12 +219,13 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 		case <-ctx.Done():
 			// interrupt the running JavaScript.
 			vm.runtime.Interrupt(ctx.Err())
+			// stop the event loop.
+			vm.eventloop.Stop()
 			return
 		}
 	}()
 
 	vm.eventloop.Start(task)
-	vm.eventloop.Wait()
 }
 
 // NewPromise return a goja.Promise object.
