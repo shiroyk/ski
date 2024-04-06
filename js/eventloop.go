@@ -45,6 +45,8 @@ func (e *EventLoop) Start(f func()) {
 			continue
 		}
 
+		e.cond.L.Unlock()
+
 		if len(e.doneJobs) > 0 {
 			for _, job := range e.doneJobs {
 				job()
@@ -52,7 +54,6 @@ func (e *EventLoop) Start(f func()) {
 			e.doneJobs = e.doneJobs[:0]
 		}
 
-		e.cond.L.Unlock()
 		return
 	}
 }

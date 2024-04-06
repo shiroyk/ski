@@ -119,7 +119,15 @@ func TestEventLoopStop(t *testing.T) {
 func TestEventLoopOnDone(t *testing.T) {
 	t.Parallel()
 	loop := NewEventLoop()
-	var i int
-	loop.Start(func() { loop.OnDone(func() { i++ }) })
-	assert.Equal(t, 1, i)
+	{
+		var i int
+		loop.Start(func() { loop.OnDone(func() { i++ }) })
+		assert.Equal(t, 1, i)
+	}
+	{
+
+		var i int
+		loop.Start(func() { loop.OnDone(func() { loop.OnDone(func() { i++ }) }) })
+		assert.Equal(t, 0, i)
+	}
 }
