@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
-	github.com/antchfx/htmlquery v1.3.0
+	github.com/antchfx/htmlquery v1.3.1
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/dop251/goja v0.0.0-20231027120936-b396bb4c349d
 	github.com/ohler55/ojg v1.21.1
@@ -18,7 +18,7 @@ require (
 
 require (
 	github.com/andybalholm/cascadia v1.3.2 // indirect
-	github.com/antchfx/xpath v1.2.5 // indirect
+	github.com/antchfx/xpath v1.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
