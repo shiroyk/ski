@@ -117,7 +117,7 @@ func TestAsyncResponse(t *testing.T) {
 				size++;
 				return read();
 			};
-			assert.equal(await read(), "0\r\n\x001\r\n\x002\r\n\x003\r\n\x004\r\n\x005\r\n\x00");
+			assert.equal(await read(), "0\r\n1\r\n2\r\n3\r\n4\r\n5\r\n");
 			assert.true(res.bodyUsed);
 			assert.true(res.ok);
 			assert.equal(res.status, 200);

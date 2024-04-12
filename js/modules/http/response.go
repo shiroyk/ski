@@ -187,16 +187,14 @@ func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *
 
 	_ = object.Set("read", func(call goja.FunctionCall) goja.Value {
 		var buffer []byte
-		var value *goja.Object
-		var view bool
 		if goja.IsUndefined(call.Argument(0)) {
 			buffer = make([]byte, 1024)
 		} else {
+			var view bool
 			buffer, view = call.Argument(0).Export().([]byte)
 			if !view {
 				js.Throw(vm, errors.New("read view is not TypedArray"))
 			}
-			value = call.Argument(0).ToObject(vm)
 		}
 
 		return vm.ToValue(js.NewPromise(vm,
@@ -208,12 +206,9 @@ func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *
 					}
 					return nil, err
 				}
-				if !view {
-					buffer = buffer[:n]
-					value, err = vm.New(vm.Get("Uint8Array"), vm.ToValue(&buffer))
-					if err != nil {
-						js.Throw(vm, err)
-					}
+				value, err := vm.New(vm.Get("Uint8Array"), vm.ToValue(vm.NewArrayBuffer(buffer[:n])))
+				if err != nil {
+					js.Throw(vm, err)
 				}
 				return iter{value, false}, nil
 			}))
