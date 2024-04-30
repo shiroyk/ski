@@ -3,6 +3,7 @@ package http
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -31,6 +32,17 @@ func (*URLSearchParams) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 		var ret urlSearchParams
 		if goja.IsUndefined(params) {
 			ret.data = make(map[string][]string)
+			return ret.object(rt)
+		}
+
+		if params.ExportType().Kind() == reflect.String {
+			str := strings.TrimPrefix(params.String(), "?")
+			kvs := strings.Split(str, "&")
+			ret.data = make(map[string][]string, len(kvs))
+			for _, kv := range kvs {
+				k, v, _ := strings.Cut(kv, "=")
+				ret.Append(k, v)
+			}
 			return ret.object(rt)
 		}
 

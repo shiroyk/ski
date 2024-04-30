@@ -19,6 +19,9 @@ func TestURLSearchParams(t *testing.T) {
 		 } catch (e) {
 			assert.true(e.toString().includes('unsupported type'))
 		 }`,
+		`assert.equal(new URLSearchParams('foo=1&bar=2').toString(), 'foo=1&bar=2')`,
+		`assert.equal(new URLSearchParams('?foo=1&bar=2').toString(), 'foo=1&bar=2')`,
+		`assert.equal(new URLSearchParams('https://example.com?foo=1&bar=2').toString(), 'https%3A%2F%2Fexample.com%3Ffoo=1&bar=2')`,
 		`params.forEach((v, k) => assert.true(v.length == 1))
 		 assert.equal(params.get('name'), 'foo')`,
 		`params.append('name', 'bar');
