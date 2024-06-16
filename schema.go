@@ -366,7 +366,7 @@ func (pipe _pipe) Exec(ctx context.Context, v any) (any, error) {
 		return pipe[0].Exec(ctx, v)
 	default:
 		ret, err := pipe[0].Exec(ctx, v)
-		if err != nil {
+		if err != nil || ret == nil {
 			return nil, err
 		}
 		for _, s := range pipe[1:] {
