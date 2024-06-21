@@ -25,7 +25,7 @@ func Register(name string, fn NewExecutor) {
 		panic("ski: invalid pattern")
 	}
 	if fn == nil {
-		panic("ski: new function is nil")
+		panic("ski: NewExecutor is nil")
 	}
 	if !isValidName(name) {
 		panic(fmt.Sprintf("ski: invalid name %q", name))
@@ -85,6 +85,11 @@ func RemoveExecutor(name string) {
 		return
 	}
 
+	if method == "" {
+		delete(executors.registry, name)
+		return
+	}
+
 	newEntries := slices.DeleteFunc(entries, func(e entry) bool {
 		return e.method == method
 	})
@@ -94,6 +99,24 @@ func RemoveExecutor(name string) {
 	} else {
 		executors.registry[name] = newEntries
 	}
+}
+
+// AllExecutors returns the all NewExecutor
+func AllExecutors() map[string]NewExecutor {
+	executors.RLock()
+	defer executors.RUnlock()
+
+	ret := make(map[string]NewExecutor)
+	for name, entries := range executors.registry {
+		for _, entry := range entries {
+			if entry.method == "" {
+				ret[name] = entry.new
+			} else {
+				ret[name+"."+entry.method] = entry.new
+			}
+		}
+	}
+	return ret
 }
 
 func isValidName(s string) bool {
