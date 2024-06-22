@@ -69,14 +69,21 @@ func (r _replace) Exec(_ context.Context, arg any) (any, error) {
 	switch conv := arg.(type) {
 	case string:
 		return r.Replace(conv, r.replace, r.start, r.count)
-	case []string:
-		var err error
-		ret := make([]string, len(conv))
-		for i := 0; i < len(conv); i++ {
-			conv[i], err = r.Replace(conv[i], r.replace, r.start, r.count)
+	case ski.Iterator:
+		if conv.Len() == 0 {
+			return nil, nil
+		}
+		_, ok := conv.At(0).(string)
+		if !ok {
+			return nil, fmt.Errorf("regex.replace unsupported type %T", arg)
+		}
+		ret := make([]string, 0, conv.Len())
+		for i := 0; i < conv.Len(); i++ {
+			v, err := r.Replace(conv.At(i).(string), r.replace, r.start, r.count)
 			if err != nil {
 				return nil, err
 			}
+			ret = append(ret, v)
 		}
 		return ret, nil
 	case fmt.Stringer:

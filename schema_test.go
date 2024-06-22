@@ -39,12 +39,12 @@ func TestExecutor(t *testing.T) {
 		{KindInt, "1", int32(1)},
 		{_or{_raw{nil}, _raw{"b"}}, nil, "b"},
 		{_map{_raw{"k"}, _inc{}}, 0, map[string]any{"k": 1}},
-		{_each{_inc{}}, []string{"1", "2", "3"}, []any{2, 3, 4}},
-		{_map{_raw{"k"}, _inc{}}, []any{1}, map[string]any{"k": 2}},
-		{_string_join(""), []string{"1", "2", "3"}, "123"},
-		{_pipe{_each{KindString}, _string_join("")}, []any{1, 2, 3}, "123"},
-		{_pipe{_each{_inc{}}, _each{_inc{}}}, []any{1, 2, 3}, []any{3, 4, 5}},
-		{_each{_map{_raw{"k"}, _inc{}}}, []any{1}, []any{map[string]any{"k": 2}}},
+		{_each{_inc{}}, _iter[any]{"1", "2", "3"}, _iter[any]{2, 3, 4}},
+		{_map{_raw{"k"}, _inc{}}, _iter[any]{1}, map[string]any{"k": 2}},
+		{_string_join(""), _iter[any]{"1", "2", "3"}, "123"},
+		{_pipe{_each{KindString}, _string_join("")}, _iter[any]{1, 2, 3}, "123"},
+		{_pipe{_each{_inc{}}, _each{_inc{}}}, _iter[any]{1, 2, 3}, _iter[any]{3, 4, 5}},
+		{_each{_map{_raw{"k"}, _inc{}}}, _iter[any]{1}, _iter[any]{map[string]any{"k": 2}}},
 		{_map{_raw{"k"}, _json_parse{}}, `{"foo": "bar"}`, map[string]any{"k": map[string]any{"foo": "bar"}}},
 	}
 	for i, c := range testCases {

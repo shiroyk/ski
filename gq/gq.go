@@ -129,8 +129,11 @@ func (f matcher) Exec(ctx context.Context, arg any) (any, error) {
 }
 
 func value(ctx context.Context, node any, _ ...string) (any, error) {
+	if node == nil {
+		return nil, nil
+	}
 	v, err := Text(ctx, node)
-	if node == nil || err != nil {
+	if err != nil {
 		return nil, err
 	}
 	return v, nil
@@ -140,7 +143,7 @@ func element(_ context.Context, node any, _ ...string) (any, error) {
 	switch t := node.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected type %T", node)
-	case string, []string, *html.Node, nil:
+	case string, []string, *html.Node, ski.Iterator, nil:
 		return t, nil
 	case *goquery.Selection:
 		if len(t.Nodes) == 0 {
@@ -159,20 +162,12 @@ func elements(_ context.Context, node any, _ ...string) (any, error) {
 	switch t := node.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected type %T", node)
-	case string, []string, *html.Node, nil:
+	case string, []string, *html.Node, ski.Iterator, nil:
 		return t, nil
 	case *goquery.Selection:
-		ele := make([]any, t.Length())
-		for i, n := range t.Nodes {
-			ele[i] = n
-		}
-		return ele, nil
+		return ski.NewIterator(t.Nodes), nil
 	case []*html.Node:
-		ele := make([]any, len(t))
-		for i, n := range t {
-			ele[i] = n
-		}
-		return ele, nil
+		return ski.NewIterator(t), nil
 	}
 }
 
@@ -200,22 +195,37 @@ func selection(content any) (*goquery.Selection, error) {
 		root := &html.Node{Type: html.DocumentNode}
 		root.AppendChild(cloneNode(data))
 		return goquery.NewDocumentFromNode(root).Selection, nil
-	case []any:
-		if len(data) == 0 {
+	case ski.Iterator:
+		if data.Len() == 0 {
 			return nil, nil
 		}
 		root := &html.Node{Type: html.DocumentNode}
 		doc := goquery.NewDocumentFromNode(root)
-		for _, v := range data {
-			n, ok := v.(*html.Node)
-			if !ok {
-				return nil, fmt.Errorf("expected type *html.Node, but got %T", v)
+		for i := 0; i < data.Len(); i++ {
+			switch v := data.At(i).(type) {
+			case *html.Node:
+				root.AppendChild(cloneNode(v))
+			case string:
+				nodes, err := html.ParseFragment(strings.NewReader(v), &html.Node{Type: html.ElementNode})
+				if err != nil {
+					return nil, err
+				}
+				for _, node := range nodes {
+					root.AppendChild(cloneNode(node))
+				}
+			default:
+				return nil, fmt.Errorf("unexpected type %T", v)
 			}
-			root.AppendChild(cloneNode(n))
 		}
 		return doc.Selection, nil
 	case []string:
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(strings.Join(data, "\n")))
+		if err != nil {
+			return nil, err
+		}
+		return doc.Selection, nil
+	case fmt.Stringer:
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(data.String()))
 		if err != nil {
 			return nil, err
 		}

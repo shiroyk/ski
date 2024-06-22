@@ -49,6 +49,15 @@ func doc(content any) (any, error) {
 		return oj.ParseString(data.String())
 	case json.RawMessage:
 		return oj.Parse(data)
+	case ski.Iterator:
+		if data.Len() == 0 {
+			return nil, nil
+		}
+		s, ok := data.At(0).(string)
+		if !ok {
+			return data, nil
+		}
+		return oj.ParseString(s)
 	case []byte:
 		return oj.Parse(data)
 	case []string:

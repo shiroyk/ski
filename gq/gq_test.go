@@ -70,7 +70,7 @@ func assertValue(t *testing.T, arg string, expected any) {
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
-			assert.Equal(t, expected, v)
+			assert.EqualValues(t, expected, v)
 		}
 	}
 }
@@ -99,17 +99,24 @@ func assertElements(t *testing.T, arg string, expected []string) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
-			case []any:
-				ele := make([]string, len(c))
-				for i, v := range c {
+			case ski.Iterator:
+				ele := make([]string, c.Len())
+				for i := 0; i < c.Len(); i++ {
 					var b bytes.Buffer
-					if assert.NoError(t, html.Render(&b, v.(*html.Node))) {
-						ele[i] = b.String()
+					switch e := c.At(i).(type) {
+					case *html.Node:
+						if assert.NoError(t, html.Render(&b, e)) {
+							ele[i] = b.String()
+						}
+					case string:
+						ele[i] = e
+					default:
+						ele[i] = fmt.Sprintf("%v", e)
 					}
 				}
 				assert.Equal(t, expected, ele)
 			default:
-				assert.Equal(t, expected, v)
+				assert.EqualValues(t, expected, v)
 			}
 		}
 	}
@@ -165,7 +172,7 @@ func TestNodeSelect(t *testing.T) {
 			}
 			v1, err := exec.Exec(ctx, v)
 			if assert.NoError(t, err) {
-				assert.Equal(t, "text/javascript", v1)
+				assert.EqualValues(t, "text/javascript", v1)
 			}
 		}
 		{
@@ -175,7 +182,7 @@ func TestNodeSelect(t *testing.T) {
 			}
 			v2, err := exec.Exec(ctx, v)
 			if assert.NoError(t, err) {
-				assert.Equal(t, "text/javascript", v2)
+				assert.EqualValues(t, "text/javascript", v2)
 			}
 		}
 	})
@@ -196,7 +203,7 @@ func TestNodeSelect(t *testing.T) {
 			}
 			v1, err := exec.Exec(ctx, v)
 			if assert.NoError(t, err) {
-				assert.Equal(t, []string{"f1", "f2", "f3"}, v1)
+				assert.EqualValues(t, []string{"f1", "f2", "f3"}, v1)
 			}
 		}
 		{
@@ -206,7 +213,7 @@ func TestNodeSelect(t *testing.T) {
 			}
 			v2, err := exec.Exec(ctx, v)
 			if assert.NoError(t, err) {
-				assert.Equal(t, []string{"f1", "f2", "f3"}, v2)
+				assert.EqualValues(t, []string{"f1", "f2", "f3"}, v2)
 			}
 		}
 	})
@@ -226,7 +233,7 @@ func TestExternalFunc(t *testing.T) {
 		if assert.NoError(t, err) {
 			v, err := exec.Exec(ctx, content)
 			if assert.NoError(t, err) {
-				assert.Equal(t, []string{"Google", "Github", "Golang", "Home"}, v)
+				assert.EqualValues(t, []string{"Google", "Github", "Golang", "Home"}, v)
 			}
 		}
 		assert.Contains(t, data.String(), `result type was *goquery.Selection`)

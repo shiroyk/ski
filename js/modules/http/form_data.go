@@ -59,6 +59,8 @@ func (*FormData) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 				}}
 			case []any:
 				ret.data[key] = ve
+			case nil:
+				ret.data[key] = nil
 			default:
 				ret.data[key] = []any{fmt.Sprintf("%s", ve)}
 			}

@@ -66,7 +66,7 @@ func TestBuildInFuncSlice(t *testing.T) {
 	t.Parallel()
 	assertError(t, `#main -> slice`, "slice(start, end) must have at least one int argument")
 
-	assertError(t, `#main div -> text -> slice(0)`, "slice: unexpected type []string")
+	assertError(t, `#main div -> text -> slice(0)`, "slice: unexpected type")
 
 	assertValue(t, `#main div -> slice(0)`, "1")
 

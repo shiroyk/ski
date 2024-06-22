@@ -261,5 +261,12 @@ func (p Executor) Exec(ctx context.Context, arg any) (any, error) {
 		return nil, err
 	}
 
-	return Unwrap(value)
+	unwrap, err := Unwrap(value)
+	if err != nil {
+		return nil, err
+	}
+	if s, ok := unwrap.([]any); ok {
+		return ski.NewIterator(s), nil
+	}
+	return unwrap, nil
 }

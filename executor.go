@@ -10,7 +10,8 @@ import (
 )
 
 type (
-	// Executor accept the argument and output result
+	// Executor accept the argument and output result.
+	// when the parameter is a slice, it needs to be wrapped with Iterator.
 	Executor interface {
 		Exec(context.Context, any) (any, error)
 	}

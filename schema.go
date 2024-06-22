@@ -24,6 +24,27 @@ func init() {
 	Register("json.string", new_json_string)
 }
 
+// Iterator is an interface for iterators
+type Iterator interface {
+	// Len returns the length of the iterator
+	Len() int
+	// At returns the element at the given index, or nil if the index is out of range
+	At(idx int) any
+}
+
+// NewIterator creates a new iterator
+func NewIterator[T any](v []T) Iterator { return _iter[T](v) }
+
+type _iter[T any] []T
+
+func (i _iter[T]) Len() int { return len(i) }
+func (i _iter[T]) At(idx int) any {
+	if idx < 0 || idx >= len(i) {
+		return nil
+	}
+	return i[idx]
+}
+
 type Kind uint
 
 const (
@@ -102,6 +123,7 @@ func (k Kind) Exec(_ context.Context, v any) (any, error) {
 }
 
 type compiler struct {
+	exec Executor
 	meta func(node *yaml.Node, exec Executor, isParser bool) Executor
 }
 
@@ -112,23 +134,19 @@ func (c compiler) newError(message string, node *yaml.Node, err error) error {
 	return fmt.Errorf("line %d column %d %s", node.Line, node.Column, message)
 }
 
-// compile the Executor from the YAML string.
-func (c compiler) compile(str string) (Executor, error) {
-	node := new(yaml.Node)
-	if err := yaml.Unmarshal([]byte(str), node); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal YAML: %s", err)
-	}
-	if node.Kind != yaml.DocumentNode || len(node.Content) != 1 {
-		return nil, errors.New("invalid YAML schema: document node is missing or incorrect")
-	}
-	exec, err := c.compileNode(node.Content[0])
+// UnmarshalYAML compile the Executor from the YAML string.
+func (c *compiler) UnmarshalYAML(node *yaml.Node) error {
+	exec, err := c.compileNode(node)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if len(exec) == 1 {
-		return exec[0], nil
+	switch len(exec) {
+	case 1:
+		c.exec = exec[0]
+	default:
+		c.exec = c.piping(exec)
 	}
-	return c.piping(exec), nil
+	return nil
 }
 
 // piping return the first arg if the length is 1, else return _pipe
@@ -246,7 +264,7 @@ type Meta = func(node *yaml.Node, exec Executor, isParser bool) Executor
 
 // WithMeta with the meta message
 func WithMeta(meta Meta) Option {
-	return func(parser *compiler) { parser.meta = meta }
+	return func(c *compiler) { c.meta = meta }
 }
 
 // Compile the Executor with the Option.
@@ -255,7 +273,10 @@ func Compile(str string, opts ...Option) (Executor, error) {
 	for _, opt := range opts {
 		opt(c)
 	}
-	return c.compile(str)
+	if err := yaml.Unmarshal([]byte(str), c); err != nil {
+		return nil, err
+	}
+	return c.exec, nil
 }
 
 // String the Executor for string value
@@ -294,16 +315,10 @@ func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 	}
 
 	switch s := arg.(type) {
-	case []any:
-		ret = make(map[string]any, len(s))
-		for _, a := range s {
-			exec(a)
-		}
-		return ret, nil
-	case []string:
-		ret = make(map[string]any, len(s))
-		for _, a := range s {
-			exec(a)
+	case Iterator:
+		ret = make(map[string]any, s.Len())
+		for i := 0; i < s.Len(); i++ {
+			exec(s.At(i))
 		}
 		return ret, nil
 	default:
@@ -324,26 +339,19 @@ func new_each(args ...Executor) (Executor, error) {
 
 func (each _each) Exec(ctx context.Context, arg any) (any, error) {
 	switch s := arg.(type) {
-	case []any:
-		ret := make([]any, 0, len(s))
-		for _, i := range s {
-			v, _ := each.Executor.Exec(ctx, i)
+	case Iterator:
+		ret := make([]any, 0, s.Len())
+		for i := 0; i < s.Len(); i++ {
+			v, _ := each.Executor.Exec(ctx, s.At(i))
 			ret = append(ret, v)
 		}
-		return ret, nil
-	case []string:
-		ret := make([]any, 0, len(s))
-		for _, i := range s {
-			v, _ := each.Executor.Exec(ctx, i)
-			ret = append(ret, v)
-		}
-		return ret, nil
+		return NewIterator(ret), nil
 	default:
 		v, err := each.Executor.Exec(ctx, arg)
 		if err != nil {
-			return []any{}, nil
+			return nil, nil
 		}
-		return []any{v}, nil
+		return NewIterator([]any{v}), nil
 	}
 }
 
@@ -421,12 +429,16 @@ func new_string_join(args ...Executor) (Executor, error) {
 
 func (sep _string_join) Exec(_ context.Context, arg any) (any, error) {
 	switch s := arg.(type) {
-	case []any:
-		str, err := cast.ToStringSliceE(s)
-		if err != nil {
-			return nil, fmt.Errorf("expected string or []string, but got type %T", arg)
+	case Iterator:
+		ret := make([]string, 0, s.Len())
+		for i := 0; i < s.Len(); i++ {
+			s, err := cast.ToStringE(s.At(i))
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, s)
 		}
-		return strings.Join(str, string(sep)), nil
+		return strings.Join(ret, string(sep)), nil
 	case []string:
 		return strings.Join(s, string(sep)), nil
 	case string:

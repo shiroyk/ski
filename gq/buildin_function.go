@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/shiroyk/ski"
 	"github.com/spf13/cast"
+	"golang.org/x/net/html"
 )
 
 type (
@@ -54,14 +56,11 @@ func contentToString(content any, fn func(*goquery.Selection) (string, error)) (
 		case 1:
 			return list[0], nil
 		default:
-			return list, nil
+			return ski.NewIterator(list), nil
 		}
-	case string:
-		return c, nil
-	case []string:
-		if len(c) == 1 {
-			return c[0], nil
-		}
+	case *html.Node:
+		return fn(goquery.NewDocumentFromNode(c).Selection)
+	case string, ski.Iterator:
 		return c, nil
 	case nil:
 		return nil, nil
@@ -331,11 +330,16 @@ func Prefix(_ context.Context, content any, args ...string) (ret any, err error)
 	switch src := content.(type) {
 	case string:
 		return args[0] + src, nil
-	case []string:
-		for i := range src {
-			src[i] = args[0] + src[i]
+	case ski.Iterator:
+		ret := make([]string, src.Len())
+		for i := 0; i < src.Len(); i++ {
+			if s, ok := src.At(i).(string); ok {
+				ret[i] = args[0] + s
+			} else {
+				return nil, fmt.Errorf("prefix: unexpected type %T", src.At(i))
+			}
 		}
-		return src, nil
+		return ret, nil
 	case *goquery.Selection:
 		return args[0] + src.Text(), nil
 	default:
@@ -343,18 +347,23 @@ func Prefix(_ context.Context, content any, args ...string) (ret any, err error)
 	}
 }
 
-func Suffix(_ context.Context, content any, args ...string) (ret any, err error) {
+func Suffix(_ context.Context, content any, args ...string) (any, error) {
 	if len(args) == 0 {
 		return content, nil
 	}
 	switch src := content.(type) {
 	case string:
 		return src + args[0], nil
-	case []string:
-		for i := range src {
-			src[i] = src[i] + args[0]
+	case ski.Iterator:
+		ret := make([]string, src.Len())
+		for i := 0; i < src.Len(); i++ {
+			if s, ok := src.At(i).(string); ok {
+				ret[i] = s + args[0]
+			} else {
+				return nil, fmt.Errorf("suffix: unexpected type %T", src.At(i))
+			}
 		}
-		return src, nil
+		return ret, nil
 	case *goquery.Selection:
 		return src.Text() + args[0], nil
 	default:

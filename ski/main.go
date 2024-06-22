@@ -21,10 +21,10 @@ import (
 	_ "github.com/shiroyk/ski/js/modules/encoding"
 	_ "github.com/shiroyk/ski/js/modules/http"
 
-	_ "github.com/shiroyk/ski/executors/gq"
-	_ "github.com/shiroyk/ski/executors/jq"
-	_ "github.com/shiroyk/ski/executors/regex"
-	_ "github.com/shiroyk/ski/executors/xpath"
+	_ "github.com/shiroyk/ski/gq"
+	_ "github.com/shiroyk/ski/jq"
+	_ "github.com/shiroyk/ski/regex"
+	_ "github.com/shiroyk/ski/xpath"
 )
 
 const defaultTimeout = time.Minute

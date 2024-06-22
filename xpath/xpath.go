@@ -96,12 +96,25 @@ func elements(nodes []*html.Node) (any, error) {
 	return ret, nil
 }
 
-func htmlNode(content any) (node *html.Node, err error) {
+func htmlNode(content any) (*html.Node, error) {
 	switch data := content.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected type %T", content)
 	case nil:
 		return &html.Node{Type: html.DocumentNode}, nil
+	case ski.Iterator:
+		root := &html.Node{Type: html.DocumentNode}
+		if data.Len() == 0 {
+			return root, nil
+		}
+		for i := 0; i < data.Len(); i++ {
+			n, err := htmlNode(data.At(i))
+			if err != nil {
+				return nil, err
+			}
+			root.AppendChild(n)
+		}
+		return root, nil
 	case *html.Node:
 		return data, nil
 	case []string:
