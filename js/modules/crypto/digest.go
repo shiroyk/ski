@@ -11,13 +11,13 @@ import (
 	"fmt"
 	"hash"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"golang.org/x/crypto/ripemd160"
 )
 
 // RandomBytes returns a random ArrayBuffer of the given size.
-func RandomBytes(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func RandomBytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	size := int(call.Argument(0).ToInteger())
 	if size < 1 {
 		js.Throw(rt, errors.New("invalid size"))

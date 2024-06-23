@@ -8,12 +8,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // Throw js exception
-func Throw(rt *goja.Runtime, err error) {
-	var ex *goja.Exception
+func Throw(rt *sobek.Runtime, err error) {
+	var ex *sobek.Exception
 	if errors.As(err, &ex) { //nolint:errorlint
 		panic(ex)
 	}
@@ -27,28 +27,28 @@ func ToBytes(data any) ([]byte, error) {
 		return dt, nil
 	case string:
 		return []byte(dt), nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return dt.Bytes(), nil
 	default:
 		return nil, fmt.Errorf("expected string, []byte or ArrayBuffer, but got %T, ", data)
 	}
 }
 
-// Unwrap the goja.Value to the raw value
-func Unwrap(value goja.Value) (any, error) {
+// Unwrap the sobek.Value to the raw value
+func Unwrap(value sobek.Value) (any, error) {
 	if value == nil {
 		return nil, nil
 	}
 	switch v := value.Export().(type) {
 	default:
 		return v, nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return v.Bytes(), nil
-	case *goja.Promise:
+	case *sobek.Promise:
 		switch v.State() {
-		case goja.PromiseStateRejected:
+		case sobek.PromiseStateRejected:
 			return nil, errors.New(v.Result().String())
-		case goja.PromiseStateFulfilled:
+		case sobek.PromiseStateFulfilled:
 			return v.Result().Export(), nil
 		default:
 			return nil, errors.New("unexpected promise pending state")
@@ -56,8 +56,8 @@ func Unwrap(value goja.Value) (any, error) {
 	}
 }
 
-// ModuleCallable return the goja.CyclicModuleRecord default export as goja.Callable.
-func ModuleCallable(rt *goja.Runtime, resolve goja.HostResolveImportedModuleFunc, module goja.CyclicModuleRecord) (goja.Callable, error) {
+// ModuleCallable return the sobek.CyclicModuleRecord default export as sobek.Callable.
+func ModuleCallable(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFunc, module sobek.CyclicModuleRecord) (sobek.Callable, error) {
 	instance := rt.GetModuleInstance(module)
 	if instance == nil {
 		if err := module.Link(); err != nil {
@@ -65,23 +65,23 @@ func ModuleCallable(rt *goja.Runtime, resolve goja.HostResolveImportedModuleFunc
 		}
 		promise := rt.CyclicModuleRecordEvaluate(module, resolve)
 		switch promise.State() {
-		case goja.PromiseStateRejected:
+		case sobek.PromiseStateRejected:
 			return nil, promise.Result().Export().(error)
-		case goja.PromiseStateFulfilled:
+		case sobek.PromiseStateFulfilled:
 		default:
 		}
 		instance = rt.GetModuleInstance(module)
 	}
 	value := instance.GetBindingValue("default")
-	call, ok := goja.AssertFunction(value)
+	call, ok := sobek.AssertFunction(value)
 	if !ok {
 		return nil, errors.New("module default export is not a function")
 	}
 	return call, nil
 }
 
-// Context returns the current context of the goja.Runtime
-func Context(rt *goja.Runtime) context.Context {
+// Context returns the current context of the sobek.Runtime
+func Context(rt *sobek.Runtime) context.Context {
 	if v := self(rt).ctx.Export().(*vmctx).ctx; v != nil {
 		return v
 	}
@@ -90,10 +90,10 @@ func Context(rt *goja.Runtime) context.Context {
 
 // OnDone add a function to execute when the VM has finished running.
 // eg: close resources...
-func OnDone(rt *goja.Runtime, job func()) { self(rt).eventloop.OnDone(job) }
+func OnDone(rt *sobek.Runtime, job func()) { self(rt).eventloop.OnDone(job) }
 
 // InitGlobalModule init all implement the Global modules
-func InitGlobalModule(rt *goja.Runtime) {
+func InitGlobalModule(rt *sobek.Runtime) {
 	for name, mod := range AllModule() {
 		if mod, ok := mod.(Global); ok {
 			instance, err := mod.Instantiate(rt)
@@ -106,13 +106,13 @@ func InitGlobalModule(rt *goja.Runtime) {
 	}
 }
 
-func FreezeObject(rt *goja.Runtime, obj goja.Value) error {
+func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
 	global := rt.GlobalObject().Get("Object").ToObject(rt)
-	freeze, ok := goja.AssertFunction(global.Get("freeze"))
+	freeze, ok := sobek.AssertFunction(global.Get("freeze"))
 	if !ok {
 		panic("failed to get the Object.freeze function from the runtime")
 	}
-	_, err := freeze(goja.Undefined(), obj)
+	_, err := freeze(sobek.Undefined(), obj)
 	return err
 }
 

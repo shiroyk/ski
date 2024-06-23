@@ -13,7 +13,7 @@ import (
 	urlpkg "net/url"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/spf13/cast"
@@ -38,11 +38,11 @@ func init() {
 // https://developer.mozilla.org/en-US/docs/Web/API/fetch
 type Fetch struct{ ski.Fetch }
 
-func (fetch *Fetch) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (fetch *Fetch) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	if fetch.Fetch == nil {
 		return nil, errors.New("Fetch can not nil")
 	}
-	return rt.ToValue(func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+	return rt.ToValue(func(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 		req, signal := buildRequest(http.MethodGet, call, vm)
 		return vm.ToValue(js.NewPromise(vm,
 			func() (*http.Response, error) {
@@ -65,11 +65,11 @@ func (*Fetch) Global() {}
 // Http module for fetching resources (including across the network).
 type Http struct{ ski.Fetch }
 
-func (h *Http) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (h *Http) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	if h.Fetch == nil {
 		return nil, errors.New("Fetch can not nil")
 	}
-	return rt.ToValue(map[string]func(call goja.FunctionCall, vm *goja.Runtime) goja.Value{
+	return rt.ToValue(map[string]func(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value{
 		"get":     h.Get,
 		"post":    h.Post,
 		"put":     h.Put,
@@ -81,7 +81,7 @@ func (h *Http) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 }
 
 // Get Make a HTTP GET request.
-func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (h *Http) Get(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return h.do(call, vm, http.MethodGet)
 }
 
@@ -92,36 +92,36 @@ func (h *Http) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 // http.post(url, { body: new URLSearchParams({'key': 'foo', 'value': 'bar'}) })
 // Send POST with json:
 // http.post(url, { body: {'key': 'foo'} })
-func (h *Http) Post(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (h *Http) Post(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return h.do(call, vm, http.MethodPost)
 }
 
 // Put Make a HTTP PUT request.
-func (h *Http) Put(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (h *Http) Put(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return h.do(call, vm, http.MethodPut)
 }
 
 // Delete Make a HTTP DELETE request.
-func (h *Http) Delete(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (h *Http) Delete(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return h.do(call, vm, http.MethodDelete)
 }
 
 // Patch Make a HTTP PATCH request.
-func (h *Http) Patch(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (h *Http) Patch(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return h.do(call, vm, http.MethodPatch)
 }
 
 // Request Make a HTTP request.
-func (h *Http) Request(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (h *Http) Request(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return h.do(call, vm, http.MethodGet)
 }
 
 // Head Make a HTTP HEAD request.
-func (h *Http) Head(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (h *Http) Head(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return h.do(call, vm, http.MethodHead)
 }
 
-func (h *Http) do(call goja.FunctionCall, vm *goja.Runtime, method string) goja.Value {
+func (h *Http) do(call sobek.FunctionCall, vm *sobek.Runtime, method string) sobek.Value {
 	req, signal := buildRequest(method, call, vm)
 	if signal != nil {
 		defer signal.abort() // release resources
@@ -137,20 +137,20 @@ func (h *Http) do(call goja.FunctionCall, vm *goja.Runtime, method string) goja.
 
 func buildRequest(
 	method string,
-	call goja.FunctionCall,
-	vm *goja.Runtime,
+	call sobek.FunctionCall,
+	vm *sobek.Runtime,
 ) (req *http.Request, signal *abortSignal) {
 	var (
 		ctx     = context.Background()
 		url     = call.Argument(0).String()
 		options = call.Argument(1)
-		opt     *goja.Object
+		opt     *sobek.Object
 		body    io.Reader
 		headers = make(map[string]string)
 		err     error
 	)
 
-	if goja.IsUndefined(options) || goja.IsNull(options) {
+	if sobek.IsUndefined(options) || sobek.IsNull(options) {
 		ctx = js.Context(vm)
 		goto NEW
 	}
@@ -242,7 +242,7 @@ func processBody(body any, headers map[string]string) (io.Reader, error) {
 		return strings.NewReader(data.encode()), nil
 	case string:
 		return strings.NewReader(data), nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return bytes.NewReader(data.Bytes()), nil
 	case []byte:
 		return bytes.NewReader(data), nil

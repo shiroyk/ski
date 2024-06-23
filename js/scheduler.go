@@ -11,7 +11,7 @@ import (
 
 	"log/slog"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 )
 
@@ -39,8 +39,8 @@ func init() {
 // SetScheduler set the default Scheduler
 func SetScheduler(scheduler Scheduler) { _scheduler.Store(scheduler) }
 
-// RunModule the goja.CyclicModuleRecord
-func RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error) {
+// RunModule the sobek.CyclicModuleRecord
+func RunModule(ctx context.Context, module sobek.CyclicModuleRecord) (sobek.Value, error) {
 	vm, err := GetScheduler().Get()
 	if err != nil {
 		return nil, err

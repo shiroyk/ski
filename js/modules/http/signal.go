@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 )
 
@@ -28,8 +28,8 @@ func (c *abortController) Abort() {
 type AbortController struct{}
 
 // Instantiate module
-func (*AbortController) Instantiate(rt *goja.Runtime) (goja.Value, error) {
-	return rt.ToValue(func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
+func (*AbortController) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	return rt.ToValue(func(call sobek.ConstructorCall, vm *sobek.Runtime) *sobek.Object {
 		signal := new(abortSignal)
 		signal.ctx, signal.cancel = context.WithCancel(js.Context(vm))
 		return vm.ToValue(&abortController{Signal: signal}).ToObject(vm)
@@ -62,15 +62,15 @@ func (s *abortSignal) abort() {
 
 type AbortSignal struct{}
 
-func (*AbortSignal) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (*AbortSignal) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	object := rt.NewObject()
-	_ = object.Set("abort", func(_ goja.FunctionCall) goja.Value {
+	_ = object.Set("abort", func(_ sobek.FunctionCall) sobek.Value {
 		signal := new(abortSignal)
 		signal.ctx, signal.cancel = context.WithCancel(context.Background())
 		signal.abort()
 		return rt.ToValue(signal).ToObject(rt)
 	})
-	_ = object.Set("timeout", func(call goja.FunctionCall) goja.Value {
+	_ = object.Set("timeout", func(call sobek.FunctionCall) sobek.Value {
 		timeout := call.Argument(0).ToInteger()
 		signal := new(abortSignal)
 		signal.ctx, signal.cancel = context.WithTimeout(js.Context(rt), time.Duration(timeout))

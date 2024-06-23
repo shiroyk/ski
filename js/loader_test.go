@@ -14,7 +14,7 @@ import (
 	"testing/fstest"
 	_ "unsafe"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,13 +34,13 @@ export default async () => gomod1.key + 1 + (await a())`
 
 type gomod1 struct{}
 
-func (gomod1) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (gomod1) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return rt.ToValue(map[string]string{"key": "gomod1"}), nil
 }
 
 type gomod2 struct{}
 
-func (gomod2) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (gomod2) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return rt.ToValue(struct {
 		Key string `js:"key"`
 	}{Key: "gomod2"}), nil
@@ -48,7 +48,7 @@ func (gomod2) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 
 type gomod3 struct{}
 
-func (gomod3) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (gomod3) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return rt.ToValue(map[string]string{"key": "gomod3"}), nil
 }
 
@@ -304,9 +304,9 @@ func TestESMExecutor(t *testing.T) {
 func NewTestVM(t *testing.T, opts ...Option) VM {
 	vm := NewVM(opts...)
 	p := vm.Runtime().NewObject()
-	_ = p.Set("equal", func(call goja.FunctionCall) goja.Value {
+	_ = p.Set("equal", func(call sobek.FunctionCall) sobek.Value {
 		assert.Equal(t, call.Argument(1).Export(), call.Argument(0).Export(), call.Argument(2).String())
-		return goja.Undefined()
+		return sobek.Undefined()
 	})
 	_ = vm.Runtime().Set("assert", p)
 	return vm

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 )
@@ -17,11 +17,11 @@ func init() {
 // Cache interface is used to store string or bytes.
 type Cache struct{ ski.Cache }
 
-func (c *Cache) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (c *Cache) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	if c.Cache == nil {
 		return nil, errors.New("Cache can not nil")
 	}
-	return rt.ToValue(map[string]func(call goja.FunctionCall, vm *goja.Runtime) goja.Value{
+	return rt.ToValue(map[string]func(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value{
 		"get":      c.Get,
 		"getBytes": c.GetBytes,
 		"set":      c.Set,
@@ -31,25 +31,25 @@ func (c *Cache) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 }
 
 // Get returns string.
-func (c *Cache) Get(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *Cache) Get(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	if bytes, err := c.Cache.Get(js.Context(vm), call.Argument(0).String()); err == nil && bytes != nil {
 		return vm.ToValue(string(bytes))
 	}
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // GetBytes returns ArrayBuffer.
-func (c *Cache) GetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *Cache) GetBytes(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	if bytes, err := c.Cache.Get(js.Context(vm), call.Argument(0).String()); err == nil && bytes != nil {
 		return vm.ToValue(vm.NewArrayBuffer(bytes))
 	}
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // Set saves string to the cache with key.
-func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *Cache) Set(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	ctx := js.Context(vm)
-	if !goja.IsUndefined(call.Argument(2)) {
+	if !sobek.IsUndefined(call.Argument(2)) {
 		timeout, err := time.ParseDuration(call.Argument(2).String())
 		if err != nil {
 			js.Throw(vm, err)
@@ -62,13 +62,13 @@ func (c *Cache) Set(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 		js.Throw(vm, err)
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // SetBytes saves ArrayBuffer to the cache with key.
-func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *Cache) SetBytes(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	ctx := js.Context(vm)
-	if !goja.IsUndefined(call.Argument(2)) {
+	if !sobek.IsUndefined(call.Argument(2)) {
 		timeout, err := time.ParseDuration(call.Argument(2).String())
 		if err != nil {
 			js.Throw(vm, err)
@@ -86,14 +86,14 @@ func (c *Cache) SetBytes(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
 		js.Throw(vm, err)
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // Del removes key from the cache.
-func (c *Cache) Del(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (c *Cache) Del(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	err := c.Cache.Del(js.Context(vm), call.Argument(0).String())
 	if err != nil {
 		js.Throw(vm, err)
 	}
-	return goja.Undefined()
+	return sobek.Undefined()
 }

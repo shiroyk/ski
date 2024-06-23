@@ -71,9 +71,9 @@ type Enqueue func(func())
 //		defer server.Close()
 //
 //		loop := NewEventLoop()
-//		runtime := goja.New()
+//		runtime := sobek.New()
 //
-//		_ = runtime.Set("fetch", func(call goja.FunctionCall) goja.Value {
+//		_ = runtime.Set("fetch", func(call sobek.FunctionCall) sobek.Value {
 //			promise, resolve, reject := runtime.NewPromise()
 //			enqueue := loop.EnqueueJob()
 //
@@ -98,7 +98,7 @@ type Enqueue func(func())
 //		})
 //
 //		var (
-//			ret goja.Value
+//			ret sobek.Value
 //			err error
 //		)
 //
@@ -107,18 +107,18 @@ type Enqueue func(func())
 //		if err != nil {
 //			fmt.Println(err)
 //		}
-//		promise, ok := ret.Export().(*goja.Promise)
+//		promise, ok := ret.Export().(*sobek.Promise)
 //		if !ok {
 //			panic("expect promise")
 //			return
 //		}
 //
 //		switch promise.State() {
-//		case goja.PromiseStatePending:
+//		case sobek.PromiseStatePending:
 //			panic("unexpect pending state")
-//		case goja.PromiseStateRejected:
+//		case sobek.PromiseStateRejected:
 //			fmt.Println(promise.Result().String())
-//		case goja.PromiseStateFulfilled:
+//		case sobek.PromiseStateFulfilled:
 //			fmt.Println(promise.Result().Export())
 //		}
 //	}

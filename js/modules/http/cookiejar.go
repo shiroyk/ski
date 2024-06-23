@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/spf13/cast"
@@ -15,11 +15,11 @@ import (
 // CookieJar manages storage and use of cookies in HTTP requests.
 type CookieJar struct{ ski.CookieJar }
 
-func (j *CookieJar) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (j *CookieJar) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	if j.CookieJar == nil {
 		return nil, errors.New("CookieJar can not nil")
 	}
-	return rt.ToValue(map[string]func(call goja.FunctionCall, rt *goja.Runtime) goja.Value{
+	return rt.ToValue(map[string]func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value{
 		"get":    j.Get,
 		"getAll": j.GetAll,
 		"set":    j.Set,
@@ -28,7 +28,7 @@ func (j *CookieJar) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 }
 
 // Get returns the cookie for the given option.
-func (j *CookieJar) Get(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (j *CookieJar) Get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	opt, err := cast.ToStringMapStringE(call.Argument(0).Export())
 	if err != nil {
 		js.Throw(rt, errors.New("get parameter must be an object containing name, url"))
@@ -47,11 +47,11 @@ func (j *CookieJar) Get(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
 	if len(cookies) > 0 {
 		return toObj(cookies[0], rt)
 	}
-	return goja.Null()
+	return sobek.Null()
 }
 
 // GetAll returns the cookies for the given option.
-func (j *CookieJar) GetAll(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (j *CookieJar) GetAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	opt, err := cast.ToStringMapStringE(call.Argument(0).Export())
 	if err != nil {
 		js.Throw(rt, errors.New("getAll parameter must be an object containing name, url"))
@@ -64,7 +64,7 @@ func (j *CookieJar) GetAll(call goja.FunctionCall, rt *goja.Runtime) goja.Value 
 }
 
 // Set handles the receipt of the cookies in a reply for the given option.
-func (j *CookieJar) Set(call goja.FunctionCall, rt *goja.Runtime) (ret goja.Value) {
+func (j *CookieJar) Set(call sobek.FunctionCall, rt *sobek.Runtime) (ret sobek.Value) {
 	u, err := url.Parse(call.Argument(0).String())
 	if err != nil {
 		js.Throw(rt, errors.New("set first parameter must be url string"))
@@ -81,21 +81,21 @@ func (j *CookieJar) Set(call goja.FunctionCall, rt *goja.Runtime) (ret goja.Valu
 		js.Throw(rt, errors.New("set second parameter must be cookie object"))
 	}
 	if len(cookies) == 0 {
-		return goja.Undefined()
+		return sobek.Undefined()
 	}
 
 	j.CookieJar.SetCookies(u, cookies)
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // Del handles the receipt of the cookies in a reply for the given URL.
-func (j *CookieJar) Del(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (j *CookieJar) Del(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	u, err := url.Parse(call.Argument(0).String())
 	if err != nil {
 		js.Throw(rt, err)
 	}
 	j.CookieJar.RemoveCookie(u)
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 var sameSiteMapping = [...]string{
@@ -105,7 +105,7 @@ var sameSiteMapping = [...]string{
 	http.SameSiteNoneMode:    "none",
 }
 
-func toObj(cookie *http.Cookie, rt *goja.Runtime) goja.Value {
+func toObj(cookie *http.Cookie, rt *sobek.Runtime) sobek.Value {
 	o := rt.NewObject()
 	_ = o.Set("domain", rt.ToValue(cookie.Domain))
 	_ = o.Set("expires", rt.ToValue(cookie.Expires.Unix()))
@@ -114,14 +114,14 @@ func toObj(cookie *http.Cookie, rt *goja.Runtime) goja.Value {
 	_ = o.Set("sameSite", rt.ToValue(sameSiteMapping[cookie.SameSite]))
 	_ = o.Set("secure", rt.ToValue(cookie.Secure))
 	_ = o.Set("value", rt.ToValue(cookie.Value))
-	_ = o.Set("toString", func(goja.FunctionCall) goja.Value {
+	_ = o.Set("toString", func(sobek.FunctionCall) sobek.Value {
 		return rt.ToValue(cookie.String())
 	})
 	return o
 }
 
-func toObjs(cookies []*http.Cookie, rt *goja.Runtime) goja.Value {
-	ret := make([]goja.Value, 0, len(cookies))
+func toObjs(cookies []*http.Cookie, rt *sobek.Runtime) sobek.Value {
+	ret := make([]sobek.Value, 0, len(cookies))
 	for _, cookie := range cookies {
 		ret = append(ret, toObj(cookie, rt))
 	}

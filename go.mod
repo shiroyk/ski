@@ -8,7 +8,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/antchfx/xpath v1.2.5
 	github.com/dlclark/regexp2 v1.11.0
-	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
+	github.com/grafana/sobek v0.0.0-20240621115154-ed22587d72ba
 	github.com/ohler55/ojg v1.21.4
 	github.com/spf13/cast v1.6.0
 	github.com/stretchr/testify v1.9.0
@@ -25,5 +25,3 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
-
-replace github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20231212144616-08f562ee86d0

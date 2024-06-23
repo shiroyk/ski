@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 )
@@ -27,12 +27,12 @@ type formData struct {
 type FormData struct{}
 
 // Instantiate returns module instance
-func (*FormData) Instantiate(rt *goja.Runtime) (goja.Value, error) {
-	return rt.ToValue(func(call goja.ConstructorCall) *goja.Object {
+func (*FormData) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	return rt.ToValue(func(call sobek.ConstructorCall) *sobek.Object {
 		params := call.Argument(0)
 
 		var ret formData
-		if goja.IsUndefined(params) {
+		if sobek.IsUndefined(params) {
 			ret.data = make(map[string][]any)
 			return ret.object(rt)
 		}
@@ -51,7 +51,7 @@ func (*FormData) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 					data:     ve,
 					filename: "blob",
 				}}
-			case goja.ArrayBuffer:
+			case sobek.ArrayBuffer:
 				// Default filename "blob".
 				ret.data[key] = []any{fileData{
 					data:     ve.Bytes(),
@@ -74,13 +74,13 @@ func (*FormData) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 // Global it is a global module
 func (*FormData) Global() {}
 
-func (f *formData) object(rt *goja.Runtime) *goja.Object {
+func (f *formData) object(rt *sobek.Runtime) *sobek.Object {
 	obj := rt.ToValue(f).ToObject(rt)
 
-	_ = obj.SetSymbol(goja.SymIterator, func(goja.ConstructorCall) *goja.Object {
+	_ = obj.SetSymbol(sobek.SymIterator, func(sobek.ConstructorCall) *sobek.Object {
 		var i int
 		it := rt.NewObject()
-		_ = it.Set("next", func(goja.FunctionCall) goja.Value {
+		_ = it.Set("next", func(sobek.FunctionCall) sobek.Value {
 			if i < len(f.keys) {
 				key := f.keys[i]
 				i++
@@ -95,7 +95,7 @@ func (f *formData) object(rt *goja.Runtime) *goja.Object {
 
 // Append method of the formData interface appends a new value onto an existing key inside a formData object,
 // or adds the key if it does not already exist.
-func (f *formData) Append(name string, value any, filename string) goja.Value {
+func (f *formData) Append(name string, value any, filename string) sobek.Value {
 	if filename == "" {
 		// Default filename "blob".
 		filename = "blob"
@@ -113,7 +113,7 @@ func (f *formData) Append(name string, value any, filename string) goja.Value {
 			data:     v,
 			filename: filename,
 		})
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		ele = append(ele, fileData{
 			data:     v.Bytes(),
 			filename: filename,
@@ -124,7 +124,7 @@ func (f *formData) Append(name string, value any, filename string) goja.Value {
 
 	f.data[name] = ele
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // Delete method of the formData interface deletes a key and its value(s) from a formData object.
@@ -184,7 +184,7 @@ func (f *formData) Set(name string, value any, filename string) {
 	}
 
 	switch v := value.(type) {
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		f.data[name] = []any{
 			fileData{
 				data:     v.Bytes(),

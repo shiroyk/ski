@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 )
 
@@ -17,7 +17,7 @@ func init() {
 type Encoding struct{}
 
 // Instantiate returns Encoding module instance
-func (*Encoding) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (*Encoding) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return rt.ToValue(map[string]any{
 		"base64": new(Base64),
 	}), nil
@@ -48,7 +48,7 @@ func (Base64) EncodeURI(input any) (string, error) {
 }
 
 // Decode returns the string decoding of input.
-func (Base64) Decode(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (Base64) Decode(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
 	input := call.Argument(0).Export()
 	toBuffer := call.Argument(1).ToBoolean()
 

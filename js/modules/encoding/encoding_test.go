@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +13,7 @@ import (
 func TestEncodingBase64(t *testing.T) {
 	t.Parallel()
 
-	vm := modulestest.New(t, js.WithInitial(func(rt *goja.Runtime) {
+	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
 		instantiate, _ := new(Encoding).Instantiate(rt)
 		_ = rt.Set("encoding", instantiate)
 	}))

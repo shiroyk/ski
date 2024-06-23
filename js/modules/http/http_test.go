@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
@@ -70,7 +70,7 @@ func TestHttp(t *testing.T) {
 	}
 }
 
-var initial = js.WithInitial(func(rt *goja.Runtime) {
+var initial = js.WithInitial(func(rt *sobek.Runtime) {
 	client := http.Client{Transport: &http.Transport{Proxy: ski.ProxyFromRequest}}
 	instance, _ := (&Http{&client}).Instantiate(rt)
 	_ = rt.Set("http", instance)

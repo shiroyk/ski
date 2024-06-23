@@ -8,7 +8,7 @@ import (
 	"time"
 	_ "unsafe"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 )
@@ -67,7 +67,7 @@ func TestTimeout(t *testing.T) {
 
 func TestWithInitial(t *testing.T) {
 	t.Parallel()
-	vm := NewVM(WithInitial(func(rt *goja.Runtime) {
+	vm := NewVM(WithInitial(func(rt *sobek.Runtime) {
 		_ = rt.Set("init", true)
 	}))
 	v, err := runMod(context.Background(), vm, `export default () => init`)
@@ -83,7 +83,7 @@ func TestNewPromise(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	goFunc := func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+	goFunc := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		return rt.ToValue(NewPromise(rt, func() (any, error) {
 			time.Sleep(time.Second)
 			return max(call.Argument(0).ToInteger(), call.Argument(1).ToInteger()), nil
@@ -136,7 +136,7 @@ func TestVMPanic(t *testing.T) {
 	}
 }
 
-func runMod(ctx context.Context, vm VM, script string) (goja.Value, error) {
+func runMod(ctx context.Context, vm VM, script string) (sobek.Value, error) {
 	mod, err := vm.Loader().CompileModule("", script)
 	if err != nil {
 		return nil, err

@@ -5,13 +5,13 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 )
 
 // Module is what a module needs to return
 type Module interface {
-	Instantiate(*goja.Runtime) (goja.Value, error)
+	Instantiate(*sobek.Runtime) (sobek.Value, error)
 }
 
 // Global implements the interface will load into global when the VM initialize (InitGlobalModule).
@@ -62,7 +62,7 @@ var registry = struct {
 }
 
 type cjsModule struct {
-	prg           *goja.Program
+	prg           *sobek.Program
 	exportedNames []string
 	o             sync.Once
 }
@@ -71,18 +71,21 @@ func (cm *cjsModule) Link() error { return nil }
 
 func (cm *cjsModule) InitializeEnvironment() error { return nil }
 
-func (cm *cjsModule) Instantiate(_ *goja.Runtime) (goja.CyclicModuleInstance, error) {
+func (cm *cjsModule) Instantiate(_ *sobek.Runtime) (sobek.CyclicModuleInstance, error) {
 	return &cjsModuleInstance{m: cm}, nil
 }
 
 func (cm *cjsModule) RequestedModules() []string { return nil }
 
-func (cm *cjsModule) Evaluate(_ *goja.Runtime) *goja.Promise { return nil }
+func (cm *cjsModule) Evaluate(_ *sobek.Runtime) *sobek.Promise { return nil }
 
-func (cm *cjsModule) GetExportedNames(_ ...goja.ModuleRecord) []string { return cm.exportedNames }
+func (cm *cjsModule) GetExportedNames(callback func([]string), _ ...sobek.ModuleRecord) bool {
+	callback(cm.exportedNames)
+	return true
+}
 
-func (cm *cjsModule) ResolveExport(exportName string, _ ...goja.ResolveSetElement) (*goja.ResolvedBinding, bool) {
-	return &goja.ResolvedBinding{
+func (cm *cjsModule) ResolveExport(exportName string, _ ...sobek.ResolveSetElement) (*sobek.ResolvedBinding, bool) {
+	return &sobek.ResolvedBinding{
 		Module:      cm,
 		BindingName: exportName,
 	}, false
@@ -90,12 +93,12 @@ func (cm *cjsModule) ResolveExport(exportName string, _ ...goja.ResolveSetElemen
 
 type cjsModuleInstance struct {
 	m       *cjsModule
-	exports *goja.Object
+	exports *sobek.Object
 }
 
 func (cmi *cjsModuleInstance) HasTLA() bool { return false }
 
-func (cmi *cjsModuleInstance) GetBindingValue(name string) goja.Value {
+func (cmi *cjsModuleInstance) GetBindingValue(name string) sobek.Value {
 	if name == "default" {
 		if d := cmi.exports.Get("default"); d != nil {
 			return d
@@ -105,7 +108,7 @@ func (cmi *cjsModuleInstance) GetBindingValue(name string) goja.Value {
 	return cmi.exports.Get(name)
 }
 
-func (cmi *cjsModuleInstance) ExecuteModule(rt *goja.Runtime, _, _ func(any)) (goja.CyclicModuleInstance, error) {
+func (cmi *cjsModuleInstance) ExecuteModule(rt *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
 	f, err := rt.RunProgram(cmi.m.prg)
 	if err != nil {
 		return nil, err
@@ -114,7 +117,7 @@ func (cmi *cjsModuleInstance) ExecuteModule(rt *goja.Runtime, _, _ func(any)) (g
 	jsModule := rt.NewObject()
 	cmi.exports = rt.NewObject()
 	_ = jsModule.Set("exports", cmi.exports)
-	if call, ok := goja.AssertFunction(f); ok {
+	if call, ok := sobek.AssertFunction(f); ok {
 		jsRequire := rt.Get("require")
 
 		// Run the module source, with "cmi.exports" as "this",
@@ -128,7 +131,7 @@ func (cmi *cjsModuleInstance) ExecuteModule(rt *goja.Runtime, _, _ func(any)) (g
 	}
 
 	exports := jsModule.Get("exports")
-	if goja.IsNull(exports) {
+	if sobek.IsNull(exports) {
 		return nil, ErrInvalidModule
 	}
 	cmi.exports = exports.ToObject(rt)
@@ -150,7 +153,7 @@ func (gm *goModule) RequestedModules() []string { return nil }
 
 func (gm *goModule) InitializeEnvironment() error { return nil }
 
-func (gm *goModule) Instantiate(rt *goja.Runtime) (goja.CyclicModuleInstance, error) {
+func (gm *goModule) Instantiate(rt *sobek.Runtime) (sobek.CyclicModuleInstance, error) {
 	instance, err := gm.mod.Instantiate(rt)
 	if err != nil {
 		return nil, err
@@ -160,22 +163,23 @@ func (gm *goModule) Instantiate(rt *goja.Runtime) (goja.CyclicModuleInstance, er
 	return &goModuleInstance{exports}, nil
 }
 
-func (gm *goModule) GetExportedNames(_ ...goja.ModuleRecord) []string {
-	return gm.exportedNames
+func (gm *goModule) GetExportedNames(callback func([]string), _ ...sobek.ModuleRecord) bool {
+	callback(gm.exportedNames)
+	return true
 }
 
-func (gm *goModule) ResolveExport(exportName string, _ ...goja.ResolveSetElement) (*goja.ResolvedBinding, bool) {
-	return &goja.ResolvedBinding{
+func (gm *goModule) ResolveExport(exportName string, _ ...sobek.ResolveSetElement) (*sobek.ResolvedBinding, bool) {
+	return &sobek.ResolvedBinding{
 		Module:      gm,
 		BindingName: exportName,
 	}, false
 }
 
-func (gm *goModule) Evaluate(_ *goja.Runtime) *goja.Promise { return nil }
+func (gm *goModule) Evaluate(_ *sobek.Runtime) *sobek.Promise { return nil }
 
-type goModuleInstance struct{ *goja.Object }
+type goModuleInstance struct{ *sobek.Object }
 
-func (gmi *goModuleInstance) GetBindingValue(name string) goja.Value {
+func (gmi *goModuleInstance) GetBindingValue(name string) sobek.Value {
 	if gmi.Object == nil {
 		return nil
 	}
@@ -190,7 +194,7 @@ func (gmi *goModuleInstance) GetBindingValue(name string) goja.Value {
 
 func (gmi *goModuleInstance) HasTLA() bool { return false }
 
-func (gmi *goModuleInstance) ExecuteModule(_ *goja.Runtime, _, _ func(any)) (goja.CyclicModuleInstance, error) {
+func (gmi *goModuleInstance) ExecuteModule(_ *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
 	return gmi, nil
 }
 
@@ -198,8 +202,8 @@ const _js_executor_prefix = "executor/"
 
 type _js_executor map[string]ski.NewExecutor
 
-func (m _js_executor) Instantiate(rt *goja.Runtime) (goja.Value, error) {
-	var object *goja.Object
+func (m _js_executor) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	var object *sobek.Object
 	main, ok := m[""]
 	if ok {
 		object = rt.ToValue(toJSExec(main)).ToObject(rt)
@@ -220,16 +224,16 @@ type _js_exec struct {
 	e ski.Executor
 }
 
-func (e _js_exec) Exec(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (e _js_exec) Exec(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	v, err := e.e.Exec(Context(rt), call.Argument(0).Export())
 	if err != nil {
-		return goja.Null()
+		return sobek.Null()
 	}
 	return rt.ToValue(v)
 }
 
-func toJSExec(init ski.NewExecutor) func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
-	return func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func toJSExec(init ski.NewExecutor) func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		args := make([]ski.Executor, 0, len(call.Arguments))
 		for _, arg := range call.Arguments {
 			args = append(args, ski.Raw(arg.Export()))
@@ -243,7 +247,7 @@ func toJSExec(init ski.NewExecutor) func(call goja.FunctionCall, rt *goja.Runtim
 }
 
 // Executor the ski.Executor
-type Executor struct{ goja.CyclicModuleRecord }
+type Executor struct{ sobek.CyclicModuleRecord }
 
 func new_executor() ski.NewExecutor {
 	return ski.StringExecutor(func(str string) (ski.Executor, error) {

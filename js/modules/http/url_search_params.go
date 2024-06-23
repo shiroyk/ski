@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/spf13/cast"
@@ -25,12 +25,12 @@ type urlSearchParams struct {
 type URLSearchParams struct{}
 
 // Instantiate instance module
-func (*URLSearchParams) Instantiate(rt *goja.Runtime) (goja.Value, error) {
-	return rt.ToValue(func(call goja.ConstructorCall) *goja.Object {
+func (*URLSearchParams) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	return rt.ToValue(func(call sobek.ConstructorCall) *sobek.Object {
 		params := call.Argument(0)
 
 		var ret urlSearchParams
-		if goja.IsUndefined(params) {
+		if sobek.IsUndefined(params) {
 			ret.data = make(map[string][]string)
 			return ret.object(rt)
 		}
@@ -68,13 +68,13 @@ func (*URLSearchParams) Instantiate(rt *goja.Runtime) (goja.Value, error) {
 // Global it is a global module
 func (*URLSearchParams) Global() {}
 
-func (u *urlSearchParams) object(rt *goja.Runtime) *goja.Object {
+func (u *urlSearchParams) object(rt *sobek.Runtime) *sobek.Object {
 	obj := rt.ToValue(u).ToObject(rt)
 
-	_ = obj.SetSymbol(goja.SymIterator, func(goja.ConstructorCall) *goja.Object {
+	_ = obj.SetSymbol(sobek.SymIterator, func(sobek.ConstructorCall) *sobek.Object {
 		var i int
 		it := rt.NewObject()
-		_ = it.Set("next", func(goja.FunctionCall) goja.Value {
+		_ = it.Set("next", func(sobek.FunctionCall) sobek.Value {
 			if i < len(u.keys) {
 				key := u.keys[i]
 				i++
@@ -139,11 +139,11 @@ func (u *urlSearchParams) Entries() any {
 
 // ForEach method of the urlSearchParams interface allows iteration
 // through all values contained in this object via a callback function.
-func (u *urlSearchParams) ForEach(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
+func (u *urlSearchParams) ForEach(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
 	arg := call.Argument(0)
-	if callback, ok := goja.AssertFunction(arg); ok {
+	if callback, ok := sobek.AssertFunction(arg); ok {
 		for _, key := range u.keys {
-			if _, err := callback(goja.Undefined(), vm.ToValue(u.data[key]), vm.ToValue(key), vm.ToValue(u)); err != nil {
+			if _, err := callback(sobek.Undefined(), vm.ToValue(u.data[key]), vm.ToValue(key), vm.ToValue(u)); err != nil {
 				panic(vm.ToValue(err))
 			}
 		}

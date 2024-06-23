@@ -8,16 +8,16 @@ import (
 	"reflect"
 	"runtime/debug"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 )
 
 // VM the js runtime.
 // An instance of VM can only be used by a single goroutine at a time.
 type VM interface {
-	// RunModule run the goja.CyclicModuleRecord.
-	// To compile the module, goja.ParseModule or ModuleLoader.CompileModule
-	RunModule(ctx context.Context, module goja.CyclicModuleRecord) (goja.Value, error)
+	// RunModule run the sobek.CyclicModuleRecord.
+	// To compile the module, sobek.ParseModule or ModuleLoader.CompileModule
+	RunModule(ctx context.Context, module sobek.CyclicModuleRecord) (sobek.Value, error)
 	// Run execute the given function in the EventLoop.
 	// when context done interrupt VM execution and release the VM.
 	// This is usually used when needs to be called repeatedly many times.
@@ -48,7 +48,7 @@ type VM interface {
 	//			var total int64
 	//			vm.Run(ctx, func() {
 	//				for i := 0; i < 8; i++ {
-	//					v, err := sum(goja.Undefined(), rt.ToValue(i), rt.ToValue(total))
+	//					v, err := sum(sobek.Undefined(), rt.ToValue(i), rt.ToValue(total))
 	//					if err != nil {
 	//						panic(err)
 	//					}
@@ -66,17 +66,17 @@ type VM interface {
 	//	}
 	Run(context.Context, func())
 	// Context return the ja context object of NewContext
-	Context() goja.Value
+	Context() sobek.Value
 	// Loader return the ModuleLoader
 	Loader() ModuleLoader
 	// Runtime return the js runtime
-	Runtime() *goja.Runtime
+	Runtime() *sobek.Runtime
 }
 
 type Option func(*vmImpl)
 
-// WithInitial call goja.Runtime on VM create, be care require and module not working when init.
-func WithInitial(fn func(*goja.Runtime)) Option {
+// WithInitial call sobek.Runtime on VM create, be care require and module not working when init.
+func WithInitial(fn func(*sobek.Runtime)) Option {
 	return func(vm *vmImpl) { fn(vm.runtime) }
 }
 
@@ -88,7 +88,7 @@ func WithModuleLoader(loader ModuleLoader) Option {
 // NewVM creates a new JavaScript VM
 // Initialize the EventLoop, global module, console.
 func NewVM(opts ...Option) VM {
-	rt := goja.New()
+	rt := sobek.New()
 	rt.SetFieldNameMapper(FieldNameMapper{})
 	EnableConsole(rt)
 	InitGlobalModule(rt)
@@ -115,9 +115,9 @@ func NewVM(opts ...Option) VM {
 
 type (
 	vmImpl struct {
-		runtime   *goja.Runtime
+		runtime   *sobek.Runtime
 		eventloop *EventLoop
-		ctx       goja.Value
+		ctx       sobek.Value
 		release   func()
 		loader    ModuleLoader
 	}
@@ -131,20 +131,20 @@ type (
 func (vm *vmImpl) Loader() ModuleLoader { return vm.loader }
 
 // Runtime return the js runtime
-func (vm *vmImpl) Runtime() *goja.Runtime { return vm.runtime }
+func (vm *vmImpl) Runtime() *sobek.Runtime { return vm.runtime }
 
-func (vm *vmImpl) Context() goja.Value { return vm.ctx }
+func (vm *vmImpl) Context() sobek.Value { return vm.ctx }
 
-// RunModule run the goja.CyclicModuleRecord.
+// RunModule run the sobek.CyclicModuleRecord.
 // The module default export must be a function.
-func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord) (ret goja.Value, err error) {
+func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord) (ret sobek.Value, err error) {
 	vm.Run(ctx, func() {
-		var call goja.Callable
+		var call sobek.Callable
 		call, err = ModuleCallable(vm.runtime, vm.loader.ResolveModule, module)
 		if err != nil {
 			return
 		}
-		ret, err = call(goja.Undefined(), vm.ctx)
+		ret, err = call(sobek.Undefined(), vm.ctx)
 	})
 	return
 }
@@ -179,7 +179,7 @@ func (vm *vmImpl) RunModule(ctx context.Context, module goja.CyclicModuleRecord)
 //			var total int64
 //			vm.Run(ctx, func() {
 //				for i := 0; i < 8; i++ {
-//					v, err := sum(goja.Undefined(), rt.ToValue(i), rt.ToValue(total))
+//					v, err := sum(sobek.Undefined(), rt.ToValue(i), rt.ToValue(total))
 //					if err != nil {
 //						panic(err)
 //					}
@@ -228,7 +228,7 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 	vm.eventloop.Start(task)
 }
 
-// NewPromise return a goja.Promise object.
+// NewPromise return a sobek.Promise object.
 // The second argument is a long-running asynchronous task that will be executed in a child goroutine.
 // The third optional argument is a callback that will be executed in the main goroutine.
 // Additional arguments will be ignored.
@@ -245,7 +245,7 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 //		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 //		defer cancel()
 //
-//		fetch := func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+//		fetch := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 //			return rt.ToValue(js.NewPromise(rt,
 //				func() (*http.Response, error) { return http.Get(call.Argument(0).String()) },
 //				func(res *http.Response, err error) (any, error) {
@@ -273,7 +273,7 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 //		fmt.Println(value)
 //		fmt.Println(time.Since(start))
 //	}
-func NewPromise[T any](runtime *goja.Runtime, async func() (T, error), then ...func(T, error) (any, error)) *goja.Promise {
+func NewPromise[T any](runtime *sobek.Runtime, async func() (T, error), then ...func(T, error) (any, error)) *sobek.Promise {
 	enqueue := self(runtime).eventloop.EnqueueJob()
 	promise, resolve, reject := runtime.NewPromise()
 	thenFun := func(r T, e error) (any, error) { return r, e }
@@ -305,11 +305,11 @@ func NewPromise[T any](runtime *goja.Runtime, async func() (T, error), then ...f
 var (
 	reflectTypeCtx    = reflect.TypeOf((*vmctx)(nil))
 	reflectTypeVmself = reflect.TypeOf((*vmself)(nil))
-	symbolVM          = goja.NewSymbol("Symbol.__vm__")
+	symbolVM          = sobek.NewSymbol("Symbol.__vm__")
 )
 
 // NewContext create the js context object
-func NewContext(ctx context.Context, rt *goja.Runtime) *goja.Object {
+func NewContext(ctx context.Context, rt *sobek.Runtime) *sobek.Object {
 	ret := rt.ToValue(&vmctx{ctx}).ToObject(rt)
 	proto := rt.NewObject()
 	_ = ret.SetPrototype(proto)
@@ -318,10 +318,10 @@ func NewContext(ctx context.Context, rt *goja.Runtime) *goja.Object {
 		panic(err)
 	}
 
-	_ = proto.Set("get", func(call goja.FunctionCall) goja.Value {
+	_ = proto.Set("get", func(call sobek.FunctionCall) sobek.Value {
 		return rt.ToValue(toCtx(rt, call.This).Value(call.Argument(0).Export()))
 	})
-	_ = proto.Set("set", func(call goja.FunctionCall) goja.Value {
+	_ = proto.Set("set", func(call sobek.FunctionCall) sobek.Value {
 		e := toCtx(rt, call.This)
 		if c, ok := e.(ski.Context); ok {
 			c.SetValue(call.Argument(0).Export(), call.Argument(1).Export())
@@ -329,13 +329,13 @@ func NewContext(ctx context.Context, rt *goja.Runtime) *goja.Object {
 		}
 		return rt.ToValue(false)
 	})
-	_ = proto.Set("toString", func(call goja.FunctionCall) goja.Value {
+	_ = proto.Set("toString", func(call sobek.FunctionCall) sobek.Value {
 		return rt.ToValue("[context]")
 	})
 	return ret
 }
 
-func toCtx(rt *goja.Runtime, v goja.Value) context.Context {
+func toCtx(rt *sobek.Runtime, v sobek.Value) context.Context {
 	if v.ExportType() == reflectTypeCtx {
 		if u := v.Export().(*vmctx); u != nil && u.ctx != nil {
 			return u.ctx
@@ -345,7 +345,7 @@ func toCtx(rt *goja.Runtime, v goja.Value) context.Context {
 }
 
 // self get VM self
-func self(rt *goja.Runtime) *vmImpl {
+func self(rt *sobek.Runtime) *vmImpl {
 	value := rt.GlobalObject().GetSymbol(symbolVM)
 	if value.ExportType() == reflectTypeVmself {
 		return value.Export().(*vmself).vm

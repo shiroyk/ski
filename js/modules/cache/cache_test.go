@@ -3,7 +3,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
@@ -12,7 +12,7 @@ import (
 
 func TestCache(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *goja.Runtime) {
+	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
 		cache := Cache{ski.NewCache()}
 		instantiate, err := cache.Instantiate(rt)
 		if err != nil {

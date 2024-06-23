@@ -7,20 +7,20 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 )
 
 var errBodyAlreadyRead = errors.New("body stream already read")
 
-func defineGetter(r *goja.Runtime, o *goja.Object, name string, v func() any) {
-	_ = o.DefineAccessorProperty(name, r.ToValue(func(goja.FunctionCall) goja.Value {
+func defineGetter(r *sobek.Runtime, o *sobek.Object, name string, v func() any) {
+	_ = o.DefineAccessorProperty(name, r.ToValue(func(sobek.FunctionCall) sobek.Value {
 		return r.ToValue(v())
-	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 }
 
 // NewResponse returns a new Response
-func NewResponse(rt *goja.Runtime, res *http.Response) goja.Value {
+func NewResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
 	var bodyUsed bool
 	js.OnDone(rt, func() {
 		if !bodyUsed {
@@ -49,20 +49,20 @@ func NewResponse(rt *goja.Runtime, res *http.Response) goja.Value {
 	defineGetter(rt, object, "ok", func() any {
 		return res.StatusCode >= 200 && res.StatusCode < 300
 	})
-	_ = object.Set("text", func(goja.FunctionCall) goja.Value { return rt.ToValue(string(readBody())) })
-	_ = object.Set("json", func(call goja.FunctionCall) goja.Value {
+	_ = object.Set("text", func(sobek.FunctionCall) sobek.Value { return rt.ToValue(string(readBody())) })
+	_ = object.Set("json", func(call sobek.FunctionCall) sobek.Value {
 		var data any
 		if err := json.Unmarshal(readBody(), &data); err != nil {
 			js.Throw(rt, err)
 		}
 		return rt.ToValue(data)
 	})
-	_ = object.Set("arrayBuffer", func(goja.FunctionCall) goja.Value { return rt.ToValue(rt.NewArrayBuffer(readBody())) })
+	_ = object.Set("arrayBuffer", func(sobek.FunctionCall) sobek.Value { return rt.ToValue(rt.NewArrayBuffer(readBody())) })
 	return object
 }
 
 // NewAsyncResponse returns a new async Response
-func NewAsyncResponse(rt *goja.Runtime, res *http.Response) goja.Value {
+func NewAsyncResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
 	var bodyUsed bool
 	js.OnDone(rt, func() {
 		if !bodyUsed {
@@ -97,7 +97,7 @@ func NewAsyncResponse(rt *goja.Runtime, res *http.Response) goja.Value {
 	defineGetter(rt, object, "ok", func() any {
 		return res.StatusCode >= 200 && res.StatusCode < 300
 	})
-	_ = object.Set("text", func(goja.FunctionCall) goja.Value {
+	_ = object.Set("text", func(sobek.FunctionCall) sobek.Value {
 		return rt.ToValue(js.NewPromise(rt, func() (any, error) {
 			data, err := readBody()
 			if err != nil {
@@ -106,7 +106,7 @@ func NewAsyncResponse(rt *goja.Runtime, res *http.Response) goja.Value {
 			return string(data), nil
 		}))
 	})
-	_ = object.Set("json", func(goja.FunctionCall) goja.Value {
+	_ = object.Set("json", func(sobek.FunctionCall) sobek.Value {
 		return rt.ToValue(js.NewPromise(rt, func() (any, error) {
 			data, err := readBody()
 			if err != nil {
@@ -119,7 +119,7 @@ func NewAsyncResponse(rt *goja.Runtime, res *http.Response) goja.Value {
 			return j, err
 		}))
 	})
-	_ = object.Set("arrayBuffer", func(goja.FunctionCall) goja.Value {
+	_ = object.Set("arrayBuffer", func(sobek.FunctionCall) sobek.Value {
 		return rt.ToValue(js.NewPromise(rt, func() (any, error) {
 			data, err := readBody()
 			if err != nil {
@@ -141,7 +141,7 @@ func joinHeader(header http.Header) map[string]string {
 
 // NewReadableStream ReadableStream API
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
-func NewReadableStream(body io.ReadCloser, vm *goja.Runtime, bodyUsed *bool) *goja.Object {
+func NewReadableStream(body io.ReadCloser, vm *sobek.Runtime, bodyUsed *bool) *sobek.Object {
 	var lock bool
 	object := vm.NewObject()
 	_ = object.Set("cancel", func() {
@@ -149,7 +149,7 @@ func NewReadableStream(body io.ReadCloser, vm *goja.Runtime, bodyUsed *bool) *go
 			js.Throw(vm, err)
 		}
 	})
-	_ = object.Set("getReader", func(call goja.FunctionCall) goja.Value {
+	_ = object.Set("getReader", func(call sobek.FunctionCall) sobek.Value {
 		if *bodyUsed {
 			js.Throw(vm, errBodyAlreadyRead)
 		}
@@ -169,14 +169,14 @@ func NewReadableStream(body io.ReadCloser, vm *goja.Runtime, bodyUsed *bool) *go
 }
 
 type iter struct {
-	Value goja.Value
+	Value sobek.Value
 	Done  bool
 }
 
 // NewReadableStreamDefaultReader Streams API
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamBYOBReader
-func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *bool) *goja.Object {
+func NewReadableStreamDefaultReader(body io.ReadCloser, vm *sobek.Runtime, lock *bool) *sobek.Object {
 	object := vm.NewObject()
 	defineGetter(vm, object, "locked", func() any { return &lock })
 	_ = object.Set("cancel", func() {
@@ -185,9 +185,9 @@ func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *
 		}
 	})
 
-	_ = object.Set("read", func(call goja.FunctionCall) goja.Value {
+	_ = object.Set("read", func(call sobek.FunctionCall) sobek.Value {
 		var buffer []byte
-		if goja.IsUndefined(call.Argument(0)) {
+		if sobek.IsUndefined(call.Argument(0)) {
 			buffer = make([]byte, 1024)
 		} else {
 			var view bool
@@ -202,7 +202,7 @@ func NewReadableStreamDefaultReader(body io.ReadCloser, vm *goja.Runtime, lock *
 			func(n int, err error) (any, error) {
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						return iter{goja.Undefined(), true}, nil
+						return iter{sobek.Undefined(), true}, nil
 					}
 					return nil, err
 				}

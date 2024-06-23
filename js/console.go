@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"log/slog"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 )
 
@@ -12,49 +12,49 @@ import (
 type console struct{}
 
 // EnableConsole enables the console with the slog.Logger
-func EnableConsole(rt *goja.Runtime) {
+func EnableConsole(rt *sobek.Runtime) {
 	_ = rt.Set("console", new(console))
 }
 
-func (c *console) log(level slog.Level, call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (c *console) log(level slog.Level, call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	ski.Logger(Context(rt)).Log(Context(rt), level, Format(call, rt).String())
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // Log calls slog.Log.
-func (c *console) Log(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (c *console) Log(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return c.log(slog.LevelInfo, call, rt)
 }
 
 // Info calls slog.Info.
-func (c *console) Info(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (c *console) Info(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return c.log(slog.LevelInfo, call, rt)
 }
 
 // Warn calls slog.Warn.
-func (c *console) Warn(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (c *console) Warn(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return c.log(slog.LevelWarn, call, rt)
 }
 
 // Warn calls slog.Error.
-func (c *console) Error(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (c *console) Error(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return c.log(slog.LevelError, call, rt)
 }
 
 // Debug calls slog.Debug.
-func (c *console) Debug(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func (c *console) Debug(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return c.log(slog.LevelDebug, call, rt)
 }
 
-func runeFormat(rt *goja.Runtime, f rune, val goja.Value, w *bytes.Buffer) bool {
+func runeFormat(rt *sobek.Runtime, f rune, val sobek.Value, w *bytes.Buffer) bool {
 	switch f {
 	case 's':
 		w.WriteString(val.String())
 	case 'd':
 		w.WriteString(val.ToNumber().String())
 	case 'j':
-		if json, ok := rt.Get("JSON").(*goja.Object); ok {
-			if stringify, ok := goja.AssertFunction(json.Get("stringify")); ok {
+		if json, ok := rt.Get("JSON").(*sobek.Object); ok {
+			if stringify, ok := sobek.AssertFunction(json.Get("stringify")); ok {
 				res, err := stringify(json, val)
 				if err != nil {
 					panic(err)
@@ -73,7 +73,7 @@ func runeFormat(rt *goja.Runtime, f rune, val goja.Value, w *bytes.Buffer) bool 
 	return true
 }
 
-func bufferFormat(vm *goja.Runtime, b *bytes.Buffer, f string, args ...goja.Value) {
+func bufferFormat(vm *sobek.Runtime, b *bytes.Buffer, f string, args ...sobek.Value) {
 	pct := false
 	argNum := 0
 	for _, chr := range f {
@@ -103,15 +103,15 @@ func bufferFormat(vm *goja.Runtime, b *bytes.Buffer, f string, args ...goja.Valu
 }
 
 // Format implements js format
-func Format(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+func Format(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	var b bytes.Buffer
 	var f string
 
-	if arg := call.Argument(0); !goja.IsUndefined(arg) {
+	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
 		f = arg.String()
 	}
 
-	var args []goja.Value
+	var args []sobek.Value
 	if len(call.Arguments) > 0 {
 		args = call.Arguments[1:]
 	}

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
@@ -16,7 +16,7 @@ import (
 
 func TestCookie(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *goja.Runtime) {
+	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
 		jar := CookieJar{ski.NewCookieJar()}
 		instantiate, err := jar.Instantiate(rt)
 		if err != nil {

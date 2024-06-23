@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 )
 
@@ -17,7 +17,7 @@ func init() {
 type Crypto struct{}
 
 // Instantiate returns module instance
-func (*Crypto) Instantiate(rt *goja.Runtime) (goja.Value, error) {
+func (*Crypto) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return rt.ToValue(map[string]any{
 		"aes":          Aes,
 		"createCipher": CreateCipher,
@@ -51,6 +51,6 @@ func (e *Encoder) Hex() string { return hex.EncodeToString(e.data) }
 func (e *Encoder) String() string { return string(e.data) }
 
 // Binary encode to arraybuffer
-func (e *Encoder) Binary(_ goja.FunctionCall, vm *goja.Runtime) goja.Value {
+func (e *Encoder) Binary(_ sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
 	return vm.ToValue(vm.NewArrayBuffer(e.data))
 }

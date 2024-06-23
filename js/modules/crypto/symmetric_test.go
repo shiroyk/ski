@@ -3,7 +3,7 @@ package crypto
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +15,7 @@ func TestCipherAlgorithm(t *testing.T) {
 		return
 	}
 
-	vm := modulestest.New(t, js.WithInitial(func(rt *goja.Runtime) {
+	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
 		c := new(Crypto)
 		instance, _ := c.Instantiate(rt)
 		_ = rt.Set("crypto", instance)
