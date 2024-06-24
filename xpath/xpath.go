@@ -72,7 +72,7 @@ func value(nodes []*html.Node) (any, error) {
 		for i, node := range nodes {
 			str[i] = htmlquery.InnerText(node)
 		}
-		return str, nil
+		return ski.NewIterator(str), nil
 	}
 }
 
@@ -87,13 +87,7 @@ func elements(nodes []*html.Node) (any, error) {
 	if len(nodes) == 0 {
 		return nil, nil
 	}
-
-	ret := make([]any, len(nodes))
-	for i, node := range nodes {
-		ret[i] = node
-	}
-
-	return ret, nil
+	return ski.NewIterator(nodes), nil
 }
 
 func htmlNode(content any) (*html.Node, error) {
