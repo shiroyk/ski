@@ -58,7 +58,7 @@ func (f _fetch) Exec(ctx context.Context, _ any) (any, error) {
 	}
 	req.Header.Set("User-Agent", "ski")
 
-	res, err := ski.NewFetch().Do(req)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
