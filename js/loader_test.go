@@ -185,8 +185,8 @@ func TestModuleLoader(t *testing.T) {
 			{"gomod3", `export default () => assert.equal(gomod3.key, "gomod3")`},
 			{"remote cjs", `import foo from "http://foo.com/foo.min.js?type=cjs";
 			 export default () => assert.equal(foo.foo, "bargomod1")`},
-			//{"remote esm", `import foo from "http://foo.com/foo.min.js?type=esm";
-			// export default async () => assert.equal(await foo(), "gomod114")`},
+			{"remote esm", `import foo from "http://foo.com/foo.min.js?type=esm";
+			 export default async () => assert.equal(await foo(), "gomod114")`},
 			{"module1", `import module1 from "module1";
 			 export default () => assert.equal(module1(), "module1");`},
 			{"module2", `import m2 from "module2";
@@ -199,8 +199,8 @@ func TestModuleLoader(t *testing.T) {
 			 export default () => assert.equal(module5(), "/module5/module6");`},
 			{"module6", `import module6 from "module6";
 			 export default () => assert.equal(module6(), "/module6/module5");`},
-			//{"module7", `import module7 from "module7";
-			// export default async () => assert.equal(await module7(), "dynamic import /module6");`},
+			{"module7", `import module7 from "module7";
+			 export default async () => assert.equal(await module7(), "dynamic import /module6");`},
 			{"es_script1", `import es from "./es_script1";
 			 export default () => assert.equal(es(), "module1/module2/module3/es_script1");`},
 			{"es_script2", `import { value } from "./es_script2";

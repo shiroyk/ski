@@ -8,7 +8,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/antchfx/xpath v1.2.5
 	github.com/dlclark/regexp2 v1.11.0
-	github.com/grafana/sobek v0.0.0-20240621115154-ed22587d72ba
+	github.com/grafana/sobek v0.0.0-20240624162318-afbc13aa071b
 	github.com/ohler55/ojg v1.21.4
 	github.com/spf13/cast v1.6.0
 	github.com/stretchr/testify v1.9.0
