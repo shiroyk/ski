@@ -3,6 +3,7 @@ package xpath
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/shiroyk/ski"
@@ -58,7 +59,7 @@ func assertValue(t *testing.T, arg string, expected any) {
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
-			assert.Equal(t, expected, v)
+			assert.EqualValues(t, expected, v)
 		}
 	}
 }
@@ -87,12 +88,19 @@ func assertElements(t *testing.T, arg string, expected []string) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
-			case []any:
-				ele := make([]string, len(c))
-				for i, v := range c {
+			case ski.Iterator:
+				ele := make([]string, c.Len())
+				for i := 0; i < c.Len(); i++ {
 					var b bytes.Buffer
-					if assert.NoError(t, html.Render(&b, v.(*html.Node))) {
-						ele[i] = b.String()
+					switch e := c.At(i).(type) {
+					case *html.Node:
+						if assert.NoError(t, html.Render(&b, e)) {
+							ele[i] = b.String()
+						}
+					case string:
+						ele[i] = e
+					default:
+						ele[i] = fmt.Sprintf("%v", e)
 					}
 				}
 				assert.Equal(t, expected, ele)
