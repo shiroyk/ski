@@ -1,19 +1,17 @@
 package http
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAbortSignal(t *testing.T) {
-	ctx := context.Background()
 	vm := modulestest.New(t)
 
-	testCase := []string{
+	testCases := []string{
 		`const controller = new AbortController();
 		 controller.abort();
          assert.equal(controller.reason, "context canceled");
@@ -26,9 +24,9 @@ func TestAbortSignal(t *testing.T) {
          assert.true(!signal.aborted);`,
 	}
 
-	for i, s := range testCase {
+	for i, s := range testCases {
 		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			_, err := vm.RunString(ctx, s)
+			_, err := vm.Runtime().RunString(fmt.Sprintf(`{%s}`, s))
 			assert.NoError(t, err)
 		})
 	}

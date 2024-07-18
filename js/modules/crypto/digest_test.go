@@ -1,347 +1,75 @@
 package crypto
 
 import (
-	"context"
-	"crypto/rand"
-	"errors"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/grafana/sobek"
+	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
-type MockReader struct{}
-
-func (MockReader) Read(_ []byte) (n int, err error) {
-	return -1, errors.New("contrived failure")
-}
-
 func TestHashAlgorithms(t *testing.T) {
-	if testing.Short() {
-		return
+	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+		c := new(Crypto)
+		instance, _ := c.Instantiate(rt)
+		_ = rt.Set("crypto", instance)
+	}))
+
+	testCases := []struct {
+		algorithm, origin, want string
+	}{
+		{"md5", "hello md5", "741fc6b1878e208346359af502dd11c5"},
+		{"ripemd160", "hello ripemd160", "6fb0548fc1acb266457d6ddae686905295b47a2a"},
+		{"sha1", "hello sha1", "64faca92dec81be17500f67d521fbd32bb3a6968"},
+		{"sha256", "hello sha256", "433855b7d2b96c23a6f60e70c655eb4305e8806b682a9596a200642f947259b1"},
+		{"sha384", "hello sha384", "5a37b3a56f9a5ae7b267d25303801d2a610c329d799e9a61879fe35b8108ccb8a4c1154c420ea69fdb6d177fbf6db8b6"},
+		{"sha512", "hello sha512", "ae9ae8f823f9b841bd94062d0af09c2dcffc04a705a89e5415330ed1279f369ea990ca92d63adda838696efe28436c0c14d8e805cd0f04b6c6a0e25127de838c"},
+		{"sha512_224", "hello sha512_224", "60765c29a50404c4ff1797540fd5bd38383a24d1232e39030638e647"},
+		{"sha512_256", "hello sha512_256", "b5e03d2c411178f6c174370e2f420d274cd20b9635ae7a41e40120d826a4b23b"},
 	}
 
-	vm := modulestest.New(t)
-	_, _ = vm.Runtime().RunString(`
-		const crypto = require('cloudcat/crypto');
-	`)
-
-	t.Run("RandomBytesSuccess", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		let buf = crypto.randomBytes(5);
-		assert.equal(5, buf.byteLength);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("RandomBytesInvalidSize", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `crypto.randomBytes(-1);`)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("RandomBytesFailure", func(t *testing.T) {
-		SavedReader := rand.Reader
-		rand.Reader = MockReader{}
-		_, err := vm.RunString(context.Background(), `crypto.randomBytes(5);`)
-		rand.Reader = SavedReader
-
-		assert.Error(t, err)
-	})
-
-	t.Run("MD4", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correct = "aa010fbc1d14c795d86ef98c95479d17";
-		var hash = crypto.md4("hello world").hex();
-		assert.equal(correct, hash);
-		`)
-		assert.NoError(t, err)
-	})
-
-	t.Run("MD5", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correct = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-		var hash = crypto.md5("hello world").hex();
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("SHA1", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correct = "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed";
-		var hash = crypto.sha1("hello world").hex();
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("SHA256", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correct = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
-		var hash = crypto.sha256("hello world").hex();
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("SHA384", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correct = "fdbd8e75a67f29f701a4e040385e2e23986303ea10239211af907fcbb83578b3e417cb71ce646efd0819dd8c088de1bd";
-		var hash = crypto.sha384("hello world").hex();
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("SHA512", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correct = "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f";
-		var hash = crypto.sha512("hello world").hex();
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("SHA512_224", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var hash = crypto.sha512_224("hello world").hex();
-		var correct = "22e0d52336f64a998085078b05a6e37b26f8120f43bf4db4c43a64ee";
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("SHA512_256", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var hash = crypto.sha512_256("hello world").hex();
-		var correct = "0ac561fac838104e3f2e4ad107b4bee3e938bf15f2b15f009ccccd61a913f017";
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("RIPEMD160", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var hash = crypto.ripemd160("hello world").hex();
-		var correct = "98c615784ccb5fe5936fbc0cbe9dfdb408d92f0f";
-		assert.equal(correct, hash);
-		`)
-
-		assert.NoError(t, err)
-	})
-}
-
-func TestStreamingApi(t *testing.T) {
-	if testing.Short() {
-		return
+	for _, testCase := range testCases {
+		t.Run(testCase.algorithm, func(t *testing.T) {
+			_, err := vm.Runtime().RunString(`{
+			let correct = "` + testCase.want + `";
+			let hash = crypto.` + testCase.algorithm + `("` + testCase.origin + `").hex();
+			assert.equal(hash, correct);
+			}`)
+			assert.NoError(t, err)
+		})
 	}
-
-	vm := modulestest.New(t)
-	_, _ = vm.Runtime().RunString(`
-		const crypto = require('cloudcat/crypto');
-	`)
-
-	// Empty strings are still hashable
-	t.Run("Empty", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correctHex = "d41d8cd98f00b204e9800998ecf8427e";
-		var hasher = crypto.createHash("md5");
-		assert.equal(correctHex, hasher.digest().hex());
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("UpdateOnce", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-
-		var hasher = crypto.createHash("md5");
-		hasher.update("hello world");
-		assert.equal(correctHex, hasher.digest().hex());
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("UpdateMultiple", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-
-		var hasher = crypto.createHash("md5");
-		hasher.update("hello");
-		hasher.update(" ");
-		hasher.update("world");
-
-		assert.equal(correctHex, hasher.digest().hex());
-		`)
-
-		assert.NoError(t, err)
-	})
-}
-
-func TestOutputEncoding(t *testing.T) {
-	if testing.Short() {
-		return
-	}
-
-	vm := modulestest.New(t)
-	_, _ = vm.Runtime().RunString(`
-		const crypto = require('cloudcat/crypto');
-	`)
-
-	t.Run("Valid", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		let correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-		let correctBase64 = "XrY7u+Ae7tCTyyK7j1rNww==";
-		let correctBase64URL = "XrY7u-Ae7tCTyyK7j1rNww=="
-		let correctBase64RawURL = "XrY7u-Ae7tCTyyK7j1rNww";
-		let correctBinary = new Uint8Array([94,182,59,187,224,30,238,208,147,203,34,187,143,90,205,195]);
-
-		let hasher = crypto.createHash("md5");
-		let encoder = hasher.encrypt("hello world");
-
-		assert.equal(correctHex, encoder.hex());
-		assert.equal(correctBase64, encoder.base64());
-		assert.equal(correctBase64URL, encoder.base64url());
-		assert.equal(correctBase64RawURL, encoder.base64rawurl());
-		assert.equal(correctBinary, encoder.binary());
-		`)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("Invalid", func(t *testing.T) {
-		_, err := vm.RunString(context.Background(), `
-		crypto.createHash("md5").encrypt("hello world").someInvalidEncoding();
-		`)
-		assert.ErrorContains(t, err, "Object has no member 'someInvalidEncoding'")
-	})
 }
 
 func TestHMac(t *testing.T) {
-	if testing.Short() {
-		return
+	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+		c := new(Crypto)
+		instance, _ := c.Instantiate(rt)
+		_ = rt.Set("crypto", instance)
+	}))
+
+	testCases := []struct {
+		algorithm, origin, want string
+	}{
+		{"md5", "hello hmac md5", "6c241e7c650d8a839aeff9a7a28db599"},
+		{"ripemd160", "hello hmac ripemd160", "dfbd49aebc8a7cc33ffd3f6e16ab922a23329c2d"},
+		{"sha1", "hello hmac sha1", "754cfe3b0dc73755f9d7cfa90ec979e2c1d42f08"},
+		{"sha256", "hello hmac sha256", "1d103c86749c67b0c5531bcf4b1125f32540a3bad4165f4efe804a1a5b4dd9f1"},
+		{"sha384", "hello hmac sha384", "bc19f1775949f93a53909fb674c65e6978d6fa80173ead68717543d5e01c229ae0d7f6c5f8901147e9998dd477c701cb"},
+		{"sha512", "hello hmac sha512", "1f893eec7580ed74a38053c88d0a380c99213f7cb727984692b25f318e49b3e4f0b9c5ae9c5ba942287738d8d812608c0223e1a599bf4b1429a2972cb2a7844a"},
+		{"sha512_224", "hello hmac sha512_224", "5f4a8c8cb6404ad3ff85ccbde756d231ff2544be3be702a4706c8a9b"},
+		{"sha512_256", "hello hmac sha512_256", "e466b90580a96d60c34a4fb164afc725840c94d30ce1bdafaa00f8f830771dd8"},
 	}
 
-	vm := modulestest.New(t)
-	_, _ = vm.Runtime().RunString(`
-		const crypto = require('cloudcat/crypto');
-	`)
-
-	testData := map[string]string{
-		"md4":           "92d8f5c302cf04cca0144d7a9feb1596",
-		"md5":           "e04f2ec05c8b12e19e46936b171c9d03",
-		"sha1":          "c113b62711ff5d8e8100bbb17b998591af81dc24",
-		"sha256":        "7fd04df92f636fd450bc841c9418e5825c17f33ad9c87c518115a45971f7f77e",
-		"sha384":        "d331e169e2dcfc742e80a3bf4dcc76d0e6425ab3777a3ac217ac6b2552aad5529ed4d40135b06e53a495ac7425d1e462",
-		"sha512_224":    "bac4e6256bdbf81d029aec48af4fdd4b14001db6721f07c429a80817",
-		"sha512_256":    "e3d0763ba92a4f40676c3d5b234d9842b71951e6e0767082cfb3f5e14c124b22",
-		"sha512":        "cd3146f96a3005024108ff56b025517552435589a4c218411f165da0a368b6f47228b20a1a4bf081e4aae6f07e2790f27194fc77f0addc890e98ce1951cacc9f",
-		"ripemd160_256": "00bb4ce0d6afd4c7424c9d01b8a6caa3e749b08b",
-	}
-	for algorithm, value := range testData {
-		_ = vm.Runtime().Set("correctHex", vm.Runtime().ToValue(value))
-		_ = vm.Runtime().Set("algorithm", vm.Runtime().ToValue(algorithm))
-
-		t.Run(algorithm+" hasher: valid", func(t *testing.T) {
-			_, err := vm.RunString(context.Background(), `
-			var hasher = crypto.createHMAC(algorithm, "a secret");
-			assert.equal(correctHex, hasher.encrypt("some data to hash").hex());
-			`)
-
-			assert.NoError(t, err)
-		})
-
-		t.Run(algorithm+" wrapper: valid", func(t *testing.T) {
-			_, err := vm.RunString(context.Background(), `
-			var resultHex = crypto.hmac(algorithm, "a secret", "some data to hash").hex();
-			assert.equal(correctHex, resultHex);
-			`)
-
-			assert.NoError(t, err)
-		})
-
-		t.Run(algorithm+" ArrayBuffer: valid", func(t *testing.T) {
-			_, err := vm.RunString(context.Background(), `
-			var data = new Uint8Array([115,111,109,101,32,100,97,116,97,32,116,
-										111,32,104,97,115,104]);
-			var resultHex = crypto.hmac(algorithm, "a secret", data).hex();
-			assert.equal(correctHex, resultHex);
-			`)
-
+	for _, testCase := range testCases {
+		t.Run(testCase.algorithm, func(t *testing.T) {
+			_, err := vm.Runtime().RunString(`{
+			let correct = "` + testCase.want + `";
+			let origin = "` + testCase.origin + `";
+			let hasher = crypto.createHMAC("` + testCase.algorithm + `", "some secret");
+			assert.equal(hasher.encrypt(origin).hex(), correct);
+			}`)
 			assert.NoError(t, err)
 		})
 	}
-
-	// Algorithms not supported or typing error
-	invalidData := map[string]string{
-		"md6":    "e04f2ec05c8b12e19e46936b171c9d03",
-		"sha526": "7fd04df92f636fd450bc841c9418e5825c17f33ad9c87c518115a45971f7f77e",
-		"sha348": "d331e169e2dcfc742e80a3bf4dcc76d0e6425ab3777a3ac217ac6b2552aad5529ed4d40135b06e53a495ac7425d1e462",
-	}
-	for algorithm, value := range invalidData {
-		algorithm := algorithm
-		_ = vm.Runtime().Set("correctHex", vm.Runtime().ToValue(value))
-		_ = vm.Runtime().Set("algorithm", vm.Runtime().ToValue(algorithm))
-		t.Run(algorithm+" hasher: invalid", func(t *testing.T) {
-			_, err := vm.RunString(context.Background(), `
-			var hasher = crypto.createHMAC(algorithm, "a secret");	
-			assert.equal(correctHex, hasher.hash("some data to hash").hex())
-			`)
-
-			assert.Contains(t, err.Error(), "invalid algorithm: "+algorithm)
-		})
-
-		t.Run(algorithm+" wrapper: invalid", func(t *testing.T) {
-			_, err := vm.RunString(context.Background(), `
-			var resultHex = crypto.hmac(algorithm, "a secret", "some data to hash").hex();
-			assert.equal(correctHex, resultHex);
-			`)
-
-			assert.Contains(t, err.Error(), "invalid algorithm: "+algorithm)
-		})
-	}
-}
-
-func TestAWSv4(t *testing.T) {
-	// example values from https://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html
-	vm := modulestest.New(t)
-
-	_, err := vm.Runtime().RunString(`
-		const crypto = require('cloudcat/crypto');
-		let hmacSHA256 = function(data, key) {
-			return crypto.hmac("sha256", key, data);
-		};
-
-		let expectedKDate    = '969fbb94feb542b71ede6f87fe4d5fa29c789342b0f407474670f0c2489e0a0d'
-		let expectedKRegion  = '69daa0209cd9c5ff5c8ced464a696fd4252e981430b10e3d3fd8e2f197d7a70c'
-		let expectedKService = 'f72cfd46f26bc4643f06a11eabb6c0ba18780c19a8da0c31ace671265e3c87fa'
-		let expectedKSigning = 'f4780e2d9f65fa895f9c67b32ce1baf0b0d8a43505a000a1a9e090d414db404d'
-
-		let key = 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY';
-		let dateStamp = '20120215';
-		let regionName = 'us-east-1';
-		let serviceName = 'iam';
-
-		let kDate = hmacSHA256(dateStamp, "AWS4" + key);
-		let kRegion = hmacSHA256(regionName, kDate.binary());
-		let kService = hmacSHA256(serviceName, kRegion.binary());
-		let kSigning = hmacSHA256("aws4_request", kService.binary());
-
-		assert.equal(expectedKDate, kDate.hex());
-		assert.equal(expectedKRegion, kRegion.hex());
-		assert.equal(expectedKService, kService.hex());
-		assert.equal(expectedKSigning, kSigning.hex());
-		`)
-	assert.NoError(t, err)
 }

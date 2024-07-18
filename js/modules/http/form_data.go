@@ -2,98 +2,121 @@ package http
 
 import (
 	"fmt"
+	"slices"
 
-	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat"
-	"github.com/shiroyk/cloudcat/js"
+	"github.com/grafana/sobek"
+	"github.com/shiroyk/ski"
+	"github.com/shiroyk/ski/js"
 )
 
-// FileData wraps the file data and filename
-type FileData struct {
-	Data     []byte
-	Filename string
+// fileData wraps the file data and filename
+type fileData struct {
+	data     []byte
+	filename string
 }
 
-// FormData provides a way to construct a set of key/value pairs representing form fields and their values.
+// formData provides a way to construct a set of key/value pairs representing form fields and their values.
 // which can be sent using the http() method and encoding type were set to "multipart/form-data".
 // Implement the https://developer.mozilla.org/en-US/docs/Web/API/FormData
-type FormData struct {
+type formData struct {
+	keys []string
 	data map[string][]any
 }
 
-// FormDataConstructor FormData Constructor
-type FormDataConstructor struct{}
+// FormData Constructor
+type FormData struct{}
 
-// Exports returns module instance
-func (*FormDataConstructor) Exports() any {
-	return func(call goja.ConstructorCall, vm *goja.Runtime) *goja.Object {
-		param := call.Argument(0)
+// Instantiate returns module instance
+func (*FormData) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	return rt.ToValue(func(call sobek.ConstructorCall) *sobek.Object {
+		params := call.Argument(0)
 
-		if goja.IsUndefined(param) {
-			return vm.ToValue(FormData{make(map[string][]any)}).ToObject(vm)
+		var ret formData
+		if sobek.IsUndefined(params) {
+			ret.data = make(map[string][]any)
+			return ret.object(rt)
 		}
 
-		var pa map[string]any
-		var ok bool
-		pa, ok = param.Export().(map[string]any)
-		if !ok {
-			js.Throw(vm, fmt.Errorf("unsupported type %T", param.Export()))
-		}
+		object := params.ToObject(rt)
+		keys := object.Keys()
+		ret.keys = make([]string, 0, len(keys))
+		ret.data = make(map[string][]any, len(keys))
 
-		data := make(map[string][]any, len(pa))
-
-		for k, v := range pa {
-			switch ve := v.(type) {
+		for _, key := range keys {
+			value, _ := js.Unwrap(object.Get(key))
+			switch ve := value.(type) {
 			case []byte:
 				// Default filename "blob".
-				data[k] = []any{FileData{
-					Data:     ve,
-					Filename: "blob",
+				ret.data[key] = []any{fileData{
+					data:     ve,
+					filename: "blob",
 				}}
-			case goja.ArrayBuffer:
+			case sobek.ArrayBuffer:
 				// Default filename "blob".
-				data[k] = []any{FileData{
-					Data:     ve.Bytes(),
-					Filename: "blob",
+				ret.data[key] = []any{fileData{
+					data:     ve.Bytes(),
+					filename: "blob",
 				}}
 			case []any:
-				data[k] = ve
+				ret.data[key] = ve
+			case nil:
+				ret.data[key] = nil
 			default:
-				data[k] = []any{fmt.Sprintf("%v", ve)}
+				ret.data[key] = []any{fmt.Sprintf("%s", ve)}
 			}
+			ret.keys = append(ret.keys, key)
 		}
 
-		return vm.ToValue(FormData{data}).ToObject(vm)
-	}
+		return ret.object(rt)
+	}), nil
 }
 
 // Global it is a global module
-func (*FormDataConstructor) Global() {}
+func (*FormData) Global() {}
 
-// Append method of the FormData interface appends a new value onto an existing key inside a FormData object,
+func (f *formData) object(rt *sobek.Runtime) *sobek.Object {
+	obj := rt.ToValue(f).ToObject(rt)
+
+	_ = obj.SetSymbol(sobek.SymIterator, func(sobek.ConstructorCall) *sobek.Object {
+		var i int
+		it := rt.NewObject()
+		_ = it.Set("next", func(sobek.FunctionCall) sobek.Value {
+			if i < len(f.keys) {
+				key := f.keys[i]
+				i++
+				return rt.ToValue(iter{Value: rt.ToValue([2]any{key, f.data[key]})})
+			}
+			return rt.ToValue(iter{Done: true})
+		})
+		return it
+	})
+	return obj
+}
+
+// Append method of the formData interface appends a new value onto an existing key inside a formData object,
 // or adds the key if it does not already exist.
-func (f *FormData) Append(name string, value any, filename string) (ret goja.Value) {
+func (f *formData) Append(name string, value any, filename string) sobek.Value {
 	if filename == "" {
 		// Default filename "blob".
 		filename = "blob"
 	}
 
-	var ele []any
-	var ok bool
-	if ele, ok = f.data[name]; !ok {
+	ele, ok := f.data[name]
+	if !ok {
+		f.keys = append(f.keys, name)
 		ele = make([]any, 0)
 	}
 
 	switch v := value.(type) {
 	case []byte:
-		ele = append(ele, FileData{
-			Data:     v,
-			Filename: filename,
+		ele = append(ele, fileData{
+			data:     v,
+			filename: filename,
 		})
-	case goja.ArrayBuffer:
-		ele = append(ele, FileData{
-			Data:     v.Bytes(),
-			Filename: filename,
+	case sobek.ArrayBuffer:
+		ele = append(ele, fileData{
+			data:     v.Bytes(),
+			filename: filename,
 		})
 	default:
 		ele = append(ele, fmt.Sprintf("%v", v))
@@ -101,36 +124,37 @@ func (f *FormData) Append(name string, value any, filename string) (ret goja.Val
 
 	f.data[name] = ele
 
-	return
+	return sobek.Undefined()
 }
 
-// Delete method of the FormData interface deletes a key and its value(s) from a FormData object.
-func (f *FormData) Delete(name string) {
+// Delete method of the formData interface deletes a key and its value(s) from a formData object.
+func (f *formData) Delete(name string) {
+	f.keys = slices.DeleteFunc(f.keys, func(k string) bool { return k == name })
 	delete(f.data, name)
 }
 
-// Entries method returns an iterator which iterates through all key/value pairs contained in the FormData.
-func (f *FormData) Entries() any {
-	entries := make([][2]any, 0, len(f.data))
-	for k, v := range f.data {
-		entries = append(entries, [2]any{k, v})
+// Entries method returns an iterator which iterates through all key/value pairs contained in the formData.
+func (f *formData) Entries() any {
+	entries := make([][2]any, 0, len(f.keys))
+	for _, key := range f.keys {
+		entries = append(entries, [2]any{key, f.data[key]})
 	}
 	return entries
 }
 
-// Get method of the FormData interface returns the first value associated
-// with a given key from within a FormData object.
+// Get method of the formData interface returns the first value associated
+// with a given key from within a formData object.
 // If you expect multiple values and want all of them, use the getAll() method instead.
-func (f *FormData) Get(name string) any {
+func (f *formData) Get(name string) any {
 	if v, ok := f.data[name]; ok {
 		return v[0]
 	}
 	return nil
 }
 
-// GetAll method of the FormData interface returns all the values associated
-// with a given key from within a FormData object.
-func (f *FormData) GetAll(name string) any {
+// GetAll method of the formData interface returns all the values associated
+// with a given key from within a formData object.
+func (f *formData) GetAll(name string) any {
 	v, ok := f.data[name]
 	if ok {
 		return v
@@ -138,29 +162,33 @@ func (f *FormData) GetAll(name string) any {
 	return [0]any{}
 }
 
-// Has method of the FormData interface returns whether a FormData object contains a certain key.
-func (f *FormData) Has(name string) bool {
+// Has method of the formData interface returns whether a formData object contains a certain key.
+func (f *formData) Has(name string) bool {
 	_, ok := f.data[name]
 	return ok
 }
 
-// Keys method returns an iterator which iterates through all keys contained in the FormData.
+// Keys method returns an iterator which iterates through all keys contained in the formData.
 // The keys are strings.
-func (f *FormData) Keys() any { return cloudcat.MapKeys(f.data) }
+func (f *formData) Keys() any { return f.keys }
 
-// Set method of the FormData interface sets a new value for an existing key inside a FormData object,
+// Set method of the formData interface sets a new value for an existing key inside a formData object,
 // or adds the key/value if it does not already exist.
-func (f *FormData) Set(name string, value any, filename string) {
+func (f *formData) Set(name string, value any, filename string) {
 	if filename == "" {
 		filename = "blob"
 	}
 
+	if _, ok := f.data[name]; !ok {
+		f.keys = append(f.keys, name)
+	}
+
 	switch v := value.(type) {
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		f.data[name] = []any{
-			FileData{
-				Data:     v.Bytes(),
-				Filename: filename,
+			fileData{
+				data:     v.Bytes(),
+				filename: filename,
 			},
 		}
 	default:
@@ -168,5 +196,5 @@ func (f *FormData) Set(name string, value any, filename string) {
 	}
 }
 
-// Values method returns an iterator which iterates through all values contained in the FormData.
-func (f *FormData) Values() any { return cloudcat.MapValues(f.data) }
+// Values method returns an iterator which iterates through all values contained in the formData.
+func (f *formData) Values() any { return ski.MapValues(f.data) }

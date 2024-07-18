@@ -1,4 +1,4 @@
-package cloudcat
+package ski
 
 import (
 	"context"
@@ -14,26 +14,24 @@ func TestCache(t *testing.T) {
 	ctx := context.Background()
 
 	key, value := "testCacheKey", "testCacheValue"
-	if _, ok := c.Get(ctx, key); ok {
-		t.Fatal("retrieved value before adding it")
+	if v, _ := c.Get(ctx, key); len(v) != 0 {
+		t.Fatal("retrieved values before adding it")
 	}
 
-	c.Set(ctx, key, []byte(value))
+	_ = c.Set(ctx, key, []byte(value))
 	v, _ := c.Get(ctx, key)
 	assert.Equal(t, value, string(v))
 
-	c.Del(ctx, key)
-	if _, ok := c.Get(ctx, key); ok {
-		t.Fatal("delete failed")
-	}
+	_ = c.Del(ctx, key)
+	v, _ = c.Get(ctx, key)
+	assert.Empty(t, v)
 
-	c.Set(WithCacheTimeout(ctx, time.Millisecond), key, []byte(value))
+	_ = c.Set(WithCacheTimeout(ctx, time.Millisecond), key, []byte(value))
 	v1, _ := c.Get(ctx, key)
 	assert.Equal(t, value, string(v1))
 
 	time.Sleep(1 * time.Second)
 
-	if _, ok := c.Get(ctx, key); ok {
-		t.Fatalf("not expired: %v", key)
-	}
+	v, _ = c.Get(ctx, key)
+	assert.Empty(t, v, "not expired: %v", key)
 }

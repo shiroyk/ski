@@ -1,41 +1,54 @@
 package js
 
 import (
+	"bytes"
 	"context"
-	"errors"
+	"log/slog"
 	"testing"
 	"time"
+	_ "unsafe"
 
-	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/plugin"
+	"github.com/grafana/sobek"
+	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestVMRunString(t *testing.T) {
+func TestVMContext(t *testing.T) {
 	t.Parallel()
-	vm := NewTestVM(t)
+	ctx := context.WithValue(context.Background(), "foo", "bar")
+	vm := NewVM(WithModuleLoader(NewModuleLoader()))
+
+	v, err := runMod(ctx, vm, `module.exports = (ctx) => ctx.get('foo')`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "bar", v.Export())
+		assert.Equal(t, context.Background(), Context(vm.Runtime()))
+	}
+}
+
+func TestVMRunModule(t *testing.T) {
+	t.Parallel()
+	vm := NewVM()
 
 	testCases := []struct {
 		script string
 		want   any
 	}{
-		{"2", 2},
-		{"let a = 1; a + 2", 3},
-		{"(() => 4)()", 4},
-		{"[5]", []any{int64(5)}},
-		{"let a = {'key':'foo'}; a", map[string]any{"key": "foo"}},
-		{"JSON.stringify({'key':7})", `{"key":7}`},
-		{"JSON.stringify([8])", `[8]`},
-		{"(async () => 9)()", 9},
+		{"export default () => 1", 1},
+		{"export default function () {let a = 1; return a + 1}", 2},
+		{"export default async () => 3", 3},
+		{"const a = async () => 5; let b = await a(); export default () => b - 1", 4},
+		{"export default () => 3 + 2", 5},
 	}
 
 	for _, c := range testCases {
 		t.Run(c.script, func(t *testing.T) {
-			v, err := vm.RunString(context.Background(), c.script)
-			assert.NoError(t, err)
-			vv, err := Unwrap(v)
-			assert.NoError(t, err)
-			assert.EqualValues(t, c.want, vv)
+			v, err := runMod(context.Background(), vm, c.script)
+			if assert.NoError(t, err) {
+				vv, err := Unwrap(v)
+				if assert.NoError(t, err) {
+					assert.EqualValues(t, c.want, vv)
+				}
+			}
 		})
 	}
 }
@@ -45,45 +58,32 @@ func TestTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 
-	_, err := NewTestVM(t).RunString(ctx, `while(true){}`)
+	start := time.Now()
+	_, err := runMod(ctx, NewVM(), "export default () => {while(true){}}")
+	took := time.Since(start)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Greater(t, time.Millisecond*300, took)
 }
 
-func TestVMRunWithContext(t *testing.T) {
+func TestWithInitial(t *testing.T) {
 	t.Parallel()
-	{
-		vm := NewTestVM(t)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		_ = vm.Runtime().Set("testContext", func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-			return vm.ToValue(VMContext(vm))
-		})
-		v, err := vm.RunString(ctx, "testContext()")
-		assert.NoError(t, err)
-		assert.Equal(t, ctx, v.Export())
-		assert.Equal(t, context.Background(), VMContext(vm.Runtime()))
-	}
-	{
-		vm := NewTestVM(t)
-		ctx := plugin.NewContext(plugin.ContextOptions{})
-		_ = vm.Runtime().Set("testContext", func(call goja.FunctionCall, vm *goja.Runtime) goja.Value {
-			return vm.ToValue(VMContext(vm))
-		})
-		v, err := vm.RunString(ctx, "testContext()")
-		assert.NoError(t, err)
-		assert.Equal(t, ctx, v.Export())
-		assert.Equal(t, context.Background(), VMContext(vm.Runtime()))
+	vm := NewVM(WithInitial(func(rt *sobek.Runtime) {
+		_ = rt.Set("init", true)
+	}))
+	v, err := runMod(context.Background(), vm, `export default () => init`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, true, v.Export())
 	}
 }
 
 func TestNewPromise(t *testing.T) {
 	t.Parallel()
-	vm := NewTestVM(t)
+	vm := NewVM()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	goFunc := func(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+	goFunc := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		return rt.ToValue(NewPromise(rt, func() (any, error) {
 			time.Sleep(time.Second)
 			return max(call.Argument(0).ToInteger(), call.Argument(1).ToInteger()), nil
@@ -93,51 +93,53 @@ func TestNewPromise(t *testing.T) {
 
 	start := time.Now()
 
-	result, err := vm.RunString(ctx, `max(1, 2)`)
-	if err != nil {
-		assert.NoError(t, err)
+	result, err := runMod(ctx, vm, `export default () => max(1, 2)`)
+	if assert.NoError(t, err) {
+		value, err := Unwrap(result)
+		if assert.NoError(t, err) {
+			assert.EqualValues(t, 2, value)
+			assert.EqualValues(t, 1, int(time.Now().Sub(start).Seconds()))
+		}
 	}
-	value, err := Unwrap(result)
-	if err != nil {
-		assert.NoError(t, err)
-	}
-	assert.EqualValues(t, 2, value)
-	assert.EqualValues(t, 1, int(time.Now().Sub(start).Seconds()))
 }
 
-func NewTestVM(t *testing.T) VM {
-	vm := NewVM()
+type testScheduler struct{ vm VM }
 
-	assertObject := vm.Runtime().NewObject()
-	_ = assertObject.Set("equal", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		a, err := Unwrap(call.Argument(0))
-		if err != nil {
-			Throw(vm, err)
-		}
-		b, err := Unwrap(call.Argument(1))
-		if err != nil {
-			Throw(vm, err)
-		}
-		var msg string
-		if !goja.IsUndefined(call.Argument(2)) {
-			msg = call.Argument(2).String()
-		}
-		if !assert.Equal(t, b, a, msg) {
-			Throw(vm, errors.New("not equal"))
-		}
-		return
-	})
-	_ = assertObject.Set("true", func(call goja.FunctionCall, vm *goja.Runtime) (ret goja.Value) {
-		var msg string
-		if !goja.IsUndefined(call.Argument(1)) {
-			msg = call.Argument(1).String()
-		}
-		if !assert.True(t, call.Argument(0).ToBoolean(), msg) {
-			Throw(vm, errors.New("should be true"))
-		}
-		return
-	})
-	_ = vm.Runtime().Set("assert", assertObject)
+func (t *testScheduler) release(vm VM)  { t.vm = vm }
+func (*testScheduler) Get() (VM, error) { return nil, nil }
+func (*testScheduler) Close() error     { return nil }
 
-	return vm
+func TestVMPanic(t *testing.T) {
+	t.Parallel()
+	scheduler := new(testScheduler)
+	vm := NewVM(func(vm *vmImpl) {
+		vm.release = func() { scheduler.release(vm) }
+	})
+
+	ctx, cancel := context.WithTimeout(ski.NewContext(context.Background(), nil), time.Second)
+	defer cancel()
+
+	log := new(bytes.Buffer)
+
+	logger := slog.New(slog.NewTextHandler(log, nil))
+
+	_ = vm.Runtime().Set("some", func() {
+		OnDone(vm.Runtime(), func() { assert.Equal(t, Context(vm.Runtime()), ctx) })
+		OnDone(vm.Runtime(), func() { panic("some panic") })
+	})
+	_, err := runMod(ski.WithLogger(ctx, logger), vm, `export default () => {some(); (() => other.error)()}`)
+	if assert.Error(t, err) {
+		assert.ErrorContains(t, err, "other is not defined")
+		assert.NotNil(t, scheduler.vm)
+		assert.Equal(t, context.Background(), Context(vm.Runtime()))
+		assert.Contains(t, log.String(), "vm run error: some panic")
+	}
+}
+
+func runMod(ctx context.Context, vm VM, script string) (sobek.Value, error) {
+	mod, err := vm.Loader().CompileModule("", script)
+	if err != nil {
+		return nil, err
+	}
+	return vm.RunModule(ctx, mod)
 }

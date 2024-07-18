@@ -1,25 +1,22 @@
 package encoding
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	"github.com/shiroyk/cloudcat/js/modulestest"
+	"github.com/grafana/sobek"
+	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEncodingBase64(t *testing.T) {
 	t.Parallel()
 
-	if testing.Short() {
-		return
-	}
-
-	vm := modulestest.New(t)
-	_, _ = vm.Runtime().RunString(`
-		const encoding = require('cloudcat/encoding');
-	`)
+	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+		instantiate, _ := new(Encoding).Instantiate(rt)
+		_ = rt.Set("encoding", instantiate)
+	}))
 
 	buffer := vm.Runtime().NewArrayBuffer([]byte{100, 97, 110, 107, 111, 103, 97, 105})
 
@@ -50,7 +47,7 @@ func TestEncodingBase64(t *testing.T) {
 			if testCase.url {
 				code += "URI"
 			}
-			_, err := vm.RunString(context.Background(), code+"(raw, padding);assert.equal(want, result);")
+			_, err := vm.Runtime().RunString(code + "(raw, padding);assert.equal(want, result);")
 			assert.NoError(t, err)
 		})
 	}
@@ -73,7 +70,7 @@ func TestEncodingBase64(t *testing.T) {
 			_ = vm.Runtime().Set("want", testCase.want)
 			_ = vm.Runtime().Set("toBuffer", testCase.toBuffer)
 
-			_, err := vm.RunString(context.Background(), `
+			_, err := vm.Runtime().RunString(`
 			assert.equal(want, encoding.base64.decode(raw, toBuffer));
 			`)
 			assert.NoError(t, err)

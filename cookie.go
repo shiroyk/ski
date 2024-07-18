@@ -1,4 +1,4 @@
-package cloudcat
+package ski
 
 import (
 	"net/http"
@@ -6,30 +6,23 @@ import (
 	"net/url"
 )
 
-// Cookie manages storage and use of cookies in HTTP requests.
-// Implementations of Cookie must be safe for concurrent use by multiple
+// CookieJar manages storage and use of cookies in HTTP requests.
+// Implementations of CookieJar must be safe for concurrent use by multiple
 // goroutines.
-type Cookie interface {
+type CookieJar interface {
 	http.CookieJar
 
-	// CookieString returns the cookies string for the given URL.
-	CookieString(u *url.URL) []string
-	// DeleteCookie delete the cookies for the given URL.
-	DeleteCookie(u *url.URL)
+	// RemoveCookie delete the cookies for the given URL.
+	RemoveCookie(u *url.URL)
 }
 
-// memoryCookie is an implementation of Cookie that stores http.Cookie in in-memory.
+// memoryCookie is an implementation of CookieJar that stores http.Cookie in in-memory.
 type memoryCookie struct {
 	*cookiejar.Jar
 }
 
-// CookieString returns the cookies string for the given URL.
-func (c *memoryCookie) CookieString(u *url.URL) []string {
-	return CookieToString(c.Cookies(u))
-}
-
-// DeleteCookie delete the cookies for the given URL.
-func (c *memoryCookie) DeleteCookie(u *url.URL) {
+// RemoveCookie remove the cookies for the given URL.
+func (c *memoryCookie) RemoveCookie(u *url.URL) {
 	exists := c.Cookies(u)
 	cookie := make([]*http.Cookie, 0, len(exists))
 	for _, e := range exists {
@@ -39,11 +32,8 @@ func (c *memoryCookie) DeleteCookie(u *url.URL) {
 	c.SetCookies(u, cookie)
 }
 
-// NewCookie returns a new Cookie that will store cookies in in-memory.
-func NewCookie() Cookie {
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		panic(err)
-	}
+// NewCookieJar returns a new CookieJar that will store cookies in in-memory.
+func NewCookieJar() CookieJar {
+	jar, _ := cookiejar.New(nil)
 	return &memoryCookie{jar}
 }

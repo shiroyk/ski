@@ -4,21 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"reflect"
+	"strings"
 
-	"github.com/dop251/goja"
-	"github.com/shiroyk/cloudcat/plugin/jsmodule"
-	"github.com/spf13/cast"
+	"github.com/grafana/sobek"
 )
 
-// vmContextKey the VM current context
-var vmContextKey = goja.NewSymbol("__ctx__")
-
 // Throw js exception
-func Throw(vm *goja.Runtime, err error) {
-	if e, ok := err.(*goja.Exception); ok { //nolint:errorlint
-		panic(e)
+func Throw(rt *sobek.Runtime, err error) {
+	var ex *sobek.Exception
+	if errors.As(err, &ex) { //nolint:errorlint
+		panic(ex)
 	}
-	panic(vm.ToValue(err))
+	panic(rt.ToValue(err))
 }
 
 // ToBytes tries to return a byte slice from compatible types.
@@ -28,46 +27,28 @@ func ToBytes(data any) ([]byte, error) {
 		return dt, nil
 	case string:
 		return []byte(dt), nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return dt.Bytes(), nil
 	default:
-		return nil, fmt.Errorf("invalid type %T, expected string, []byte or ArrayBuffer", data)
+		return nil, fmt.Errorf("expected string, []byte or ArrayBuffer, but got %T, ", data)
 	}
 }
 
-// ToStrings tries to return a string slice or string from compatible types.
-func ToStrings(data any) (s any, err error) {
-	switch dt := data.(type) {
-	case string:
-		return dt, nil
-	case []string:
-		return dt, nil
-	case []byte:
-		return string(dt), nil
-	case []any:
-		return cast.ToStringSliceE(dt)
-	case goja.ArrayBuffer:
-		return string(dt.Bytes()), nil
-	default:
-		return nil, fmt.Errorf("invalid type %T, expected string, string array or ArrayBuffer", data)
-	}
-}
-
-// Unwrap the goja.Value to the raw value
-func Unwrap(value goja.Value) (any, error) {
+// Unwrap the sobek.Value to the raw value
+func Unwrap(value sobek.Value) (any, error) {
 	if value == nil {
 		return nil, nil
 	}
 	switch v := value.Export().(type) {
 	default:
 		return v, nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return v.Bytes(), nil
-	case *goja.Promise:
+	case *sobek.Promise:
 		switch v.State() {
-		case goja.PromiseStateRejected:
+		case sobek.PromiseStateRejected:
 			return nil, errors.New(v.Result().String())
-		case goja.PromiseStateFulfilled:
+		case sobek.PromiseStateFulfilled:
 			return v.Result().Export(), nil
 		default:
 			return nil, errors.New("unexpected promise pending state")
@@ -75,23 +56,83 @@ func Unwrap(value goja.Value) (any, error) {
 	}
 }
 
-// VMContext returns the current context of the goja.Runtime
-func VMContext(runtime *goja.Runtime) context.Context {
-	ctx := context.Background()
-	if v := runtime.GlobalObject().GetSymbol(vmContextKey); v != nil {
-		if c, ok := v.Export().(context.Context); ok {
-			ctx = c
+// ModuleCallable return the sobek.CyclicModuleRecord default export as sobek.Callable.
+func ModuleCallable(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFunc, module sobek.CyclicModuleRecord) (sobek.Callable, error) {
+	instance := rt.GetModuleInstance(module)
+	if instance == nil {
+		if err := module.Link(); err != nil {
+			return nil, err
 		}
+		promise := rt.CyclicModuleRecordEvaluate(module, resolve)
+		switch promise.State() {
+		case sobek.PromiseStateRejected:
+			return nil, promise.Result().Export().(error)
+		case sobek.PromiseStateFulfilled:
+		default:
+		}
+		instance = rt.GetModuleInstance(module)
 	}
-	return ctx
+	value := instance.GetBindingValue("default")
+	call, ok := sobek.AssertFunction(value)
+	if !ok {
+		return nil, errors.New("module default export is not a function")
+	}
+	return call, nil
 }
 
-// InitGlobalModule init all global modules
-func InitGlobalModule(runtime *goja.Runtime) {
-	// Init global modules
-	for _, extension := range jsmodule.AllModules() {
-		if mod, ok := extension.Module.(jsmodule.Global); ok {
-			_ = runtime.Set(extension.Name, mod.Exports())
+// Context returns the current context of the sobek.Runtime
+func Context(rt *sobek.Runtime) context.Context {
+	if v := self(rt).ctx.Export().(*vmctx).ctx; v != nil {
+		return v
+	}
+	return context.Background()
+}
+
+// OnDone add a function to execute when the VM has finished running.
+// eg: close resources...
+func OnDone(rt *sobek.Runtime, job func()) { self(rt).eventloop.OnDone(job) }
+
+// InitGlobalModule init all implement the Global modules
+func InitGlobalModule(rt *sobek.Runtime) {
+	for name, mod := range AllModule() {
+		if mod, ok := mod.(Global); ok {
+			instance, err := mod.Instantiate(rt)
+			if err != nil {
+				slog.Warn(fmt.Sprintf("instantiate global js module %s failed: %s", name, err))
+				continue
+			}
+			_ = rt.Set(name, instance)
 		}
 	}
+}
+
+func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
+	global := rt.GlobalObject().Get("Object").ToObject(rt)
+	freeze, ok := sobek.AssertFunction(global.Get("freeze"))
+	if !ok {
+		panic("failed to get the Object.freeze function from the runtime")
+	}
+	_, err := freeze(sobek.Undefined(), obj)
+	return err
+}
+
+// FieldNameMapper provides custom mapping between Go and JavaScript property names.
+type FieldNameMapper struct{}
+
+// FieldName returns a JavaScript name for the given struct field in the given type.
+// If this method returns "" the field becomes hidden.
+func (FieldNameMapper) FieldName(_ reflect.Type, f reflect.StructField) string {
+	if v, ok := f.Tag.Lookup("js"); ok {
+		if v == "-" {
+			return ""
+		}
+		return v
+	}
+	return strings.ToLower(f.Name[0:1]) + f.Name[1:]
+}
+
+// MethodName returns a JavaScript name for the given method in the given type.
+// If this method returns "" the method becomes hidden.
+func (FieldNameMapper) MethodName(_ reflect.Type, m reflect.Method) string {
+	return strings.ToLower(m.Name[0:1]) + m.Name[1:]
 }

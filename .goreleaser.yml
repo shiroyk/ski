@@ -1,11 +1,11 @@
-project_name: cloudcat
+project_name: ski
 
 env:
   - GO111MODULE=on
 
 builds:
-  - id: cloudcat
-    main: ./cmd
+  - id: ski
+    main: ./ski
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -14,7 +14,7 @@ builds:
       - -X main.CommitSHA={{ .ShortCommit }}
     flags:
       - -trimpath
-    binary: cloudcat
+    binary: ski
     goos:
       - darwin
       - linux
