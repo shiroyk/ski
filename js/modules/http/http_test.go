@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
@@ -40,9 +39,6 @@ func TestHttp(t *testing.T) {
 		`fetch(url, { method: 'custom' })
 		 .then(res => res.text())
 		 .then(body => assert.equal(body,  "CUSTOM"));`,
-		`fetch(url, { proxy: proxyURL })
-		 .then(res => res.text())
-		 .then(body => assert.equal(body, "proxy ok"))`,
 		`try {
 			fetch(url, { method: 'put', body: 114514 })
 		 } catch (e) {
@@ -71,10 +67,9 @@ func TestHttp(t *testing.T) {
 }
 
 var initial = js.WithInitial(func(rt *sobek.Runtime) {
-	client := http.Client{Transport: &http.Transport{Proxy: ski.ProxyFromRequest}}
-	instance, _ := (&Http{&client}).Instantiate(rt)
+	instance, _ := (&Http{http.DefaultClient}).Instantiate(rt)
 	_ = rt.Set("http", instance)
-	f, _ := (&Fetch{&client}).Instantiate(rt)
+	f, _ := (&FetchModule{http.DefaultClient}).Instantiate(rt)
 	_ = rt.Set("fetch", f)
 })
 
@@ -119,20 +114,14 @@ func createVM(t *testing.T) modulestest.VM {
 			assert.NoError(t, err)
 		}
 	}))
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := fmt.Fprint(w, "proxy ok")
-		assert.NoError(t, err)
-	}))
 
 	t.Cleanup(func() {
 		ts.Close()
-		proxy.Close()
 	})
 
 	_, _ = vm.Runtime().RunString(fmt.Sprintf(`
 		const url = "%s";
-		const proxyURL = "%s";
-		const fa = new Uint8Array([226, 153, 130, 239, 184, 142])`, ts.URL, proxy.URL))
+		const fa = new Uint8Array([226, 153, 130, 239, 184, 142])`, ts.URL))
 
 	return vm
 }

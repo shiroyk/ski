@@ -2,7 +2,6 @@ package ski
 
 import (
 	"context"
-	"maps"
 	"sync"
 )
 
@@ -15,25 +14,18 @@ type Context interface {
 
 type valuesCtx struct {
 	context.Context
-	mu     sync.RWMutex
-	values map[any]any
+	values *sync.Map
 }
 
 func (c *valuesCtx) Value(key any) any {
-	c.mu.RLock()
-	v, ok := c.values[key]
-	c.mu.RUnlock()
+	value, ok := c.values.Load(key)
 	if ok {
-		return v
+		return value
 	}
 	return c.Context.Value(key)
 }
 
-func (c *valuesCtx) SetValue(key, value any) {
-	c.mu.Lock()
-	c.values[key] = value
-	c.mu.Unlock()
-}
+func (c *valuesCtx) SetValue(key, value any) { c.values.Store(key, value) }
 
 var _ctxKey byte
 
@@ -42,14 +34,14 @@ func NewContext(parent context.Context, values map[any]any) Context {
 	if parent == nil {
 		panic("cannot create context from nil parent")
 	}
-	var clone map[any]any
-	if values == nil {
-		clone = make(map[any]any)
-	} else {
-		clone = maps.Clone(values)
+	m := new(sync.Map)
+	if values != nil {
+		for k, v := range values {
+			m.Store(k, v)
+		}
 	}
-	ctx := &valuesCtx{Context: parent, values: clone}
-	clone[&_ctxKey] = ctx
+	ctx := &valuesCtx{Context: parent, values: m}
+	m.Store(&_ctxKey, ctx)
 	return ctx
 }
 

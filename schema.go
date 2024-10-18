@@ -2,10 +2,10 @@ package ski
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strings"
 
 	"github.com/spf13/cast"
@@ -13,38 +13,27 @@ import (
 )
 
 func init() {
-	Register("kind", new_kind())
-	Register("map", new_map)
-	Register("each", new_each)
-	Register("pipe", new_pipe)
-	Register("or", new_or)
-	Register("debug", new_debug)
-	Register("string.join", new_string_join)
-	Register("json.parse", new_json_parse)
-	Register("json.string", new_json_string)
+	Registers(NewExecutors{
+		"fetch":       fetch,
+		"raw":         raw,
+		"kind":        kind,
+		"map":         mapping,
+		"each":        each,
+		"pipe":        pipe,
+		"or":          or,
+		"debug":       debug,
+		"list.of":     list_of,
+		"if.match":    if_match,
+		"str.join":    str_join,
+		"str.split":   str_split,
+		"str.suffix":  str_suffix,
+		"str.prefix":  str_prefix,
+		"json.parse":  json_parse,
+		"json.string": json_string,
+	})
 }
 
-// Iterator is an interface for iterators
-type Iterator interface {
-	// Len returns the length of the iterator
-	Len() int
-	// At returns the element at the given index, or nil if the index is out of range
-	At(idx int) any
-}
-
-// NewIterator creates a new iterator
-func NewIterator[T any](v []T) Iterator { return _iter[T](v) }
-
-type _iter[T any] []T
-
-func (i _iter[T]) Len() int { return len(i) }
-func (i _iter[T]) At(idx int) any {
-	if idx < 0 || idx >= len(i) {
-		return nil
-	}
-	return i[idx]
-}
-
+// Kind converts to a Kind type
 type Kind uint
 
 const (
@@ -57,14 +46,13 @@ const (
 	KindString
 )
 
-func new_kind() NewExecutor {
-	return StringExecutor(func(str string) (Executor, error) {
-		var k Kind
-		if err := k.UnmarshalText([]byte(str)); err != nil {
-			return nil, err
-		}
-		return k, nil
-	})
+// kind converts to a Kind type
+func kind(args Arguments) (Executor, error) {
+	var k Kind
+	if err := k.UnmarshalText([]byte(args.GetString(0))); err != nil {
+		return nil, err
+	}
+	return k, nil
 }
 
 var kindNames = [...]string{
@@ -124,7 +112,6 @@ func (k Kind) Exec(_ context.Context, v any) (any, error) {
 
 type compiler struct {
 	exec Executor
-	meta func(node *yaml.Node, exec Executor, isParser bool) Executor
 }
 
 func (c compiler) newError(message string, node *yaml.Node, err error) error {
@@ -149,12 +136,12 @@ func (c *compiler) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// piping return the first arg if the length is 1, else return _pipe
+// piping return the first arg if the length is 1, else return Pipe
 func (c compiler) piping(args []Executor) Executor {
 	if len(args) == 1 {
 		return args[0]
 	}
-	return _pipe(args)
+	return Pipe(args)
 }
 
 // compileExecutor return the Executor with the key and values
@@ -168,12 +155,14 @@ func (c compiler) compileExecutor(k, v *yaml.Node) (Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	exec, err := init(args...)
+	exec, err := init(args)
 	if err != nil {
 		return nil, c.newError(key, k, err)
 	}
-	if c.meta != nil {
-		return c.meta(k, exec, false), nil
+	if meta, ok := exec.(Meta); ok {
+		if err = meta.Meta(k, v); err != nil {
+			return nil, c.newError("meta", k, err)
+		}
 	}
 	return exec, nil
 }
@@ -185,6 +174,9 @@ func (c compiler) compileNode(node *yaml.Node) ([]Executor, error) {
 	case yaml.SequenceNode:
 		return c.compileSequence(node)
 	case yaml.ScalarNode:
+		if node.Tag == "!!null" {
+			return []Executor{_raw{nil}}, nil
+		}
 		return []Executor{String(node.Value)}, nil
 	case yaml.AliasNode:
 		return c.compileNode(node.Alias)
@@ -245,7 +237,7 @@ func (c compiler) compileMapping(node *yaml.Node) ([]Executor, error) {
 			continue
 		}
 
-		pipe := make(_pipe, 0, len(valueNode.Content)/2)
+		pipe := make(Pipe, 0, len(valueNode.Content)/2)
 		for j := 0; j < len(valueNode.Content); j += 2 {
 			exec, err := c.compileExecutor(valueNode.Content[j], valueNode.Content[j+1])
 			if err != nil {
@@ -260,11 +252,9 @@ func (c compiler) compileMapping(node *yaml.Node) ([]Executor, error) {
 
 type Option func(*compiler)
 
-type Meta = func(node *yaml.Node, exec Executor, isParser bool) Executor
-
-// WithMeta with the meta message
-func WithMeta(meta Meta) Option {
-	return func(c *compiler) { c.meta = meta }
+// Meta from the yaml node, if Executor implements Meta, it will be called on compile
+type Meta interface {
+	Meta(k, v *yaml.Node) error
 }
 
 // Compile the Executor with the Option.
@@ -279,16 +269,11 @@ func Compile(str string, opts ...Option) (Executor, error) {
 	return c.exec, nil
 }
 
-// String the Executor for string value
-type String string
-
-func (k String) Exec(_ context.Context, _ any) (any, error) { return k.String(), nil }
-
-func (k String) String() string { return string(k) }
-
 type _map []Executor
 
-func new_map(args ...Executor) (Executor, error) {
+// mapping return a map with the key and values [k1, v1, k2, v2, ...]
+// if the key Executor implements If and condition not met, it will be skipped
+func mapping(args Arguments) (Executor, error) {
 	m := _map(args)
 	if len(m)%2 != 0 {
 		m = append(m, Raw(nil))
@@ -299,9 +284,14 @@ func new_map(args ...Executor) (Executor, error) {
 func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 	var ret map[string]any
 
-	exec := func(a any) {
+	exec := func(arg any) {
 		for i := 0; i < len(m); i += 2 {
-			k, err := m[i].Exec(ctx, a)
+			if control, ok := m[i].(If); ok {
+				if !control.If(ctx, arg) {
+					continue
+				}
+			}
+			k, err := m[i].Exec(ctx, arg)
 			if err != nil {
 				continue
 			}
@@ -309,16 +299,17 @@ func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 			if err != nil {
 				continue
 			}
-			v, _ := m[i+1].Exec(ctx, a)
+			v, _ := m[i+1].Exec(ctx, arg)
 			ret[ks] = v
 		}
 	}
 
-	switch s := arg.(type) {
-	case Iterator:
-		ret = make(map[string]any, s.Len())
-		for i := 0; i < s.Len(); i++ {
-			exec(s.At(i))
+	v := reflect.ValueOf(arg)
+	switch v.Kind() {
+	case reflect.Slice:
+		ret = make(map[string]any, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			exec(v.Index(i).Interface())
 		}
 		return ret, nil
 	default:
@@ -330,66 +321,85 @@ func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 
 type _each struct{ Executor }
 
-func new_each(args ...Executor) (Executor, error) {
+// each loop the slice arg and execute the Executor, if the Executor implements If
+// and condition not met, the arg will be skipped.
+func each(args Arguments) (Executor, error) {
 	if len(args) != 1 {
 		return nil, errors.New("each needs 1 parameter")
 	}
-	return _each{args[0]}, nil
+	return _each{args.Get(0)}, nil
 }
 
 func (each _each) Exec(ctx context.Context, arg any) (any, error) {
-	switch s := arg.(type) {
-	case Iterator:
-		ret := make([]any, 0, s.Len())
-		for i := 0; i < s.Len(); i++ {
-			v, _ := each.Executor.Exec(ctx, s.At(i))
-			ret = append(ret, v)
+	v := reflect.ValueOf(arg)
+	switch v.Kind() {
+	case reflect.Slice:
+		ret := make([]any, 0, v.Len())
+		if control, ok := each.Executor.(If); ok {
+			for i := 0; i < v.Len(); i++ {
+				ele := v.Index(i).Interface()
+				if control.If(ctx, ele) {
+					v, _ := each.Executor.Exec(ctx, ele)
+					ret = append(ret, v)
+				}
+			}
+		} else {
+			for i := 0; i < v.Len(); i++ {
+				v, _ := each.Executor.Exec(ctx, v.Index(i).Interface())
+				ret = append(ret, v)
+			}
 		}
-		return NewIterator(ret), nil
+		return ret, nil
 	default:
+		if control, ok := each.Executor.(If); ok && !control.If(ctx, arg) {
+			return arg, nil
+		}
 		v, err := each.Executor.Exec(ctx, arg)
 		if err != nil {
 			return nil, nil
 		}
-		return NewIterator([]any{v}), nil
+		return v, nil
 	}
 }
 
-// Raw the Executor for raw value, return the original value
-func Raw(arg any) Executor { return _raw{arg} }
+// Pipe executes a slice of Executor.
+// if the Executor implements If and condition not met, it will be skipped.
+type Pipe []Executor
 
-type _raw struct{ any }
+// pipe executes a slice of Executor.
+// if the Executor implements If and condition not met, it will be skipped.
+func pipe(args Arguments) (Executor, error) { return Pipe(args), nil }
 
-func (raw _raw) Exec(context.Context, any) (any, error) { return raw.any, nil }
-
-type _pipe []Executor
-
-func new_pipe(args ...Executor) (Executor, error) { return _pipe(args), nil }
-
-func (pipe _pipe) Exec(ctx context.Context, v any) (any, error) {
+func (pipe Pipe) Exec(ctx context.Context, arg any) (ret any, err error) {
 	switch len(pipe) {
 	case 0:
 		return nil, nil
 	case 1:
-		return pipe[0].Exec(ctx, v)
+		return pipe[0].Exec(ctx, arg)
 	default:
-		ret, err := pipe[0].Exec(ctx, v)
-		if err != nil || ret == nil {
-			return nil, err
-		}
-		for _, s := range pipe[1:] {
-			ret, err = s.Exec(ctx, ret)
-			if err != nil {
-				return nil, err
+		ret = arg
+
+		for _, exec := range pipe {
+			switch control := exec.(type) {
+			case If:
+				if !control.If(ctx, ret) {
+					continue
+				}
+			}
+			ret, err = exec.Exec(ctx, ret)
+			if err != nil || ret == nil {
+				return
 			}
 		}
-		return ret, nil
+
+		return
 	}
 }
 
-type _or []Executor
+// or executes a slice of Executor. return result if the Executor result is not nil.
+func or(args Arguments) (Executor, error) { return _or(args), nil }
 
-func new_or(args ...Executor) (Executor, error) { return _or(args), nil }
+type _or []Executor
 
 func (or _or) Exec(ctx context.Context, arg any) (any, error) {
 	for _, exec := range or {
@@ -404,72 +414,24 @@ func (or _or) Exec(ctx context.Context, arg any) (any, error) {
 	return nil, nil
 }
 
-type _debug string
+// Raw the Executor for raw value, return the original value
+func Raw(arg any) Executor { return _raw{arg} }
 
-func new_debug(args ...Executor) (Executor, error) {
-	if len(args) > 0 {
-		return _debug(ExecToString(args[0])), nil
-	}
-	return _debug(""), nil
+// Raw the Executor for raw value, return the original value
+func raw(args Arguments) (Executor, error) { return args.Get(0), nil }
+
+type _raw struct{ any }
+
+func (raw _raw) Exec(context.Context, any) (any, error) { return raw.any, nil }
+
+// debug output the debug message and the origin arg
+func debug(args Arguments) (Executor, error) {
+	return _debug(args.GetString(0)), nil
 }
+
+type _debug string
 
 func (debug _debug) Exec(ctx context.Context, v any) (any, error) {
 	Logger(ctx).LogAttrs(ctx, slog.LevelDebug, string(debug), slog.Any("value", v))
 	return v, nil
-}
-
-type _string_join string
-
-func new_string_join(args ...Executor) (Executor, error) {
-	if len(args) > 0 {
-		return _string_join(ExecToString(args[0])), nil
-	}
-	return _string_join(""), nil
-}
-
-func (sep _string_join) Exec(_ context.Context, arg any) (any, error) {
-	switch s := arg.(type) {
-	case Iterator:
-		ret := make([]string, 0, s.Len())
-		for i := 0; i < s.Len(); i++ {
-			s, err := cast.ToStringE(s.At(i))
-			if err != nil {
-				return nil, err
-			}
-			ret = append(ret, s)
-		}
-		return strings.Join(ret, string(sep)), nil
-	case []string:
-		return strings.Join(s, string(sep)), nil
-	case string:
-		return s, nil
-	default:
-		return nil, fmt.Errorf("expected string or []string, but got type %T", arg)
-	}
-}
-
-type _json_parse struct{}
-
-func new_json_parse(_ ...Executor) (Executor, error) { return _json_parse{}, nil }
-
-func (_json_parse) Exec(_ context.Context, v any) (any, error) {
-	s, err := cast.ToStringE(v)
-	if err != nil {
-		return nil, err
-	}
-	var ret any
-	err = json.Unmarshal([]byte(s), &ret)
-	return ret, err
-}
-
-type _json_string struct{}
-
-func new_json_string(_ ...Executor) (Executor, error) { return _json_string{}, nil }
-
-func (_json_string) Exec(_ context.Context, v any) (any, error) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	return string(data), nil
 }

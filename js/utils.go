@@ -136,3 +136,13 @@ func (FieldNameMapper) FieldName(_ reflect.Type, f reflect.StructField) string {
 func (FieldNameMapper) MethodName(_ reflect.Type, m reflect.Method) string {
 	return strings.ToLower(m.Name[0:1]) + m.Name[1:]
 }
+
+// MapValues returns the values of the map m.
+// The values will be in an indeterminate order.
+func MapValues[M ~map[K]V, K comparable, V any](m M) []V {
+	r := make([]V, 0, len(m))
+	for _, v := range m {
+		r = append(r, v)
+	}
+	return r
+}

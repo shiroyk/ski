@@ -10,7 +10,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	urlpkg "net/url"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -20,54 +19,26 @@ import (
 )
 
 func init() {
-	jar := ski.NewCookieJar()
-	fetch := ski.NewFetch().(*http.Client)
-	fetch.Jar = jar
-	js.Register("cookieJar", &CookieJar{jar})
+	jar := NewCookieJar()
+	fetch := &http.Client{
+		Transport: http.DefaultTransport,
+		Jar:       jar,
+	}
+	js.Register("cookieJar", &CookieJarModule{jar})
 	js.Register("http", &Http{fetch})
-	js.Register("fetch", &Fetch{fetch})
+	js.Register("fetch", &FetchModule{fetch})
 	js.Register("FormData", new(FormData))
 	js.Register("URLSearchParams", new(URLSearchParams))
 	js.Register("AbortController", new(AbortController))
 	js.Register("AbortSignal", new(AbortSignal))
 }
 
-// Fetch the global Fetch() method starts the process of
-// fetching a resource from the network, returning a promise
-// which is fulfilled once the response is available.
-// https://developer.mozilla.org/en-US/docs/Web/API/fetch
-type Fetch struct{ ski.Fetch }
-
-func (fetch *Fetch) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	if fetch.Fetch == nil {
-		return nil, errors.New("Fetch can not nil")
-	}
-	return rt.ToValue(func(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
-		req, signal := buildRequest(http.MethodGet, call, vm)
-		return vm.ToValue(js.NewPromise(vm,
-			func() (*http.Response, error) {
-				if signal != nil {
-					defer signal.abort() // release resources
-				}
-				return fetch.Do(req)
-			},
-			func(res *http.Response, err error) (any, error) {
-				if err != nil {
-					return nil, err
-				}
-				return NewAsyncResponse(vm, res), nil
-			}))
-	}), nil
-}
-
-func (*Fetch) Global() {}
-
 // Http module for fetching resources (including across the network).
 type Http struct{ ski.Fetch }
 
 func (h *Http) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	if h.Fetch == nil {
-		return nil, errors.New("Fetch can not nil")
+		return nil, errors.New("fetch can not nil")
 	}
 	return rt.ToValue(map[string]func(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value{
 		"get":     h.Get,
@@ -184,13 +155,6 @@ func buildRequest(
 		ctx = signal.ctx
 	} else {
 		ctx = js.Context(vm)
-	}
-	if v := opt.Get("proxy"); v != nil {
-		proxy, err := urlpkg.Parse(v.String())
-		if err != nil {
-			js.Throw(vm, fmt.Errorf("options proxy is invalid URL, %s", err))
-		}
-		ctx = ski.WithProxyURL(ctx, proxy)
 	}
 
 NEW:

@@ -3,7 +3,6 @@ package xpath
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/shiroyk/ski"
@@ -50,12 +49,12 @@ var (
 )
 
 func assertError(t *testing.T, arg string, contains string) {
-	_, err := new_value()(ski.String(arg))
+	_, err := xpath_value(ski.Arguments{ski.String(arg)})
 	assert.ErrorContains(t, err, contains)
 }
 
 func assertValue(t *testing.T, arg string, expected any) {
-	exec, err := new_value()(ski.String(arg))
+	exec, err := xpath_value(ski.Arguments{ski.String(arg)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
@@ -65,7 +64,7 @@ func assertValue(t *testing.T, arg string, expected any) {
 }
 
 func assertElement(t *testing.T, arg string, expected string) {
-	exec, err := new_element()(ski.String(arg))
+	exec, err := xpath_element(ski.Arguments{ski.String(arg)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
@@ -83,24 +82,17 @@ func assertElement(t *testing.T, arg string, expected string) {
 }
 
 func assertElements(t *testing.T, arg string, expected []string) {
-	exec, err := new_elements()(ski.String(arg))
+	exec, err := xpath_elements(ski.Arguments{ski.String(arg)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
-			case ski.Iterator:
-				ele := make([]string, c.Len())
-				for i := 0; i < c.Len(); i++ {
+			case []*html.Node:
+				ele := make([]string, len(c))
+				for i := 0; i < len(c); i++ {
 					var b bytes.Buffer
-					switch e := c.At(i).(type) {
-					case *html.Node:
-						if assert.NoError(t, html.Render(&b, e)) {
-							ele[i] = b.String()
-						}
-					case string:
-						ele[i] = e
-					default:
-						ele[i] = fmt.Sprintf("%v", e)
+					if assert.NoError(t, html.Render(&b, c[i])) {
+						ele[i] = b.String()
 					}
 				}
 				assert.Equal(t, expected, ele)

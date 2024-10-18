@@ -3,10 +3,11 @@ package gq
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"maps"
+	"net/url"
 	"strings"
-	"sync/atomic"
+	"unsafe"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/andybalholm/cascadia"
@@ -14,72 +15,71 @@ import (
 	"golang.org/x/net/html"
 )
 
-var buildInFuncs atomic.Value
-
 func init() {
-	buildInFuncs.Store(builtins())
-	ski.Register("gq", new_value())
-	ski.Register("gq.element", new_element())
-	ski.Register("gq.elements", new_elements())
-}
-
-// SetFuncs set external FuncMap
-func SetFuncs(m FuncMap) {
-	funcs := maps.Clone(builtins())
-	maps.Copy(funcs, m)
-	buildInFuncs.Store(funcs)
-}
-
-func new_value() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		ret, err := compile(str)
-		if err != nil {
-			return nil, err
-		}
-		ret.calls = append(ret.calls, call{fn: value})
-		return ret, nil
+	ski.Registers(ski.NewExecutors{
+		"gq":          gq,
+		"gq.element":  gq_element,
+		"gq.elements": gq_elements,
+		"gq.attr":     gq_attr,
+		"gq.text":     gq_text,
+		"gq.html":     gq_html,
+		"gq.href":     gq_href,
+		"gq.next":     gq_next,
+		"gq.prev":     gq_prev,
+		"gq.chunk":    gq_chunk,
+		"gq.child":    gq_child,
+		"gq.slice":    gq_slice,
+		"gq.parent":   gq_parent,
+		"gq.parents":  gq_parents,
 	})
 }
 
-func new_element() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		ret, err := compile(str)
-		if err != nil {
-			return nil, err
-		}
-		ret.calls = append(ret.calls, call{fn: element})
-		return ret, nil
-	})
+// gq executes selector and returns the node text,
+// if node list length is 1, return the first node text
+func gq(args ski.Arguments) (ski.Executor, error) {
+	pipe, err := compile(args)
+	if err != nil {
+		return nil, err
+	}
+	return append(pipe, value{}), nil
 }
 
-func new_elements() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		ret, err := compile(str)
-		if err != nil {
-			return nil, err
-		}
-		ret.calls = append(ret.calls, call{fn: elements})
-		return ret, nil
-	})
+// gq_element executes goquery selector and returns the first node
+func gq_element(args ski.Arguments) (ski.Executor, error) {
+	pipe, err := compile(args)
+	if err != nil {
+		return nil, err
+	}
+	return append(pipe, element{}), nil
 }
 
-func compile(raw string) (ret matcher, err error) {
-	funcs := strings.Split(raw, "->")
+// gq_elements executes goquery selector and returns all nodes
+func gq_elements(args ski.Arguments) (ski.Executor, error) {
+	pipe, err := compile(args)
+	if err != nil {
+		return nil, err
+	}
+	return append(pipe, elements{}), nil
+}
+
+// compile the gq function
+func compile(args ski.Arguments) (ski.Pipe, error) {
+	funcs := strings.Split(args.GetString(0), "->")
+
 	if len(funcs) == 1 {
-		ret.Matcher, err = cascadia.Compile(funcs[0])
-		return
-	}
-	selector := strings.TrimSpace(funcs[0])
-	if len(selector) == 0 {
-		ret.Matcher = new(emptyMatcher)
-	} else {
-		ret.Matcher, err = cascadia.Compile(selector)
-		if err != nil {
-			return
-		}
+		v, err := cascadia.Compile(funcs[0])
+		return ski.Pipe{selector(v)}, err
 	}
 
-	ret.calls = make([]call, 0, len(funcs)-1)
+	pipe := make(ski.Pipe, 0, len(funcs))
+
+	if s := strings.TrimSpace(funcs[0]); len(s) > 0 {
+		sel, err := cascadia.Compile(s)
+		if err != nil {
+			return nil, err
+		}
+		pipe = append(pipe, selector(sel))
+	}
 
 	for _, function := range funcs[1:] {
 		function = strings.TrimSpace(function)
@@ -88,62 +88,54 @@ func compile(raw string) (ret matcher, err error) {
 		}
 		name, args, err := parseFuncArguments(function)
 		if err != nil {
-			return ret, err
-		}
-		fn, ok := buildInFuncs.Load().(FuncMap)[name]
-		if !ok {
-			return ret, fmt.Errorf("function %s not exists", name)
-		}
-		ret.calls = append(ret.calls, call{fn, args})
-	}
-
-	return
-}
-
-type call struct {
-	fn   Func
-	args []string
-}
-
-type matcher struct {
-	goquery.Matcher
-	calls []call
-}
-
-func (f matcher) Exec(ctx context.Context, arg any) (any, error) {
-	nodes, err := selection(arg)
-	if err != nil {
-		return nil, err
-	}
-
-	var node any = nodes.FindMatcher(f)
-
-	for _, c := range f.calls {
-		node, err = c.fn(ctx, node, c.args...)
-		if err != nil || node == nil {
 			return nil, err
 		}
+
+		if strings.IndexByte(name, '.') == -1 {
+			name = fmt.Sprintf("gq.%s", name)
+		}
+		ne, ok := ski.GetExecutor(name)
+		if !ok {
+			return nil, fmt.Errorf("function %s not exists", name)
+		}
+		e, err := ne(args)
+		if err != nil {
+			return nil, fmt.Errorf("compile function %s failed: %s", name, err)
+		}
+		pipe = append(pipe, e)
 	}
 
-	return node, nil
+	return pipe, nil
 }
 
-func value(ctx context.Context, node any, _ ...string) (any, error) {
-	if node == nil {
-		return nil, nil
+// compileSelector compile the selector
+func compileSelector(args ski.Arguments) (ret cascadia.Selector, err error) {
+	selector := args.GetString(0)
+	if len(selector) == 0 {
+		return ret, errors.New("missing selector argument")
 	}
-	v, err := Text(ctx, node)
+	return cascadia.Compile(selector)
+}
+
+type selector cascadia.Selector
+
+func (s selector) Exec(_ context.Context, arg any) (any, error) {
+	node, err := toSelection(arg)
 	if err != nil {
 		return nil, err
 	}
-	return v, nil
+	return node.FindMatcher(cascadia.Selector(s)).Nodes, nil
 }
 
-func element(_ context.Context, node any, _ ...string) (any, error) {
+type value = text
+
+type element struct{}
+
+func (element) Exec(_ context.Context, node any) (any, error) {
 	switch t := node.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected type %T", node)
-	case string, []string, *html.Node, ski.Iterator, nil:
+	case string, []string, *html.Node, nil:
 		return t, nil
 	case *goquery.Selection:
 		if len(t.Nodes) == 0 {
@@ -158,16 +150,16 @@ func element(_ context.Context, node any, _ ...string) (any, error) {
 	}
 }
 
-func elements(_ context.Context, node any, _ ...string) (any, error) {
+type elements struct{}
+
+func (elements) Exec(_ context.Context, node any) (any, error) {
 	switch t := node.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected type %T", node)
-	case string, []string, *html.Node, ski.Iterator, nil:
+	case string, []string, *html.Node, []*html.Node, nil:
 		return t, nil
 	case *goquery.Selection:
-		return ski.NewIterator(t.Nodes), nil
-	case []*html.Node:
-		return ski.NewIterator(t), nil
+		return t.Nodes, nil
 	}
 }
 
@@ -184,42 +176,32 @@ func cloneNode(n *html.Node) *html.Node {
 	return m
 }
 
-// selection converts content to goquery.Selection
-func selection(content any) (*goquery.Selection, error) {
+// toSelection converts content to goquery.Selection
+func toSelection(content any) (*goquery.Selection, error) {
 	switch data := content.(type) {
 	default:
 		return nil, fmt.Errorf("unexpected type %T", content)
 	case nil:
 		return new(goquery.Selection), nil
 	case *html.Node:
-		root := &html.Node{Type: html.DocumentNode}
-		root.AppendChild(cloneNode(data))
-		return goquery.NewDocumentFromNode(root).Selection, nil
-	case ski.Iterator:
-		if data.Len() == 0 {
-			return nil, nil
+		return goquery.NewDocumentFromNode(data).Selection, nil
+	case []*html.Node:
+		if len(data) == 0 {
+			return new(goquery.Selection), nil
 		}
-		root := &html.Node{Type: html.DocumentNode}
-		doc := goquery.NewDocumentFromNode(root)
-		for i := 0; i < data.Len(); i++ {
-			switch v := data.At(i).(type) {
-			case *html.Node:
-				root.AppendChild(cloneNode(v))
-			case string:
-				nodes, err := html.ParseFragment(strings.NewReader(v), &html.Node{Type: html.ElementNode})
-				if err != nil {
-					return nil, err
-				}
-				for _, node := range nodes {
-					root.AppendChild(cloneNode(node))
-				}
-			default:
-				return nil, fmt.Errorf("unexpected type %T", v)
+		root := data[0].Parent
+		if root == nil {
+			root = &html.Node{Type: html.DocumentNode}
+			for _, n := range data {
+				root.AppendChild(n)
 			}
 		}
+		d := &document{nil, nil, root}
+		d.Selection = &selection{data, d, nil}
+		doc := (*goquery.Document)(unsafe.Pointer(d))
 		return doc.Selection, nil
 	case []string:
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(strings.Join(data, "\n")))
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(strings.Join(data, "")))
 		if err != nil {
 			return nil, err
 		}
@@ -239,10 +221,14 @@ func selection(content any) (*goquery.Selection, error) {
 	}
 }
 
-type emptyMatcher struct{}
+type document struct {
+	Selection *selection
+	Url       *url.URL
+	rootNode  *html.Node
+}
 
-func (emptyMatcher) Match(*html.Node) bool { return true }
-
-func (emptyMatcher) MatchAll(node *html.Node) []*html.Node { return []*html.Node{node} }
-
-func (emptyMatcher) Filter(nodes []*html.Node) []*html.Node { return nodes }
+type selection struct {
+	Nodes    []*html.Node
+	document *document
+	prevSel  *selection
+}

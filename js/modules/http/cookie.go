@@ -1,4 +1,4 @@
-package ski
+package http
 
 import (
 	"net/http"

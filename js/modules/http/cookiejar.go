@@ -7,15 +7,14 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/spf13/cast"
 )
 
-// CookieJar manages storage and use of cookies in HTTP requests.
-type CookieJar struct{ ski.CookieJar }
+// CookieJarModule manages storage and use of cookies in HTTP requests.
+type CookieJarModule struct{ CookieJar }
 
-func (j *CookieJar) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+func (j *CookieJarModule) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	if j.CookieJar == nil {
 		return nil, errors.New("CookieJar can not nil")
 	}
@@ -28,7 +27,7 @@ func (j *CookieJar) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 }
 
 // Get returns the cookie for the given option.
-func (j *CookieJar) Get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+func (j *CookieJarModule) Get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	opt, err := cast.ToStringMapStringE(call.Argument(0).Export())
 	if err != nil {
 		js.Throw(rt, errors.New("get parameter must be an object containing name, url"))
@@ -51,7 +50,7 @@ func (j *CookieJar) Get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 }
 
 // GetAll returns the cookies for the given option.
-func (j *CookieJar) GetAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+func (j *CookieJarModule) GetAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	opt, err := cast.ToStringMapStringE(call.Argument(0).Export())
 	if err != nil {
 		js.Throw(rt, errors.New("getAll parameter must be an object containing name, url"))
@@ -64,7 +63,7 @@ func (j *CookieJar) GetAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 }
 
 // Set handles the receipt of the cookies in a reply for the given option.
-func (j *CookieJar) Set(call sobek.FunctionCall, rt *sobek.Runtime) (ret sobek.Value) {
+func (j *CookieJarModule) Set(call sobek.FunctionCall, rt *sobek.Runtime) (ret sobek.Value) {
 	u, err := url.Parse(call.Argument(0).String())
 	if err != nil {
 		js.Throw(rt, errors.New("set first parameter must be url string"))
@@ -89,7 +88,7 @@ func (j *CookieJar) Set(call sobek.FunctionCall, rt *sobek.Runtime) (ret sobek.V
 }
 
 // Del handles the receipt of the cookies in a reply for the given URL.
-func (j *CookieJar) Del(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+func (j *CookieJarModule) Del(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	u, err := url.Parse(call.Argument(0).String())
 	if err != nil {
 		js.Throw(rt, err)

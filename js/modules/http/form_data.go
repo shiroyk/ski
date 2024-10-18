@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 )
 
@@ -197,4 +196,4 @@ func (f *formData) Set(name string, value any, filename string) {
 }
 
 // Values method returns an iterator which iterates through all values contained in the formData.
-func (f *formData) Values() any { return ski.MapValues(f.data) }
+func (f *formData) Values() any { return js.MapValues(f.data) }

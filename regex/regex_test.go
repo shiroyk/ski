@@ -26,7 +26,7 @@ func TestReplace(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.re, func(t *testing.T) {
-			exec, err := new_replace()(ski.String(testCase.re))
+			exec, err := regex_replace(ski.Arguments{ski.String(testCase.re)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -60,7 +60,7 @@ func TestMatch(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.re, func(t *testing.T) {
-			exec, err := new_match()(ski.String(testCase.re))
+			exec, err := regex_match(ski.Arguments{ski.String(testCase.re)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -88,7 +88,7 @@ func TestAssert(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.re, func(t *testing.T) {
-			exec, err := new_assert()(ski.String(testCase.re))
+			exec, err := regex_assert(ski.Arguments{ski.String(testCase.re)})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	ski.Register("jq", new_expr())
+	ski.Register("jq", jq)
 }
 
 type expr struct {
@@ -20,14 +20,13 @@ type expr struct {
 	normal bool
 }
 
-func new_expr() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		x, err := jp.ParseString(str)
-		if err != nil {
-			return nil, err
-		}
-		return expr{x, x.Normal()}, nil
-	})
+// jq executes json path
+func jq(args ski.Arguments) (ski.Executor, error) {
+	x, err := jp.ParseString(args.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	return expr{x, x.Normal()}, nil
 }
 
 func (e expr) Exec(_ context.Context, arg any) (any, error) {
@@ -49,15 +48,6 @@ func doc(content any) (any, error) {
 		return oj.ParseString(data.String())
 	case json.RawMessage:
 		return oj.Parse(data)
-	case ski.Iterator:
-		if data.Len() == 0 {
-			return nil, nil
-		}
-		s, ok := data.At(0).(string)
-		if !ok {
-			return data, nil
-		}
-		return oj.ParseString(s)
 	case []byte:
 		return oj.Parse(data)
 	case []string:

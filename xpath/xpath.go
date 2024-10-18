@@ -13,39 +13,39 @@ import (
 )
 
 func init() {
-	ski.Register("xpath", new_value())
-	ski.Register("xpath.element", new_element())
-	ski.Register("xpath.elements", new_elements())
-}
-
-func new_value() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		ex, err := xpath.Compile(str)
-		if err != nil {
-			return nil, err
-		}
-		return expr{ex, value}, nil
+	ski.Registers(ski.NewExecutors{
+		"xpath":          xpath_value,
+		"xpath.element":  xpath_element,
+		"xpath.elements": xpath_elements,
 	})
 }
 
-func new_element() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		ex, err := xpath.Compile(str)
-		if err != nil {
-			return nil, err
-		}
-		return expr{ex, element}, nil
-	})
+// xpath_value executes xpath selector and returns the result
+// if length is 1, return the first of the result
+func xpath_value(arg ski.Arguments) (ski.Executor, error) {
+	ex, err := xpath.Compile(arg.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	return expr{ex, value}, nil
 }
 
-func new_elements() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		ex, err := xpath.Compile(str)
-		if err != nil {
-			return nil, err
-		}
-		return expr{ex, elements}, nil
-	})
+// xpath_element executes xpath selector and returns the first element
+func xpath_element(arg ski.Arguments) (ski.Executor, error) {
+	ex, err := xpath.Compile(arg.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	return expr{ex, element}, nil
+}
+
+// xpath_elements executes xpath selector and returns all elements
+func xpath_elements(arg ski.Arguments) (ski.Executor, error) {
+	ex, err := xpath.Compile(arg.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	return expr{ex, elements}, nil
 }
 
 type expr struct {
@@ -72,7 +72,7 @@ func value(nodes []*html.Node) (any, error) {
 		for i, node := range nodes {
 			str[i] = htmlquery.InnerText(node)
 		}
-		return ski.NewIterator(str), nil
+		return str, nil
 	}
 }
 
@@ -87,7 +87,7 @@ func elements(nodes []*html.Node) (any, error) {
 	if len(nodes) == 0 {
 		return nil, nil
 	}
-	return ski.NewIterator(nodes), nil
+	return nodes, nil
 }
 
 func htmlNode(content any) (*html.Node, error) {
@@ -96,23 +96,21 @@ func htmlNode(content any) (*html.Node, error) {
 		return nil, fmt.Errorf("unexpected type %T", content)
 	case nil:
 		return &html.Node{Type: html.DocumentNode}, nil
-	case ski.Iterator:
+	case []*html.Node:
 		root := &html.Node{Type: html.DocumentNode}
-		if data.Len() == 0 {
+		if len(data) == 0 {
 			return root, nil
 		}
-		for i := 0; i < data.Len(); i++ {
-			n, err := htmlNode(data.At(i))
-			if err != nil {
-				return nil, err
-			}
+		for _, n := range data {
 			root.AppendChild(n)
 		}
 		return root, nil
 	case *html.Node:
 		return data, nil
 	case []string:
-		return html.Parse(strings.NewReader(strings.Join(data, "\n")))
+		return html.Parse(strings.NewReader(strings.Join(data, "")))
+	case fmt.Stringer:
+		return html.Parse(strings.NewReader(data.String()))
 	case string:
 		return html.Parse(strings.NewReader(data))
 	}

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/spf13/cast"
 )
@@ -201,5 +200,5 @@ func (u *urlSearchParams) ToString() string {
 // Values method of the urlSearchParams interface returns an iterator allowing iteration through
 // all values contained in this object. The values are string objects.
 func (u *urlSearchParams) Values() [][]string {
-	return ski.MapValues(u.data)
+	return js.MapValues(u.data)
 }

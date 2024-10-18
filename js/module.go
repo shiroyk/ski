@@ -238,7 +238,7 @@ func toJSExec(init ski.NewExecutor) func(call sobek.FunctionCall, rt *sobek.Runt
 		for _, arg := range call.Arguments {
 			args = append(args, ski.Raw(arg.Export()))
 		}
-		exec, err := init(args...)
+		exec, err := init(args)
 		if err != nil {
 			Throw(rt, err)
 		}
@@ -249,14 +249,15 @@ func toJSExec(init ski.NewExecutor) func(call sobek.FunctionCall, rt *sobek.Runt
 // Executor the ski.Executor
 type Executor struct{ sobek.CyclicModuleRecord }
 
-func new_executor() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		module, err := GetScheduler().Loader().CompileModule("", str)
-		if err != nil {
-			return nil, err
-		}
-		return Executor{module}, nil
-	})
+func js(arg ski.Arguments) (ski.Executor, error) {
+	if len(arg) == 0 {
+		return nil, ErrInvalidModule
+	}
+	module, err := GetScheduler().Loader().CompileModule("", arg.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	return Executor{module}, nil
 }
 
 func (p Executor) Exec(ctx context.Context, arg any) (any, error) {
@@ -268,9 +269,6 @@ func (p Executor) Exec(ctx context.Context, arg any) (any, error) {
 	unwrap, err := Unwrap(value)
 	if err != nil {
 		return nil, err
-	}
-	if s, ok := unwrap.([]any); ok {
-		return ski.NewIterator(s), nil
 	}
 	return unwrap, nil
 }

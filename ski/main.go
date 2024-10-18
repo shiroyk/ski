@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/shiroyk/ski"
@@ -37,40 +35,6 @@ var (
 	versionFlag = flag.Bool("v", false, "output version")
 )
 
-type _fetch string
-
-func new_fetch() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		return _fetch(str), nil
-	})
-}
-
-func (f _fetch) Exec(ctx context.Context, _ any) (any, error) {
-	method, url, found := strings.Cut(string(f), " ")
-	if !found {
-		url = string(f)
-		method = http.MethodGet
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "ski")
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	return string(data), nil
-}
-
 func runModel() (err error) {
 	var bytes []byte
 	if *modelFlag == "-" {
@@ -82,8 +46,6 @@ func runModel() (err error) {
 		return
 	}
 	fmt.Println(string(bytes))
-
-	ski.Register("fetch", new_fetch())
 
 	executor, err := ski.Compile(string(bytes))
 	if err != nil {

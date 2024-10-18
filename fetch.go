@@ -2,9 +2,10 @@ package ski
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
-	"net/url"
+	"strings"
 	"time"
 )
 
@@ -20,7 +21,7 @@ type Fetch interface {
 func NewFetch() Fetch {
 	return &http.Client{
 		Transport: &http.Transport{
-			Proxy: ProxyFromRequest,
+			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
@@ -31,33 +32,39 @@ func NewFetch() Fetch {
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
-		Jar: NewCookieJar(),
 	}
 }
 
-var requestProxyKey byte
+type _fetch string
 
-// WithProxyURL returns a copy of parent context in which the proxy associated with context.
-func WithProxyURL(ctx context.Context, proxy *url.URL) context.Context {
-	if proxy == nil {
-		return ctx
-	}
-	if c, ok := ctx.(Context); ok {
-		c.SetValue(&requestProxyKey, proxy)
-		return c
-	}
-	return context.WithValue(ctx, &requestProxyKey, proxy)
+// fetch the resource from the network, default method is GET
+// Method http://example.com
+func fetch(arg Arguments) (Executor, error) {
+	return _fetch(arg.GetString(0)), nil
 }
 
-// ProxyFromContext returns a proxy URL on context.
-func ProxyFromContext(ctx context.Context) *url.URL {
-	if proxy := ctx.Value(&requestProxyKey); proxy != nil {
-		return proxy.(*url.URL)
+func (f _fetch) Exec(ctx context.Context, _ any) (any, error) {
+	method, url, found := strings.Cut(string(f), " ")
+	if !found {
+		url = string(f)
+		method = http.MethodGet
 	}
-	return nil
-}
 
-// ProxyFromRequest returns a proxy URL on request context.
-func ProxyFromRequest(req *http.Request) (*url.URL, error) {
-	return ProxyFromContext(req.Context()), nil
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "ski")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	return string(data), nil
 }

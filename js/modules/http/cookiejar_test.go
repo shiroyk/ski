@@ -8,16 +8,15 @@ import (
 	"testing"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCookie(t *testing.T) {
+func TestCookieJarModule(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
-		jar := CookieJar{ski.NewCookieJar()}
+		jar := CookieJarModule{NewCookieJar()}
 		instantiate, err := jar.Instantiate(rt)
 		if err != nil {
 			t.Fatal(err)

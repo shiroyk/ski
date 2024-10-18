@@ -50,7 +50,7 @@ var (
 )
 
 func assertValue(t *testing.T, arg string, expected any) {
-	exec, err := new_expr()(ski.String(arg))
+	exec, err := jq(ski.Arguments{ski.String(arg)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(context.Background(), content)
 		if assert.NoError(t, err) {

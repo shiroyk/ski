@@ -269,8 +269,8 @@ func TestConcurrentLoader(t *testing.T) {
 
 type testExec struct{ v any }
 
-func new_testExec(arg ...ski.Executor) (ski.Executor, error) {
-	return testExec{ski.ExecToString(arg[0])}, nil
+func new_testExec(args ski.Arguments) (ski.Executor, error) {
+	return testExec{args.GetString(0)}, nil
 }
 
 func (t testExec) Exec(context.Context, any) (any, error) { return t.v, nil }
@@ -292,7 +292,7 @@ func TestJSExecutor(t *testing.T) {
 }
 
 func TestESMExecutor(t *testing.T) {
-	exec, err := new_executor()(ski.String(`export default (ctx) => ctx.get('content') + 1`))
+	exec, err := js(ski.Arguments{ski.String(`export default (ctx) => ctx.get('content') + 1`)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(context.Background(), "a")
 		if assert.NoError(t, err) {

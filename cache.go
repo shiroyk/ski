@@ -2,6 +2,7 @@ package ski
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -77,4 +78,79 @@ func NewCache() Cache {
 		items:   make(map[string][]byte),
 		timeout: make(map[string]int64),
 	}
+}
+
+// RegisterCache registers cache.get and cache.set with the Cache.
+func RegisterCache(cache Cache) {
+	Registers(NewExecutors{
+		"cache.get": cache_get(cache),
+		"cache.set": cache_set(cache),
+	})
+}
+
+type _cache_get struct {
+	Cache
+	key string
+}
+
+// cache_get returns the string from the cache with key
+func cache_get(cache Cache) NewExecutor {
+	return func(args Arguments) (Executor, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("cache.get: invalid arguments")
+		}
+		return _cache_get{cache, args.GetString(0)}, nil
+	}
+}
+
+func (c _cache_get) Exec(ctx context.Context, _ any) (any, error) {
+	data, err := c.Get(ctx, c.key)
+	if err != nil {
+		return nil, err
+	}
+	return string(data), nil
+}
+
+type _cache_set struct {
+	Cache
+	key     string
+	timeout time.Duration
+}
+
+// cache_set saves string to the cache with key
+func cache_set(cache Cache) NewExecutor {
+	return func(args Arguments) (Executor, error) {
+		if len(args) == 0 {
+			return nil, fmt.Errorf("cache.set: invalid arguments")
+		}
+		var timeout time.Duration
+		if len(args) > 1 {
+			var err error
+			timeout, err = cast.ToDurationE(args.GetString(1))
+			if err != nil {
+				return nil, err
+			}
+		}
+		return _cache_set{cache, args.GetString(0), timeout}, nil
+	}
+}
+
+func (c _cache_set) Exec(ctx context.Context, arg any) (any, error) {
+	var data []byte
+	switch t := arg.(type) {
+	case string:
+		data = []byte(t)
+	case []byte:
+		data = t
+	case fmt.Stringer:
+		data = []byte(t.String())
+	default:
+		return nil, fmt.Errorf("cache.set: invalid type %T", arg)
+	}
+
+	if c.timeout > 0 {
+		ctx = WithCacheTimeout(ctx, c.timeout)
+	}
+
+	return nil, c.Set(ctx, c.key, data)
 }

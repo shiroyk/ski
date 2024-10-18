@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,9 +29,9 @@ func TestExecutor(t *testing.T) {
 				exec := Executor{module}
 				v, err := exec.Exec(context.Background(), nil)
 				if assert.NoError(t, err) {
-					if s, ok := v.(ski.Iterator); ok {
-						for j := 0; j < s.Len(); j++ {
-							assert.Equal(t, c.excepted.([]any)[j], s.At(j), "at %d", j)
+					if s, ok := v.([]any); ok {
+						for j := 0; j < len(s); j++ {
+							assert.Equal(t, c.excepted.([]any)[j], s[j], "at %d", j)
 						}
 					} else {
 						assert.Equal(t, c.excepted, v)

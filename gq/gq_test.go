@@ -3,10 +3,7 @@ package gq
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
-
-	"log/slog"
 
 	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
@@ -58,25 +55,35 @@ var (
 )
 
 func assertError(t *testing.T, arg string, contains string) {
-	exec, err := new_value()(ski.String(arg))
-	if assert.NoError(t, err) {
+	exec, err := gq(ski.Arguments{ski.Raw(arg)})
+	if err == nil {
 		_, err = exec.Exec(ctx, content)
+		assert.ErrorContains(t, err, contains)
+	} else {
 		assert.ErrorContains(t, err, contains)
 	}
 }
 
 func assertValue(t *testing.T, arg string, expected any) {
-	exec, err := new_value()(ski.String(arg))
+	exec, err := gq(ski.Arguments{ski.Raw(arg)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
-			assert.EqualValues(t, expected, v)
+			switch c := v.(type) {
+			case *html.Node:
+				b := new(bytes.Buffer)
+				if assert.NoError(t, html.Render(b, c)) {
+					assert.Equal(t, expected, b.String())
+				}
+			default:
+				assert.Equal(t, expected, v)
+			}
 		}
 	}
 }
 
 func assertElement(t *testing.T, arg string, expected string) {
-	exec, err := new_element()(ski.String(arg))
+	exec, err := gq_element(ski.Arguments{ski.Raw(arg)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
@@ -94,24 +101,17 @@ func assertElement(t *testing.T, arg string, expected string) {
 }
 
 func assertElements(t *testing.T, arg string, expected []string) {
-	exec, err := new_elements()(ski.String(arg))
+	exec, err := gq_elements(ski.Arguments{ski.Raw(arg)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(ctx, content)
 		if assert.NoError(t, err) {
 			switch c := v.(type) {
-			case ski.Iterator:
-				ele := make([]string, c.Len())
-				for i := 0; i < c.Len(); i++ {
+			case []*html.Node:
+				ele := make([]string, len(c))
+				for i, n := range c {
 					var b bytes.Buffer
-					switch e := c.At(i).(type) {
-					case *html.Node:
-						if assert.NoError(t, html.Render(&b, e)) {
-							ele[i] = b.String()
-						}
-					case string:
-						ele[i] = e
-					default:
-						ele[i] = fmt.Sprintf("%v", e)
+					if assert.NoError(t, html.Render(&b, n)) {
+						ele[i] = b.String()
 					}
 				}
 				assert.Equal(t, expected, ele)
@@ -157,7 +157,7 @@ func TestElements(t *testing.T) {
 
 func TestNodeSelect(t *testing.T) {
 	t.Run("single", func(t *testing.T) {
-		exec, err := new_element()(ski.String(`script -> slice(0)`))
+		exec, err := gq_elements(ski.Arguments{ski.String(`script -> slice(0)`)})
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -165,30 +165,18 @@ func TestNodeSelect(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		{
-			exec, err = new_value()(ski.String(`-> attr(type)`))
-			if !assert.NoError(t, err) {
-				return
-			}
-			v1, err := exec.Exec(ctx, v)
-			if assert.NoError(t, err) {
-				assert.EqualValues(t, "text/javascript", v1)
-			}
+		exec, err = gq_attr(ski.Arguments{ski.String(`type`)})
+		if !assert.NoError(t, err) {
+			return
 		}
-		{
-			exec, err = new_value()(ski.String(`script -> attr(type)`))
-			if !assert.NoError(t, err) {
-				return
-			}
-			v2, err := exec.Exec(ctx, v)
-			if assert.NoError(t, err) {
-				assert.EqualValues(t, "text/javascript", v2)
-			}
+		v1, err := exec.Exec(ctx, v)
+		if assert.NoError(t, err) {
+			assert.EqualValues(t, "text/javascript", v1)
 		}
 	})
 
 	t.Run("multiple", func(t *testing.T) {
-		exec, err := new_elements()(ski.String(`#foot div -> slice(0, 3)`))
+		exec, err := gq_elements(ski.Arguments{ski.String(`#foot div -> slice(0, 3)`)})
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -196,60 +184,13 @@ func TestNodeSelect(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		{
-			exec, err = new_value()(ski.String(`-> text`))
-			if !assert.NoError(t, err) {
-				return
-			}
-			v1, err := exec.Exec(ctx, v)
-			if assert.NoError(t, err) {
-				assert.EqualValues(t, []string{"f1", "f2", "f3"}, v1)
-			}
+		exec, err = gq_text(nil)
+		if !assert.NoError(t, err) {
+			return
 		}
-		{
-			exec, err = new_value()(ski.String(`div -> text`))
-			if !assert.NoError(t, err) {
-				return
-			}
-			v2, err := exec.Exec(ctx, v)
-			if assert.NoError(t, err) {
-				assert.EqualValues(t, []string{"f1", "f2", "f3"}, v2)
-			}
+		v1, err := exec.Exec(ctx, v)
+		if assert.NoError(t, err) {
+			assert.EqualValues(t, []string{"f1", "f2", "f3"}, v1)
 		}
 	})
-}
-
-func TestExternalFunc(t *testing.T) {
-	{
-		fun := func(logger *slog.Logger) Func {
-			return func(_ context.Context, content any, args ...string) (any, error) {
-				logger.Info(fmt.Sprintf("result type was %T", content))
-				return content, nil
-			}
-		}
-		data := new(bytes.Buffer)
-		SetFuncs(FuncMap{"logger": fun(slog.New(slog.NewTextHandler(data, nil)))})
-		exec, err := new_value()(ski.String(".body ul a -> logger -> text"))
-		if assert.NoError(t, err) {
-			v, err := exec.Exec(ctx, content)
-			if assert.NoError(t, err) {
-				assert.EqualValues(t, []string{"Google", "Github", "Golang", "Home"}, v)
-			}
-		}
-		assert.Contains(t, data.String(), `result type was *goquery.Selection`)
-	}
-
-	{
-		fun := func(_ context.Context, content any, args ...string) (any, error) {
-			return nil, nil
-		}
-		SetFuncs(FuncMap{"nil": fun})
-		exec, err := new_value()(ski.String(".body ul a -> nil -> text"))
-		if assert.NoError(t, err) {
-			v, err := exec.Exec(ctx, content)
-			if assert.NoError(t, err) {
-				assert.Equal(t, nil, v)
-			}
-		}
-	}
 }

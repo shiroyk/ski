@@ -1,4 +1,4 @@
-package ski
+package http
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCookie(t *testing.T) {
+func TestCookieJar(t *testing.T) {
 	t.Parallel()
 	c := NewCookieJar()
 

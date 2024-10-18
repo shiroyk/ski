@@ -3,6 +3,8 @@ package gq
 import (
 	"fmt"
 	"strings"
+
+	"github.com/shiroyk/ski"
 )
 
 type tokenState int
@@ -13,7 +15,7 @@ const (
 	doubleQuoteState
 )
 
-func parseFuncArguments(s string) (name string, args []string, err error) {
+func parseFuncArguments(s string) (name string, args []ski.Executor, err error) {
 	openBracket := strings.IndexByte(s, '(')
 	closeBracket := strings.LastIndexByte(s, ')')
 
@@ -63,7 +65,7 @@ func parseFuncArguments(s string) (name string, args []string, err error) {
 			}
 		case ',':
 			if state == commonState {
-				args = append(args, arg.String())
+				args = append(args, ski.Raw(arg.String()))
 				arg.Reset()
 				continue
 			}
@@ -80,9 +82,18 @@ func parseFuncArguments(s string) (name string, args []string, err error) {
 	}
 
 	if arg.Cap() > 0 {
-		args = append(args, arg.String())
+		args = append(args, ski.Raw(arg.String()))
 		arg.Reset()
 	}
 
 	return
+}
+
+func isNumer(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }

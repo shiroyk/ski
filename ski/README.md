@@ -10,12 +10,12 @@ go install github.com/shiroyk/ski/ski
 cat << 'EOF' | ski -m -
 $fetch: https://news.ycombinator.com/best
 $xpath.element: //*[@id="hnmain"]/tbody/tr[3]/td/table
-$gq.elements: -> zip('.athing', '.athing + tr')
+$gq.elements: tr -> chunk(3) -> slice(0, 30)
 $each:
   $map:
     index:
       $gq: .rank
-      $regex: /[^\d]/
+      $regex.replace: /[^\d]/
       $kind: int
     title:
       $gq: .titleline>:first-child
@@ -25,7 +25,7 @@ $each:
       $gq: .age
     comments:
       $gq: .subline>:last-child
-      $regex: /[^\d]/
+      $regex.replace: /[^\d]/
       $kind: int
 EOF
 ```

@@ -14,9 +14,11 @@ import (
 )
 
 func init() {
-	ski.Register("regex.replace", new_replace())
-	ski.Register("regex.match", new_match())
-	ski.Register("regex.assert", new_assert())
+	ski.Registers(ski.NewExecutors{
+		"regex.replace": regex_replace,
+		"regex.match":   regex_match,
+		"regex.assert":  regex_assert,
+	})
 }
 
 type tokenState int
@@ -41,45 +43,40 @@ var reOptMap = map[string]regexp2.RegexOptions{
 	"u": regexp2.Unicode,
 }
 
+// regex_replace replace string of the pattern `/regex/replace/flags{start,count}`
+func regex_replace(arg ski.Arguments) (ski.Executor, error) {
+	re, replace, start, count, err := Compile(arg.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	s, err := strconv.Atoi(start)
+	if err != nil {
+		s = -1
+	}
+	c, err := strconv.Atoi(count)
+	if err != nil {
+		c = -1
+	}
+	return _replace{re, replace, s, c}, nil
+}
+
 type _replace struct {
 	*regexp2.Regexp
 	replace      string
 	start, count int
 }
 
-func new_replace() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		re, replace, start, count, err := Compile(str)
-		if err != nil {
-			return nil, err
-		}
-		s, err := strconv.Atoi(start)
-		if err != nil {
-			s = -1
-		}
-		c, err := strconv.Atoi(count)
-		if err != nil {
-			c = -1
-		}
-		return _replace{re, replace, s, c}, nil
-	})
-}
-
 func (r _replace) Exec(_ context.Context, arg any) (any, error) {
 	switch conv := arg.(type) {
 	case string:
 		return r.Replace(conv, r.replace, r.start, r.count)
-	case ski.Iterator:
-		if conv.Len() == 0 {
+	case []string:
+		if len(conv) == 0 {
 			return nil, nil
 		}
-		_, ok := conv.At(0).(string)
-		if !ok {
-			return nil, fmt.Errorf("regex.replace unsupported type %T", arg)
-		}
-		ret := make([]string, 0, conv.Len())
-		for i := 0; i < conv.Len(); i++ {
-			v, err := r.Replace(conv.At(i).(string), r.replace, r.start, r.count)
+		ret := make([]string, 0, len(conv))
+		for _, str := range conv {
+			v, err := r.Replace(str, r.replace, r.start, r.count)
 			if err != nil {
 				return nil, err
 			}
@@ -95,21 +92,20 @@ func (r _replace) Exec(_ context.Context, arg any) (any, error) {
 	}
 }
 
+// regex_match match string of the pattern `/regex/flags{start,count}`
+func regex_match(arg ski.Arguments) (ski.Executor, error) {
+	re, _, start, end, err := Compile(arg.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	s, _ := strconv.Atoi(start)
+	e, _ := strconv.Atoi(end)
+	return _match{re, s, e}, nil
+}
+
 type _match struct {
 	*regexp2.Regexp
 	start, end int
-}
-
-func new_match() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		re, _, start, end, err := Compile(str)
-		if err != nil {
-			return nil, err
-		}
-		s, _ := strconv.Atoi(start)
-		e, _ := strconv.Atoi(end)
-		return _match{re, s, e}, nil
-	})
 }
 
 func (r _match) Exec(_ context.Context, arg any) (any, error) {
@@ -162,24 +158,23 @@ func (r _match) findAllString(s string) []string {
 	return matches
 }
 
+// regex_assert assert string of the pattern `/regex/message/flags`
+func regex_assert(arg ski.Arguments) (ski.Executor, error) {
+	re, msg, _, _, err := Compile(arg.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	var ret _assert
+	ret.Regexp = re
+	if len(msg) > 0 {
+		ret.err = errors.New(msg)
+	}
+	return ret, nil
+}
+
 type _assert struct {
 	*regexp2.Regexp
 	err error
-}
-
-func new_assert() ski.NewExecutor {
-	return ski.StringExecutor(func(str string) (ski.Executor, error) {
-		re, msg, _, _, err := Compile(str)
-		if err != nil {
-			return nil, err
-		}
-		var ret _assert
-		ret.Regexp = re
-		if len(msg) > 0 {
-			ret.err = errors.New(msg)
-		}
-		return ret, nil
-	})
 }
 
 func (r _assert) assert(str string) error {
@@ -222,7 +217,7 @@ func (r _assert) Exec(_ context.Context, arg any) (any, error) {
 	return arg, nil
 }
 
-// Compile the pattern `/regex/replace/options{start,count}` or `/regex/options{start,count}`
+// Compile the pattern `/regex/replace/flags{start,count}` or `/regex/flags{start,count}`
 func Compile(arg string) (re *regexp2.Regexp, replace string, start, count string, err error) {
 	state := commonState
 	pattern := strings.Builder{}
