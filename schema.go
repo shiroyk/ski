@@ -23,7 +23,7 @@ func init() {
 		"or":          or,
 		"debug":       debug,
 		"list.of":     list_of,
-		"if.match":    if_match,
+		"if.contains": if_contains,
 		"str.join":    str_join,
 		"str.split":   str_split,
 		"str.suffix":  str_suffix,

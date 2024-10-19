@@ -39,15 +39,15 @@ $kind: int
 `$list.of` returns a list of Executor result.
 ```yaml
 $list.of:
-  - $raw: 123
-  - $raw: 456
+  - 123
+  - 456
 ```
 #### str.join
 `$str.join` joins strings with specified separator.
 ```yaml
 $list.of:
-  - $raw: 123
-  - $raw: 456
+  - 123
+  - 456
 $str.join: ~
 ```
 #### str.split
@@ -87,7 +87,7 @@ $list.of:
   - 234
   - 345
 $each:
-  $if.match: !2
+  $if.contains: !2
     $kind: int
 ```
 filter the string match "bar", output: {"bar": "some value"}
@@ -97,7 +97,7 @@ $list.of:
   - bar
   - baz
 $map:
-  $if.match: !bar
+  $if.contains: !bar
   $raw: some value
 ```
 ### Expression

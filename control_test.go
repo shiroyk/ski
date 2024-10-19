@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dlclark/regexp2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,9 +24,9 @@ func TestIf(t *testing.T) {
 		want any
 	}{
 		{_each{if_int{}}, []any{"1", 1, "2", 1, "3", 4}, []any{1, 1, 4}},
-		{_each{_if_match{regexp2.MustCompile("3", regexp2.None), nil}}, []any{"1", 2, "3", 4, "3"}, []any{"3", "3"}},
-		{_each{_if_match{regexp2.MustCompile("3", regexp2.None), _inc{}}}, []any{"1", 2, "3", 4, "3"}, []any{4, 4}},
-		{_map{_if_match{regexp2.MustCompile("3", regexp2.None), _str_prefix("key")}, String("value")}, []any{"1", "2", "3"}, map[string]any{"key3": "value"}},
+		{_each{_if_contains{"3", nil}}, []any{"1", 2, "3", 4, "3"}, []any{"3", "3"}},
+		{_each{_if_contains{"3", _inc{}}}, []any{"1", 2, "3", 4, "3"}, []any{4, 4}},
+		{_map{_if_contains{"3", _str_prefix("key")}, String("value")}, []any{"1", "2", "3"}, map[string]any{"key3": "value"}},
 	}
 	for i, c := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
