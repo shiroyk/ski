@@ -28,7 +28,7 @@ type _if_contains struct {
 	exec Executor
 }
 
-// Meta compile the regex expression from the tag
+// Meta substring from the yaml node tag
 func (c *_if_contains) Meta(_, v *yaml.Node) (err error) {
 	c.sub = strings.TrimPrefix(v.Tag, "!")
 	return nil
