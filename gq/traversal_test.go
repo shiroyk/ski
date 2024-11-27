@@ -80,6 +80,10 @@ func TestBuildInFuncChunk(t *testing.T) {
 	assertValue(t, `.body ul -> chunk(li, 2)`, []string{"GoogleGithub", "GolangHome"})
 
 	assertValue(t, `.body ul li -> chunk(3)`, []string{"GoogleGithubGolang", "Home"})
+
+	assertValue(t, `#main -> chunk(.row, 3)`, []string{"123", "456"})
+
+	assertValue(t, `#main -> chunk('#main .row', 3)`, []string{"123", "456"})
 }
 
 func TestBuildInFuncChild(t *testing.T) {

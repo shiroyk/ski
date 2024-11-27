@@ -12,6 +12,7 @@ import (
 	"github.com/shiroyk/ski"
 	"github.com/spf13/cast"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 // contentToString converts content to strings,
@@ -320,7 +321,13 @@ func (s chunk) Exec(_ context.Context, arg any) (any, error) {
 		return nil, nil
 	}
 	ret := make([]*html.Node, 0, len(nodes)/s.size)
-	parent := nodes[0]
+	parent := nodes[0].Parent
+	if parent == nil {
+		parent = &html.Node{
+			Type:     html.ElementNode,
+			DataAtom: atom.Div,
+		}
+	}
 	for i := 0; i < len(nodes); i += s.size {
 		p := &html.Node{
 			Type:     parent.Type,
