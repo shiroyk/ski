@@ -33,6 +33,29 @@ func init() {
 	})
 }
 
+// Meta from the yaml node, if Executor implements Meta, it will be called on compile
+type Meta interface {
+	Meta(k, v *yaml.Node) error
+}
+
+// Compile the Executor from the YAML string.
+func Compile(str string) (Executor, error) {
+	c := new(compiler)
+	if err := yaml.Unmarshal([]byte(str), c); err != nil {
+		return nil, err
+	}
+	return c.exec, nil
+}
+
+// CompileNode the Executor from the YAML node.
+func CompileNode(node *yaml.Node) (Executor, error) {
+	c := new(compiler)
+	if err := c.UnmarshalYAML(node); err != nil {
+		return nil, err
+	}
+	return c.exec, nil
+}
+
 // Kind converts to a Kind type
 type Kind uint
 
@@ -248,25 +271,6 @@ func (c compiler) compileMapping(node *yaml.Node) ([]Executor, error) {
 		ret = append(ret, key, pipe)
 	}
 	return ret, nil
-}
-
-type Option func(*compiler)
-
-// Meta from the yaml node, if Executor implements Meta, it will be called on compile
-type Meta interface {
-	Meta(k, v *yaml.Node) error
-}
-
-// Compile the Executor with the Option.
-func Compile(str string, opts ...Option) (Executor, error) {
-	c := new(compiler)
-	for _, opt := range opts {
-		opt(c)
-	}
-	if err := yaml.Unmarshal([]byte(str), c); err != nil {
-		return nil, err
-	}
-	return c.exec, nil
 }
 
 type _map []Executor
