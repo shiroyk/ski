@@ -97,12 +97,15 @@ func htmlNode(content any) (*html.Node, error) {
 	case nil:
 		return &html.Node{Type: html.DocumentNode}, nil
 	case []*html.Node:
-		root := &html.Node{Type: html.DocumentNode}
 		if len(data) == 0 {
-			return root, nil
+			return &html.Node{Type: html.DocumentNode}, nil
 		}
-		for _, n := range data {
-			root.AppendChild(n)
+		root := data[0].Parent
+		if root == nil {
+			root = &html.Node{Type: html.DocumentNode}
+			for _, n := range data {
+				root.AppendChild(n)
+			}
 		}
 		return root, nil
 	case *html.Node:
