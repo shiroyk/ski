@@ -101,3 +101,32 @@ func TestAssert(t *testing.T) {
 		})
 	}
 }
+
+func TestIfMatch(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		re, str string
+		valid   bool
+	}{
+		{`/[0-9]/`, `114i`, true},
+		{`/[a-z]/`, `abc`, true},
+		{`/[a-z]/i`, `ABC`, true},
+		{`/[a-z]/`, `123`, false},
+		{`/[a-z]/`, `123`, false},
+		{`/[a-z]/i`, `123`, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.re, func(t *testing.T) {
+			exec, err := if_match(ski.Arguments{ski.String(testCase.re)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = exec.Exec(context.Background(), testCase.str)
+			if testCase.valid {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, ski.ErrYield)
+			}
+		})
+	}
+}

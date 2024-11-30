@@ -15,6 +15,7 @@ import (
 
 func init() {
 	ski.Registers(ski.NewExecutors{
+		"if.match":      if_match,
 		"regex.replace": regex_replace,
 		"regex.match":   regex_match,
 		"regex.assert":  regex_assert,
@@ -215,6 +216,41 @@ func (r _assert) Exec(_ context.Context, arg any) (any, error) {
 		return nil, err
 	}
 	return arg, nil
+}
+
+// if_match check string matches the regexp,
+// if not match return the ski.ErrYield else return the original arg.
+func if_match(args ski.Arguments) (ski.Executor, error) {
+	if len(args) == 0 {
+		return nil, errors.New("if.match needs 1 string parameter")
+	}
+	regexp, _, _, _, err := Compile(args.GetString(0))
+	if err != nil {
+		return nil, err
+	}
+	return (*_if_match)(regexp), nil
+}
+
+type _if_match regexp2.Regexp
+
+func (s *_if_match) Exec(_ context.Context, arg any) (any, error) {
+	var ok bool
+	switch v := arg.(type) {
+	case string:
+		ok, _ = (*regexp2.Regexp)(s).MatchString(v)
+	case fmt.Stringer:
+		ok, _ = (*regexp2.Regexp)(s).MatchString(v.String())
+	case []string:
+		for _, i := range v {
+			if ok, _ = (*regexp2.Regexp)(s).MatchString(i); ok {
+				return arg, nil
+			}
+		}
+	}
+	if ok {
+		return arg, nil
+	}
+	return nil, ski.ErrYield
 }
 
 // Compile the pattern `/regex/replace/flags{start,count}` or `/regex/flags{start,count}`

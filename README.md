@@ -87,7 +87,8 @@ $list.of:
   - 234
   - 345
 $each:
-  $if.contains: !2
+  $pipe:
+    $if.contains: 2
     $kind: int
 ```
 filter the string match "bar", output: {"bar": "some value"}
@@ -97,7 +98,7 @@ $list.of:
   - bar
   - baz
 $map:
-  $if.contains: !bar
+  $if.contains: bar
   $raw: some value
 ```
 ### Expression

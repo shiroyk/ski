@@ -290,21 +290,16 @@ func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 
 	exec := func(arg any) {
 		for i := 0; i < len(m); i += 2 {
-			if control, ok := m[i].(If); ok {
-				if !control.If(ctx, arg) {
-					continue
-				}
-			}
 			k, err := m[i].Exec(ctx, arg)
 			if err != nil {
 				continue
 			}
-			ks, err := cast.ToStringE(k)
+			key, err := cast.ToStringE(k)
 			if err != nil {
 				continue
 			}
-			v, _ := m[i+1].Exec(ctx, arg)
-			ret[ks] = v
+			value, _ := m[i+1].Exec(ctx, arg)
+			ret[key] = value
 		}
 	}
 
@@ -325,8 +320,8 @@ func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 
 type _each struct{ Executor }
 
-// each loop the slice arg and execute the Executor, if the Executor implements If
-// and condition not met, the arg will be skipped.
+// each loop the slice arg and execute the Executor,
+// if Executor return ErrYield will be skipped.
 func each(args Arguments) (Executor, error) {
 	if len(args) != 1 {
 		return nil, errors.New("each needs 1 parameter")
@@ -339,30 +334,23 @@ func (each _each) Exec(ctx context.Context, arg any) (any, error) {
 	switch v.Kind() {
 	case reflect.Slice:
 		ret := make([]any, 0, v.Len())
-		if control, ok := each.Executor.(If); ok {
-			for i := 0; i < v.Len(); i++ {
-				ele := v.Index(i).Interface()
-				if control.If(ctx, ele) {
-					v, _ := each.Executor.Exec(ctx, ele)
-					ret = append(ret, v)
+		for i := 0; i < v.Len(); i++ {
+			v, err := each.Executor.Exec(ctx, v.Index(i).Interface())
+			if err != nil {
+				if errors.Is(err, ErrYield) {
+					continue
 				}
+				return nil, err
 			}
-		} else {
-			for i := 0; i < v.Len(); i++ {
-				v, _ := each.Executor.Exec(ctx, v.Index(i).Interface())
-				ret = append(ret, v)
-			}
+			ret = append(ret, v)
 		}
 		return ret, nil
 	default:
-		if control, ok := each.Executor.(If); ok && !control.If(ctx, arg) {
-			return arg, nil
-		}
-		v, err := each.Executor.Exec(ctx, arg)
+		ret, err := each.Executor.Exec(ctx, arg)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
-		return v, nil
+		return ret, nil
 	}
 }
 
@@ -371,7 +359,7 @@ func (each _each) Exec(ctx context.Context, arg any) (any, error) {
 type Pipe []Executor
 
 // pipe executes a slice of Executor.
-// if the Executor implements If and condition not met, it will be skipped.
+// if Executor return ErrYield will be stopped
 func pipe(args Arguments) (Executor, error) { return Pipe(args), nil }
 
 func (pipe Pipe) Exec(ctx context.Context, arg any) (ret any, err error) {
@@ -384,12 +372,6 @@ func (pipe Pipe) Exec(ctx context.Context, arg any) (ret any, err error) {
 		ret = arg
 
 		for _, exec := range pipe {
-			switch control := exec.(type) {
-			case If:
-				if !control.If(ctx, ret) {
-					continue
-				}
-			}
 			ret, err = exec.Exec(ctx, ret)
 			if err != nil || ret == nil {
 				return

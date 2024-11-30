@@ -4,56 +4,32 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
-// If control flow, check the condition is met.
-// see Pipe, each, mapping, list_of, if_contains
-type If interface {
-	If(context.Context, any) (met bool)
-}
-
 // if_contains check string contains the substring,
-// if met execute the Executor else return the original arg.
+// if not contains return the ErrYield else return the original arg.
 func if_contains(args Arguments) (Executor, error) {
-	if len(args) == 0 {
-		return new(_if_contains), nil
-	}
-	return &_if_contains{exec: Pipe(args)}, nil
+	return _if_contains(args.GetString(0)), nil
 }
 
-type _if_contains struct {
-	sub  string
-	exec Executor
-}
+type _if_contains string
 
-// Meta substring from the yaml node tag
-func (c *_if_contains) Meta(_, v *yaml.Node) (err error) {
-	c.sub = strings.TrimPrefix(v.Tag, "!")
-	return nil
-}
-
-func (c _if_contains) If(_ context.Context, arg any) bool {
-	switch t := arg.(type) {
-	case fmt.Stringer:
-		return strings.Contains(t.String(), c.sub)
+func (s _if_contains) Exec(ctx context.Context, arg any) (any, error) {
+	var ok bool
+	switch v := arg.(type) {
 	case string:
-		return strings.Contains(t, c.sub)
+		ok = strings.Contains(v, string(s))
+	case fmt.Stringer:
+		ok = strings.Contains(v.String(), string(s))
 	case []string:
-		for _, s := range t {
-			ok := strings.Contains(s, c.sub)
-			if ok {
-				return true
+		for _, i := range v {
+			if ok = strings.Contains(i, string(s)); ok {
+				return arg, nil
 			}
 		}
 	}
-	return false
-}
-
-func (c _if_contains) Exec(ctx context.Context, arg any) (any, error) {
-	if c.exec == nil {
+	if ok {
 		return arg, nil
 	}
-	return c.exec.Exec(ctx, arg)
+	return nil, ErrYield
 }
