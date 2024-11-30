@@ -53,9 +53,6 @@ var reName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 // Register registers the NewExecutor with the given name.
 // Valid name characters: a-zA-Z0-9_
 func Register(name string, fn NewExecutor) {
-	if name == "" {
-		panic("ski: invalid pattern")
-	}
 	if fn == nil {
 		panic("ski: NewExecutor is nil")
 	}
@@ -88,9 +85,6 @@ func Registers(e NewExecutors) {
 	defer executors.Unlock()
 
 	for name, fn := range e {
-		if name == "" {
-			panic("ski: invalid pattern")
-		}
 		if fn == nil {
 			panic("ski: NewExecutor is nil")
 		}
