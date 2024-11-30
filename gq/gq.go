@@ -32,6 +32,8 @@ func init() {
 		"gq.parent":   gq_parent,
 		"gq.parents":  gq_parents,
 		"gq.closest":  gq_closest,
+		"gq.not":      gq_not,
+		"gq.has":      gq_has,
 	})
 }
 
@@ -110,12 +112,12 @@ func compile(args ski.Arguments) (ski.Pipe, error) {
 }
 
 // compileSelector compile the selector
-func compileSelector(args ski.Arguments) (ret cascadia.Selector, err error) {
-	selector := args.GetString(0)
-	if len(selector) == 0 {
-		return ret, errors.New("missing selector argument")
+func compileSelector(args ski.Arguments) (cascadia.Selector, error) {
+	expr := args.GetString(0)
+	if len(expr) == 0 {
+		return nil, errors.New("missing selector argument")
 	}
-	return cascadia.Compile(selector)
+	return cascadia.Compile(expr)
 }
 
 type selector cascadia.Selector
@@ -177,11 +179,12 @@ func cloneNode(n *html.Node) *html.Node {
 	return m
 }
 
-// toSelection converts content to goquery.Selection
+// toSelection converts content to goquery.Selection.
+// from string, []string, *html.Node, []*html.Node
 func toSelection(content any) (*goquery.Selection, error) {
 	switch data := content.(type) {
 	default:
-		return nil, fmt.Errorf("unexpected type %T", content)
+		return nil, fmt.Errorf("gq: unexpected type %T", content)
 	case nil:
 		return new(goquery.Selection), nil
 	case *html.Node:

@@ -113,3 +113,17 @@ func TestBuildInClosest(t *testing.T) {
 
 	assertValue(t, `.body ul li -> closest(.selected)`, "Golang")
 }
+
+func TestBuildNot(t *testing.T) {
+	t.Parallel()
+
+	assertValue(t, `.body ul li -> not(.selected)`, []string{"Google", "Github", "Home"})
+}
+
+func TestBuildHas(t *testing.T) {
+	t.Parallel()
+
+	assertValue(t, `div ul -> has(span) -> child(li)`, []string{"b1", "b2"})
+
+	assertValue(t, `div ul -> has(a) -> child(li)`, []string{"Google", "Github", "Golang", "Home"})
+}

@@ -34,6 +34,12 @@ var (
 			<li id="a4"><a href="/home" title="Home page">Home</a></li>
 		</ul>
 	</div>
+    <div class="bottom">
+	  <ul>
+	    <li class="text">b1</li>
+	    <li class="text"><span>b2</span></li>
+      </ul>
+    </div>
     <div id="foot">
       <div id="nf1" class="one even row">f1</div>
       <div id="nf2" class="two odd row">f2</div>

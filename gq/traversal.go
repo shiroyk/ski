@@ -422,7 +422,7 @@ func (s parents) Exec(_ context.Context, arg any) (any, error) {
 	return node.Parents().Nodes, nil
 }
 
-// closest gets the first element that matches the selector by testing the
+// gq_closest gets the first element that matches the selector by testing the
 // element itself and traversing up through its ancestors in the DOM tree.
 func gq_closest(args ski.Arguments) (ski.Executor, error) {
 	if len(args) == 0 {
@@ -443,4 +443,50 @@ func (s closest) Exec(_ context.Context, arg any) (any, error) {
 		return nil, err
 	}
 	return node.ClosestMatcher(cascadia.Selector(s)).Nodes, nil
+}
+
+// gq_not removes elements that match the given matcher.
+// It returns nodes with the matching elements removed.
+func gq_not(args ski.Arguments) (ski.Executor, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("not(selector) must has selector")
+	}
+	sel, err := compileSelector(args)
+	if err != nil {
+		return nil, err
+	}
+	return not(sel), nil
+}
+
+type not cascadia.Selector
+
+func (s not) Exec(_ context.Context, arg any) (any, error) {
+	node, err := toSelection(arg)
+	if err != nil {
+		return nil, err
+	}
+	return node.NotMatcher(cascadia.Selector(s)).Nodes, nil
+}
+
+// gq_has reduces the set of matched elements to those that have a descendant
+// that matches the matcher.
+func gq_has(args ski.Arguments) (ski.Executor, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("has(selector) must has selector")
+	}
+	sel, err := compileSelector(args)
+	if err != nil {
+		return nil, err
+	}
+	return has(sel), nil
+}
+
+type has cascadia.Selector
+
+func (s has) Exec(_ context.Context, arg any) (any, error) {
+	node, err := toSelection(arg)
+	if err != nil {
+		return nil, err
+	}
+	return node.HasMatcher(cascadia.Selector(s)).Nodes, nil
 }
