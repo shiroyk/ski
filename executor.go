@@ -3,9 +3,9 @@ package ski
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
-	"unicode"
 )
 
 type (
@@ -48,8 +48,10 @@ func (a Arguments) GetString(i int) string {
 	}
 }
 
+var reName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
 // Register registers the NewExecutor with the given name.
-// Valid name: [a-zA-Z_][a-zA-Z0-9_]* (leading and trailing underscores are allowed)
+// Valid name characters: a-zA-Z0-9_
 func Register(name string, fn NewExecutor) {
 	if name == "" {
 		panic("ski: invalid pattern")
@@ -57,18 +59,21 @@ func Register(name string, fn NewExecutor) {
 	if fn == nil {
 		panic("ski: NewExecutor is nil")
 	}
-	if !isValidName(name) {
+	before, method, _ := strings.Cut(name, ".")
+	if !reName.MatchString(before) {
+		panic(fmt.Sprintf("ski: invalid name %q", name))
+	}
+	if method != "" && !reName.MatchString(method) {
 		panic(fmt.Sprintf("ski: invalid name %q", name))
 	}
 
 	executors.Lock()
 	defer executors.Unlock()
 
-	name, method, _ := strings.Cut(name, ".")
-	entries, ok := executors.registry[name]
+	entries, ok := executors.registry[before]
 	if !ok {
 		entries = make(NewExecutors)
-		executors.registry[name] = entries
+		executors.registry[before] = entries
 	}
 	entries[method] = fn
 }
@@ -77,7 +82,7 @@ func Register(name string, fn NewExecutor) {
 type NewExecutors map[string]NewExecutor
 
 // Registers register the NewExecutors.
-// Valid name: [a-zA-Z_][a-zA-Z0-9_]* (leading and trailing underscores are allowed)
+// Valid name characters: a-zA-Z0-9_
 func Registers(e NewExecutors) {
 	executors.Lock()
 	defer executors.Unlock()
@@ -89,14 +94,17 @@ func Registers(e NewExecutors) {
 		if fn == nil {
 			panic("ski: NewExecutor is nil")
 		}
-		if !isValidName(name) {
+		before, method, _ := strings.Cut(name, ".")
+		if !reName.MatchString(before) {
 			panic(fmt.Sprintf("ski: invalid name %q", name))
 		}
-		name, method, _ := strings.Cut(name, ".")
-		entries, ok := executors.registry[name]
+		if method != "" && !reName.MatchString(method) {
+			panic(fmt.Sprintf("ski: invalid name %q", name))
+		}
+		entries, ok := executors.registry[before]
 		if !ok {
 			entries = make(NewExecutors)
-			executors.registry[name] = entries
+			executors.registry[before] = entries
 		}
 		entries[method] = fn
 	}
@@ -133,26 +141,32 @@ func GetExecutors(name string) (map[string]NewExecutor, bool) {
 	return ret, true
 }
 
-// RemoveExecutor removes an Executor with the given name
-func RemoveExecutor(name string) {
+// RemoveExecutor removes Executor with the given names
+func RemoveExecutor(names ...string) {
+	if len(names) == 0 {
+		return
+	}
+
 	executors.Lock()
 	defer executors.Unlock()
 
-	name, method, _ := strings.Cut(name, ".")
-	entries, ok := executors.registry[name]
-	if !ok {
-		return
-	}
+	for _, name := range names {
+		name, method, _ := strings.Cut(name, ".")
+		entries, ok := executors.registry[name]
+		if !ok {
+			continue
+		}
 
-	if method == "" {
-		delete(executors.registry, name)
-		return
-	}
+		if method == "" {
+			delete(executors.registry, name)
+			continue
+		}
 
-	delete(entries, method)
+		delete(entries, method)
 
-	if len(entries) == 0 {
-		delete(executors.registry, name)
+		if len(entries) == 0 {
+			delete(executors.registry, name)
+		}
 	}
 }
 
@@ -172,38 +186,6 @@ func AllExecutors() map[string]NewExecutor {
 		}
 	}
 	return ret
-}
-
-func isValidName(s string) bool {
-	if s == "" {
-		return false
-	}
-	if !unicode.IsLetter(rune(s[0])) && s[0] != '_' {
-		return false
-	}
-	hasDot := false
-	for i := 0; i < len(s); i++ {
-		char := rune(s[i])
-		if char == '.' {
-			if hasDot {
-				return false
-			}
-			hasDot = true
-			if i == len(s)-1 {
-				return false
-			}
-			next := s[i+1]
-			if !unicode.IsLetter(rune(next)) && next != '_' {
-				return false
-			}
-			i++
-			continue
-		}
-		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '_' {
-			return false
-		}
-	}
-	return true
 }
 
 var executors = struct {

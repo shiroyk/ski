@@ -1,6 +1,7 @@
 package ski
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ func TestValidName(t *testing.T) {
 		{"_.bar_", true},
 		{"_foo.bar_", true},
 		{"foo123.bar123", true},
-		{"123foo.bar123", false},
+		{"123foo.bar123", true},
 		{"foo.bar.baz", false},
 		{"foo.bar.baz.", false},
 		{"foo.bar.baz..", false},
@@ -24,6 +25,11 @@ func TestValidName(t *testing.T) {
 	}
 
 	for _, testCase := range testsCases {
-		assert.Equal(t, testCase.ok, isValidName(testCase.name), testCase.name)
+		before, method, _ := strings.Cut(testCase.name, ".")
+		ok := reName.MatchString(before)
+		if method != "" {
+			ok = ok && reName.MatchString(method)
+		}
+		assert.Equal(t, testCase.ok, ok, testCase.name)
 	}
 }
