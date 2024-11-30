@@ -421,3 +421,26 @@ func (s parents) Exec(_ context.Context, arg any) (any, error) {
 	}
 	return node.Parents().Nodes, nil
 }
+
+// closest gets the first element that matches the selector by testing the
+// element itself and traversing up through its ancestors in the DOM tree.
+func gq_closest(args ski.Arguments) (ski.Executor, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("closest(selector) must has selector")
+	}
+	sel, err := compileSelector(args)
+	if err != nil {
+		return nil, err
+	}
+	return closest(sel), nil
+}
+
+type closest cascadia.Selector
+
+func (s closest) Exec(_ context.Context, arg any) (any, error) {
+	node, err := toSelection(arg)
+	if err != nil {
+		return nil, err
+	}
+	return node.ClosestMatcher(cascadia.Selector(s)).Nodes, nil
+}

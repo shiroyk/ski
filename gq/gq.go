@@ -31,6 +31,7 @@ func init() {
 		"gq.slice":    gq_slice,
 		"gq.parent":   gq_parent,
 		"gq.parents":  gq_parents,
+		"gq.closest":  gq_closest,
 	})
 }
 

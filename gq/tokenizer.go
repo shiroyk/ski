@@ -65,7 +65,7 @@ func parseFuncArguments(s string) (name string, args []ski.Executor, err error) 
 			}
 		case ',':
 			if state == commonState {
-				args = append(args, ski.Raw(arg.String()))
+				args = append(args, ski.String(arg.String()))
 				arg.Reset()
 				continue
 			}
@@ -82,7 +82,7 @@ func parseFuncArguments(s string) (name string, args []ski.Executor, err error) 
 	}
 
 	if arg.Cap() > 0 {
-		args = append(args, ski.Raw(arg.String()))
+		args = append(args, ski.String(arg.String()))
 		arg.Reset()
 	}
 

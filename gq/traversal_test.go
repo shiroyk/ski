@@ -107,3 +107,9 @@ func TestBuildInFuncParents(t *testing.T) {
 
 	assertValue(t, `.body ul .selected -> parents -> slice(0) -> attr(id)`, "url")
 }
+
+func TestBuildInClosest(t *testing.T) {
+	t.Parallel()
+
+	assertValue(t, `.body ul li -> closest(.selected)`, "Golang")
+}
