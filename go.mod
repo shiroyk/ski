@@ -11,7 +11,7 @@ require (
 	github.com/antchfx/xpath v1.3.2
 	github.com/dlclark/regexp2 v1.11.4
 	github.com/grafana/sobek v0.0.0-20240927094302-19dd311f018f
-	github.com/ohler55/ojg v1.24.1
+	github.com/ohler55/ojg v1.25.0
 	github.com/spf13/cast v1.7.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/crypto v0.28.0
