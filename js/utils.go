@@ -56,8 +56,8 @@ func Unwrap(value sobek.Value) (any, error) {
 	}
 }
 
-// ModuleCallable return the sobek.CyclicModuleRecord default export as sobek.Callable.
-func ModuleCallable(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFunc, module sobek.CyclicModuleRecord) (sobek.Callable, error) {
+// ModuleInstance return the sobek.ModuleInstance.
+func ModuleInstance(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFunc, module sobek.CyclicModuleRecord) (sobek.ModuleInstance, error) {
 	instance := rt.GetModuleInstance(module)
 	if instance == nil {
 		if err := module.Link(); err != nil {
@@ -70,7 +70,16 @@ func ModuleCallable(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFu
 		case sobek.PromiseStateFulfilled:
 		default:
 		}
-		instance = rt.GetModuleInstance(module)
+		return rt.GetModuleInstance(module), nil
+	}
+	return instance, nil
+}
+
+// ModuleCallable return the sobek.CyclicModuleRecord default export as sobek.Callable.
+func ModuleCallable(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFunc, module sobek.CyclicModuleRecord) (sobek.Callable, error) {
+	instance, err := ModuleInstance(rt, resolve, module)
+	if err != nil {
+		return nil, err
 	}
 	value := instance.GetBindingValue("default")
 	call, ok := sobek.AssertFunction(value)
