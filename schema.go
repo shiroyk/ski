@@ -134,7 +134,8 @@ func (k Kind) Exec(_ context.Context, v any) (any, error) {
 }
 
 type compiler struct {
-	exec Executor
+	exec  Executor
+	alias map[string][]Executor
 }
 
 func (c compiler) newError(message string, node *yaml.Node, err error) error {
@@ -146,6 +147,7 @@ func (c compiler) newError(message string, node *yaml.Node, err error) error {
 
 // UnmarshalYAML compile the Executor from the YAML string.
 func (c *compiler) UnmarshalYAML(node *yaml.Node) error {
+	c.alias = make(map[string][]Executor)
 	exec, err := c.compileNode(node)
 	if err != nil {
 		return err
@@ -187,7 +189,21 @@ func (c compiler) compileExecutor(k, v *yaml.Node) (Executor, error) {
 			return nil, c.newError("meta", k, err)
 		}
 	}
+	switch {
+	case v.Anchor != "":
+		c.alias[v.Anchor] = args
+	case k.Anchor != "":
+		c.alias[k.Anchor] = args
+	}
 	return exec, nil
+}
+
+func (c compiler) getAlias(node *yaml.Node) ([]Executor, error) {
+	args, ok := c.alias[node.Value]
+	if !ok {
+		return c.compileNode(node.Alias)
+	}
+	return args, nil
 }
 
 func (c compiler) compileNode(node *yaml.Node) ([]Executor, error) {
@@ -202,7 +218,7 @@ func (c compiler) compileNode(node *yaml.Node) ([]Executor, error) {
 		}
 		return []Executor{String(node.Value)}, nil
 	case yaml.AliasNode:
-		return c.compileNode(node.Alias)
+		return c.getAlias(node)
 	default:
 		return nil, c.newError("invalid node type", node, nil)
 	}
@@ -225,50 +241,78 @@ func (c compiler) compileMapping(node *yaml.Node) ([]Executor, error) {
 		return nil, c.newError("mapping node requires at least two elements", node, nil)
 	}
 
-	if strings.HasPrefix(node.Content[0].Value, "$") {
-		ret := make([]Executor, 0, len(node.Content)/2)
-		for i := 0; i < len(node.Content); i += 2 {
-			exec, err := c.compileExecutor(node.Content[i], node.Content[i+1])
-			if err != nil {
-				return nil, err
-			}
-			ret = append(ret, exec)
-		}
-		return ret, nil
-	}
-
+	var prefixInit, prefix bool
 	ret := make([]Executor, 0, len(node.Content)/2)
 	for i := 0; i < len(node.Content); i += 2 {
 		keyNode, valueNode := node.Content[i], node.Content[i+1]
 		key := String(keyNode.Value)
 
-		if valueNode.Kind != yaml.MappingNode {
-			child, err := c.compileNode(valueNode)
+		if valueNode.Kind == yaml.AliasNode {
+			alias, err := c.getAlias(valueNode)
 			if err != nil {
 				return nil, err
 			}
-			ret = append(ret, key, c.piping(child))
+			switch {
+			case prefix:
+				// $key: *alias
+				name := strings.TrimPrefix(keyNode.Value, "$")
+				init, ok := GetExecutor(name)
+				if !ok {
+					return nil, c.newError("executor not found", keyNode, errors.New(keyNode.Value))
+				}
+				exec, err := init(alias)
+				if err != nil {
+					return nil, c.newError(name, keyNode, err)
+				}
+				if meta, ok := exec.(Meta); ok {
+					if err = meta.Meta(keyNode, valueNode); err != nil {
+						return nil, c.newError("meta", keyNode, err)
+					}
+				}
+				ret = append(ret, exec)
+			case keyNode.Tag == "!!merge":
+				// key: << *alias
+				ret = append(ret, alias...)
+			default:
+				// key: *alias
+				ret = append(ret, key, c.piping(alias))
+			}
 			continue
 		}
 
-		if len(valueNode.Content) == 2 {
-			exec, err := c.compileExecutor(valueNode.Content[0], valueNode.Content[1])
+		if valueNode.Kind == yaml.SequenceNode && keyNode.Tag == "!!merge" {
+			// key: [ *alias1, *alias2, ... ]
+			exec, err := c.compileSequence(valueNode)
 			if err != nil {
 				return nil, err
 			}
-			ret = append(ret, key, exec)
+			ret = append(ret, exec...)
 			continue
 		}
 
-		pipe := make(Pipe, 0, len(valueNode.Content)/2)
-		for j := 0; j < len(valueNode.Content); j += 2 {
-			exec, err := c.compileExecutor(valueNode.Content[j], valueNode.Content[j+1])
+		ok := strings.HasPrefix(keyNode.Value, "$")
+		if !prefixInit {
+			prefix = ok
+			prefixInit = true
+		}
+		switch {
+		case !ok && prefix || ok && !prefix:
+			return nil, c.newError("mix executor and map key", keyNode, nil)
+		case prefix:
+			// $key: value
+			exec, err := c.compileExecutor(keyNode, valueNode)
 			if err != nil {
 				return nil, err
 			}
-			pipe = append(pipe, exec)
+			ret = append(ret, exec)
+		default:
+			// key: value
+			value, err := c.compileNode(valueNode)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, key, c.piping(value))
 		}
-		ret = append(ret, key, pipe)
 	}
 	return ret, nil
 }
@@ -373,8 +417,11 @@ func (pipe Pipe) Exec(ctx context.Context, arg any) (ret any, err error) {
 
 		for _, exec := range pipe {
 			ret, err = exec.Exec(ctx, ret)
-			if err != nil || ret == nil {
-				return
+			switch {
+			case err != nil:
+				return nil, err
+			case ret == nil:
+				return nil, nil
 			}
 		}
 

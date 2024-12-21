@@ -124,20 +124,6 @@ func deepEqual(x, y any) bool {
 
 func TestCompileBuildIn(t *testing.T) {
 	t.Parallel()
-	t.Run("top pipe", func(t *testing.T) {
-		expect := Pipe{
-			_map{String("title"), _debug("text")},
-			_map{String("title"), _debug("text")}}
-		exec, err := Compile(`
-$map: &alias
-    title:
-      $debug: text
-$map: *alias`)
-		if assert.NoError(t, err) {
-			assert.True(t, deepEqual(expect, exec))
-		}
-	})
-
 	t.Run("mapping pipe", func(t *testing.T) {
 		expect := _map{String("size"), Pipe{_debug("the size"), KindInt64}}
 		exec, err := Compile(`
@@ -170,6 +156,81 @@ $map:
     $pipe:
       - $debug: the size
       - $kind: int32`)
+		if assert.NoError(t, err) {
+			assert.True(t, deepEqual(expect, exec))
+		}
+	})
+
+	t.Run("mix executor", func(t *testing.T) {
+		_, err := Compile(`
+$raw:
+title: `)
+		assert.ErrorContains(t, err, "mix executor and map key")
+		_, err = Compile(`
+title:
+$raw: `)
+		assert.ErrorContains(t, err, "mix executor and map key")
+	})
+}
+
+type testPtr string
+
+func (a *testPtr) Exec(context.Context, any) (any, error) { return string(*a), nil }
+
+func TestCompileAlias(t *testing.T) {
+	t.Parallel()
+	t.Run("alias reuse", func(t *testing.T) {
+		Register("test.ptr", func(arg Arguments) (Executor, error) {
+			a := testPtr(arg.GetString(0))
+			return &a, nil
+		})
+		exec, err := Compile(`
+$each: &alias
+  $test.ptr: 1
+$each: *alias`)
+		if assert.NoError(t, err) {
+			slice := exec.(Pipe)
+			if assert.Equal(t, 2, len(slice)) {
+				p1, p2 := slice[0].(_each).Executor, slice[1].(_each).Executor
+				assert.True(t, p1 == p2, "not reuse executor")
+			}
+		}
+	})
+
+	t.Run("alias sequence merge", func(t *testing.T) {
+		expect := Pipe{
+			_map{String("title"), Pipe{String("1"), String("2")}},
+			_map{String("title"), Pipe{String("1"), String("2")}, String("value"), Pipe{String("1"), String("2"), KindInt64}}}
+		exec, err := Compile(`
+$map: 
+  title: &alias
+    - &t1 $raw: 1
+    - &t2 $raw: 2
+$map:
+  title: 
+    <<: *alias
+  value:
+    <<: [ *t1, *t2 ]
+    $kind: int64`)
+		if assert.NoError(t, err) {
+			assert.True(t, deepEqual(expect, exec))
+		}
+	})
+
+	t.Run("alias mapping merge", func(t *testing.T) {
+		expect := Pipe{
+			_map{String("title"), Pipe{String("1"), _debug("text")}},
+			_map{String("title"), Pipe{String("1"), _debug("text")}, String("value"), Pipe{String("1"), KindInt64}}}
+		exec, err := Compile(`
+$map: &alias
+  title:
+    $raw: &t1 1
+    $debug: text
+$map:
+  <<: *alias
+  value:
+    <<: *t1
+    $kind: int64`)
 		if assert.NoError(t, err) {
 			assert.True(t, deepEqual(expect, exec))
 		}
