@@ -6,7 +6,7 @@ toolchain go1.23.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.0
-	github.com/andybalholm/cascadia v1.3.2
+	github.com/andybalholm/cascadia v1.3.3
 	github.com/antchfx/htmlquery v1.3.3
 	github.com/antchfx/xpath v1.3.2
 	github.com/dlclark/regexp2 v1.11.4
@@ -14,8 +14,8 @@ require (
 	github.com/ohler55/ojg v1.26.0
 	github.com/spf13/cast v1.7.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/crypto v0.30.0
-	golang.org/x/net v0.32.0
+	golang.org/x/crypto v0.31.0
+	golang.org/x/net v0.33.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
