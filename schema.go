@@ -139,10 +139,7 @@ type compiler struct {
 }
 
 func (c compiler) newError(message string, node *yaml.Node, err error) error {
-	if err != nil {
-		message = fmt.Sprintf("%s: %s", message, err)
-	}
-	return fmt.Errorf("line %d column %d %s", node.Line, node.Column, message)
+	return CompileError{node.Line, node.Column, message, err}
 }
 
 // UnmarshalYAML compile the Executor from the YAML string.
