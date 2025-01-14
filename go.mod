@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/andybalholm/cascadia v1.3.3
 	github.com/antchfx/htmlquery v1.3.3
-	github.com/antchfx/xpath v1.3.2
+	github.com/antchfx/xpath v1.3.3
 	github.com/dlclark/regexp2 v1.11.4
 	github.com/grafana/sobek v0.0.0-20240927094302-19dd311f018f
 	github.com/ohler55/ojg v1.26.0
