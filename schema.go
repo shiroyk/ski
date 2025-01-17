@@ -359,7 +359,7 @@ func (m _map) Exec(ctx context.Context, arg any) (any, error) {
 	}
 }
 
-type _each struct{ Executor }
+type _each []Executor
 
 // each loop the slice arg and execute the Executor,
 // if Executor return ErrYield will be skipped.
@@ -367,7 +367,7 @@ func each(args Arguments) (Executor, error) {
 	if len(args) != 1 {
 		return nil, errors.New("each needs 1 parameter")
 	}
-	return _each{args.Get(0)}, nil
+	return _each(args), nil
 }
 
 func (each _each) Exec(ctx context.Context, arg any) (any, error) {
@@ -376,7 +376,7 @@ func (each _each) Exec(ctx context.Context, arg any) (any, error) {
 	case reflect.Slice:
 		ret := make([]any, 0, v.Len())
 		for i := 0; i < v.Len(); i++ {
-			v, err := each.Executor.Exec(ctx, v.Index(i).Interface())
+			v, err := Pipe(each).Exec(ctx, v.Index(i).Interface())
 			if err != nil {
 				if errors.Is(err, ErrYield) {
 					continue
@@ -387,11 +387,7 @@ func (each _each) Exec(ctx context.Context, arg any) (any, error) {
 		}
 		return ret, nil
 	default:
-		ret, err := each.Executor.Exec(ctx, arg)
-		if err != nil {
-			return nil, err
-		}
-		return ret, nil
+		return Pipe(each).Exec(ctx, arg)
 	}
 }
 

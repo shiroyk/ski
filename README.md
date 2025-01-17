@@ -87,9 +87,8 @@ $list.of:
   - 234
   - 345
 $each:
-  $pipe:
-    $if.contains: 2
-    $kind: int
+  $if.contains: 2
+  $kind: int
 ```
 filter the string match "bar", output: {"bar": "some value"}
 ```yaml
