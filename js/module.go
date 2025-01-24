@@ -261,7 +261,7 @@ func js(arg ski.Arguments) (ski.Executor, error) {
 }
 
 func (p Executor) Exec(ctx context.Context, arg any) (any, error) {
-	value, err := RunModule(ski.WithValue(ctx, "content", arg), p)
+	value, err := RunModule(ctx, p, arg)
 	if err != nil {
 		return nil, err
 	}

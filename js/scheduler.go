@@ -1,7 +1,6 @@
 package js
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 
 	"log/slog"
 
-	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 )
 
@@ -38,15 +36,6 @@ func init() {
 
 // SetScheduler set the default Scheduler
 func SetScheduler(scheduler Scheduler) { _scheduler.Store(scheduler) }
-
-// RunModule the sobek.CyclicModuleRecord
-func RunModule(ctx context.Context, module sobek.CyclicModuleRecord) (sobek.Value, error) {
-	vm, err := GetScheduler().Get()
-	if err != nil {
-		return nil, err
-	}
-	return vm.RunModule(ctx, module)
-}
 
 // GetScheduler get the default Scheduler
 func GetScheduler() Scheduler { return _scheduler.Load().(Scheduler) }

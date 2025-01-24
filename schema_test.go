@@ -191,8 +191,8 @@ $each: *alias`)
 		if assert.NoError(t, err) {
 			slice := exec.(Pipe)
 			if assert.Equal(t, 2, len(slice)) {
-				p1, p2 := slice[0].(_each).Executor, slice[1].(_each).Executor
-				assert.True(t, p1 == p2, "not reuse executor")
+				p1, p2 := slice[0].(_each), slice[1].(_each)
+				assert.Equal(t, p1, p2, "not reuse executor")
 			}
 		}
 	})

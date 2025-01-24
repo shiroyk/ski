@@ -193,7 +193,7 @@ func TestAutoClose(t *testing.T) {
 	res := NewResponse(vm.Runtime(), &http.Response{Body: body, StatusCode: http.StatusOK})
 	ctx := context.WithValue(context.Background(), "res", res)
 	assert.False(t, body.closed)
-	v, err := vm.RunModule(ctx, `export default (ctx) => ctx.get('res').ok`)
+	v, err := vm.RunModule(ctx, `export default (res) => res.ok`, res)
 	if assert.NoError(t, err) {
 		assert.True(t, v.ToBoolean())
 		assert.True(t, body.closed)

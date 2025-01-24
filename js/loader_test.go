@@ -292,7 +292,7 @@ func TestJSExecutor(t *testing.T) {
 }
 
 func TestESMExecutor(t *testing.T) {
-	exec, err := js(ski.Arguments{ski.String(`export default (ctx) => ctx.get('content') + 1`)})
+	exec, err := js(ski.Arguments{ski.String(`export default (a) => a + 1`)})
 	if assert.NoError(t, err) {
 		v, err := exec.Exec(context.Background(), "a")
 		if assert.NoError(t, err) {

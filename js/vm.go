@@ -17,7 +17,7 @@ import (
 type VM interface {
 	// RunModule run the sobek.CyclicModuleRecord.
 	// To compile the module, sobek.ParseModule or ModuleLoader.CompileModule
-	RunModule(ctx context.Context, module sobek.CyclicModuleRecord) (sobek.Value, error)
+	RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (sobek.Value, error)
 	// Run execute the given function in the EventLoop.
 	// when context done interrupt VM execution and release the VM.
 	// This is usually used when needs to be called repeatedly many times.
@@ -109,6 +109,7 @@ func NewVM(opts ...Option) VM {
 
 	vm.loader.EnableRequire(rt).EnableImportModuleDynamically(rt)
 	_ = rt.GlobalObject().SetSymbol(symbolVM, &vmself{vm})
+	_ = rt.GlobalObject().DefineDataProperty("$", vm.ctx, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
 	return vm
 }
@@ -137,14 +138,20 @@ func (vm *vmImpl) Context() sobek.Value { return vm.ctx }
 
 // RunModule run the sobek.CyclicModuleRecord.
 // The module default export must be a function.
-func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord) (ret sobek.Value, err error) {
+func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (ret sobek.Value, err error) {
 	vm.Run(ctx, func() {
 		var call sobek.Callable
 		call, err = ModuleCallable(vm.runtime, vm.loader.ResolveModule, module)
 		if err != nil {
 			return
 		}
-		ret, err = call(sobek.Undefined(), vm.ctx)
+
+		values := make([]sobek.Value, len(args))
+		for i, arg := range args {
+			values[i] = vm.runtime.ToValue(arg)
+		}
+
+		ret, err = call(sobek.Undefined(), values...)
 	})
 	return
 }
@@ -310,10 +317,10 @@ var (
 
 // NewContext create the js context object
 func NewContext(ctx context.Context, rt *sobek.Runtime) *sobek.Object {
-	ret := rt.ToValue(&vmctx{ctx}).ToObject(rt)
+	obj := rt.ToValue(&vmctx{ctx}).ToObject(rt)
 	proto := rt.NewObject()
-	_ = ret.SetPrototype(proto)
-	err := FreezeObject(rt, ret)
+	_ = obj.SetPrototype(proto)
+	err := FreezeObject(rt, obj)
 	if err != nil {
 		panic(err)
 	}
@@ -332,7 +339,7 @@ func NewContext(ctx context.Context, rt *sobek.Runtime) *sobek.Object {
 	_ = proto.Set("toString", func(call sobek.FunctionCall) sobek.Value {
 		return rt.ToValue("[context]")
 	})
-	return ret
+	return obj
 }
 
 func toCtx(rt *sobek.Runtime, v sobek.Value) context.Context {

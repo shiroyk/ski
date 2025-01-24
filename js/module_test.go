@@ -41,3 +41,16 @@ func TestExecutor(t *testing.T) {
 		})
 	}
 }
+
+func TestExecutorArgument(t *testing.T) {
+	t.Parallel()
+	vm := NewVM(WithModuleLoader(NewModuleLoader()))
+	module, err := vm.Loader().CompileModule("", `module.exports = (ori) => ori`)
+	if assert.NoError(t, err) {
+		exec := Executor{module}
+		v, err := exec.Exec(context.Background(), "ori")
+		if assert.NoError(t, err) {
+			assert.Equal(t, v, "ori")
+		}
+	}
+}

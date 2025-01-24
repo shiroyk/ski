@@ -18,7 +18,7 @@ func TestVMContext(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "foo", "bar")
 	vm := NewVM(WithModuleLoader(NewModuleLoader()))
 
-	v, err := runMod(ctx, vm, `module.exports = (ctx) => ctx.get('foo')`)
+	v, err := runMod(ctx, vm, `module.exports = () => $.get('foo')`)
 	if assert.NoError(t, err) {
 		assert.Equal(t, "bar", v.Export())
 		assert.Equal(t, context.Background(), Context(vm.Runtime()))

@@ -20,12 +20,12 @@ func (vm *VM) RunString(ctx context.Context, source string) (ret sobek.Value, er
 	return
 }
 
-func (vm *VM) RunModule(ctx context.Context, source string) (ret sobek.Value, err error) {
+func (vm *VM) RunModule(ctx context.Context, source string, args ...any) (ret sobek.Value, err error) {
 	module, err := vm.Loader().CompileModule("", source)
 	if err != nil {
 		return
 	}
-	return vm.VM.RunModule(ctx, module)
+	return vm.VM.RunModule(ctx, module, args...)
 }
 
 // New returns a test VM instance
