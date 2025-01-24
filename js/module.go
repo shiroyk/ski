@@ -108,7 +108,7 @@ func (cmi *cjsModuleInstance) GetBindingValue(name string) sobek.Value {
 	return cmi.exports.Get(name)
 }
 
-func (cmi *cjsModuleInstance) ExecuteModule(rt *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
+func (cmi *cjsModuleInstance) ExecuteModule(rt *sobek.Runtime, _, _ func(any) error) (sobek.CyclicModuleInstance, error) {
 	f, err := rt.RunProgram(cmi.m.prg)
 	if err != nil {
 		return nil, err
@@ -194,7 +194,7 @@ func (gmi *goModuleInstance) GetBindingValue(name string) sobek.Value {
 
 func (gmi *goModuleInstance) HasTLA() bool { return false }
 
-func (gmi *goModuleInstance) ExecuteModule(_ *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
+func (gmi *goModuleInstance) ExecuteModule(_ *sobek.Runtime, _, _ func(any) error) (sobek.CyclicModuleInstance, error) {
 	return gmi, nil
 }
 
