@@ -90,12 +90,7 @@ func ModuleCallable(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFu
 }
 
 // Context returns the current context of the sobek.Runtime
-func Context(rt *sobek.Runtime) context.Context {
-	if v := self(rt).ctx.Export().(*vmctx).ctx; v != nil {
-		return v
-	}
-	return context.Background()
-}
+func Context(rt *sobek.Runtime) context.Context { return self(rt).ctx }
 
 // OnDone add a function to execute when the VM has finished running.
 // eg: close resources...

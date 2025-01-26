@@ -65,8 +65,6 @@ type VM interface {
 	//		fmt.Println(run(ctx, scheduler))
 	//	}
 	Run(context.Context, func())
-	// Context return the ja context object of NewContext
-	Context() sobek.Value
 	// Loader return the ModuleLoader
 	Loader() ModuleLoader
 	// Runtime return the js runtime
@@ -95,7 +93,7 @@ func NewVM(opts ...Option) VM {
 	vm := &vmImpl{
 		runtime:   rt,
 		eventloop: NewEventLoop(),
-		ctx:       NewContext(context.Background(), rt),
+		vmctx:     &vmctx{context.Background()},
 	}
 	for _, opt := range opts {
 		opt(vm)
@@ -109,16 +107,17 @@ func NewVM(opts ...Option) VM {
 
 	vm.loader.EnableRequire(rt).EnableImportModuleDynamically(rt)
 	_ = rt.GlobalObject().SetSymbol(symbolVM, &vmself{vm})
-	_ = rt.GlobalObject().DefineDataProperty("$", vm.ctx, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = rt.GlobalObject().DefineDataProperty("$ctx", jsContext(vm.vmctx, rt),
+		sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
 	return vm
 }
 
 type (
 	vmImpl struct {
+		*vmctx
 		runtime   *sobek.Runtime
 		eventloop *EventLoop
-		ctx       sobek.Value
 		release   func()
 		loader    ModuleLoader
 	}
@@ -133,8 +132,6 @@ func (vm *vmImpl) Loader() ModuleLoader { return vm.loader }
 
 // Runtime return the js runtime
 func (vm *vmImpl) Runtime() *sobek.Runtime { return vm.runtime }
-
-func (vm *vmImpl) Context() sobek.Value { return vm.ctx }
 
 // RunModule run the sobek.CyclicModuleRecord.
 // The module default export must be a function.
@@ -214,12 +211,12 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 				slog.String("go_stack", string(debug.Stack())),
 				slog.String("js_stack", buf.String()))
 		}
-		vm.ctx.Export().(*vmctx).ctx = context.Background()
+		vm.ctx = context.Background()
 		vm.release()
 	}()
 	// resets the interrupt flag.
 	vm.runtime.ClearInterrupt()
-	vm.ctx.Export().(*vmctx).ctx = ctx
+	vm.ctx = ctx
 
 	go func() {
 		select {
@@ -315,9 +312,9 @@ var (
 	symbolVM          = sobek.NewSymbol("Symbol.__vm__")
 )
 
-// NewContext create the js context object
-func NewContext(ctx context.Context, rt *sobek.Runtime) *sobek.Object {
-	obj := rt.ToValue(&vmctx{ctx}).ToObject(rt)
+// jsContext create the js context object
+func jsContext(ctx *vmctx, rt *sobek.Runtime) *sobek.Object {
+	obj := rt.ToValue(ctx).ToObject(rt)
 	proto := rt.NewObject()
 	_ = obj.SetPrototype(proto)
 	err := FreezeObject(rt, obj)
@@ -325,21 +322,24 @@ func NewContext(ctx context.Context, rt *sobek.Runtime) *sobek.Object {
 		panic(err)
 	}
 
-	_ = proto.Set("get", func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(toCtx(rt, call.This).Value(call.Argument(0).Export()))
-	})
-	_ = proto.Set("set", func(call sobek.FunctionCall) sobek.Value {
-		e := toCtx(rt, call.This)
-		if c, ok := e.(ski.Context); ok {
-			c.SetValue(call.Argument(0).Export(), call.Argument(1).Export())
-			return rt.ToValue(true)
-		}
-		return rt.ToValue(false)
-	})
 	_ = proto.Set("toString", func(call sobek.FunctionCall) sobek.Value {
 		return rt.ToValue("[context]")
 	})
-	return obj
+
+	proxy := rt.NewProxy(obj, &sobek.ProxyTrapConfig{
+		Get: func(target *sobek.Object, property string, receiver sobek.Value) (value sobek.Value) {
+			return rt.ToValue(toCtx(rt, target).Value(property))
+		},
+		Set: func(target *sobek.Object, property string, value sobek.Value, receiver sobek.Value) (success bool) {
+			e := toCtx(rt, target)
+			if c, ok := e.(ski.Context); ok {
+				c.SetValue(property, value.Export())
+				return true
+			}
+			return
+		},
+	})
+	return rt.ToValue(proxy).ToObject(rt)
 }
 
 func toCtx(rt *sobek.Runtime, v sobek.Value) context.Context {

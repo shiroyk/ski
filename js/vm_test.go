@@ -15,12 +15,13 @@ import (
 
 func TestVMContext(t *testing.T) {
 	t.Parallel()
-	ctx := context.WithValue(context.Background(), "foo", "bar")
+	ctx := ski.WithValue(ski.NewContext(context.Background(), nil), "foo", "bar")
 	vm := NewVM(WithModuleLoader(NewModuleLoader()))
 
-	v, err := runMod(ctx, vm, `module.exports = () => $.get('foo')`)
+	v, err := runMod(ctx, vm, `module.exports = () => {$ctx.a = "1"; return $ctx.foo}`)
 	if assert.NoError(t, err) {
 		assert.Equal(t, "bar", v.Export())
+		assert.Equal(t, "1", ctx.Value("a"))
 		assert.Equal(t, context.Background(), Context(vm.Runtime()))
 	}
 }
