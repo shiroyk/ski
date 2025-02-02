@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"reflect"
 	"runtime/debug"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
@@ -87,9 +88,21 @@ func WithModuleLoader(loader ModuleLoader) Option {
 // Initialize the EventLoop, global module, console.
 func NewVM(opts ...Option) VM {
 	rt := sobek.New()
-	rt.SetFieldNameMapper(FieldNameMapper{})
+	rt.SetFieldNameMapper(fieldNameMapper{})
 	EnableConsole(rt)
-	InitGlobalModule(rt)
+
+	// init global modules
+	for name, mod := range AllModule() {
+		if mod, ok := mod.(Global); ok {
+			instance, err := mod.Instantiate(rt)
+			if err != nil {
+				slog.Warn(fmt.Sprintf("instantiate global js module %s failed: %s", name, err))
+				continue
+			}
+			_ = rt.Set(name, instance)
+		}
+	}
+
 	vm := &vmImpl{
 		runtime:   rt,
 		eventloop: NewEventLoop(),
@@ -359,4 +372,25 @@ func self(rt *sobek.Runtime) *vmImpl {
 	}
 	panic(rt.NewTypeError(`symbol value of "VM" must be of type vmself, ` +
 		`this shouldn't happen, maybe not call from VM.Runtime`))
+}
+
+// fieldNameMapper provides custom mapping between Go and JavaScript property names.
+type fieldNameMapper struct{}
+
+// FieldName returns a JavaScript name for the given struct field in the given type.
+// If this method returns "" the field becomes hidden.
+func (fieldNameMapper) FieldName(_ reflect.Type, f reflect.StructField) string {
+	if v, ok := f.Tag.Lookup("js"); ok {
+		if v == "-" {
+			return ""
+		}
+		return v
+	}
+	return strings.ToLower(f.Name[0:1]) + f.Name[1:]
+}
+
+// MethodName returns a JavaScript name for the given method in the given type.
+// If this method returns "" the method becomes hidden.
+func (fieldNameMapper) MethodName(_ reflect.Type, m reflect.Method) string {
+	return strings.ToLower(m.Name[0:1]) + m.Name[1:]
 }

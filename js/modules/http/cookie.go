@@ -3,7 +3,7 @@ package http
 import (
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
+	pkgurl "net/url"
 )
 
 // CookieJar manages storage and use of cookies in HTTP requests.
@@ -13,7 +13,7 @@ type CookieJar interface {
 	http.CookieJar
 
 	// RemoveCookie delete the cookies for the given URL.
-	RemoveCookie(u *url.URL)
+	RemoveCookie(u *pkgurl.URL)
 }
 
 // memoryCookie is an implementation of CookieJar that stores http.Cookie in in-memory.
@@ -22,7 +22,7 @@ type memoryCookie struct {
 }
 
 // RemoveCookie remove the cookies for the given URL.
-func (c *memoryCookie) RemoveCookie(u *url.URL) {
+func (c *memoryCookie) RemoveCookie(u *pkgurl.URL) {
 	exists := c.Cookies(u)
 	cookie := make([]*http.Cookie, 0, len(exists))
 	for _, e := range exists {

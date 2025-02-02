@@ -7,19 +7,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestHttp(t *testing.T) {
+func TestFetch(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
-		value, _ := (&Http{http.DefaultClient}).Instantiate(rt)
-		_ = rt.Set("http", value)
-	}))
+	vm := modulestest.New(t)
 	ctx := context.Background()
 
 	t.Run("basic request", func(t *testing.T) {
@@ -30,18 +25,18 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`");
+		export default async () => {
+			const response = await fetch("`+server.URL+`");
 			return {
 				ok: response.ok,
 				status: response.status,
 				statusText: response.statusText,
-				text: response.text(),
+				text: await response.text(),
 			};
 		}
 		`)
 		require.NoError(t, err)
-		obj := result.ToObject(vm.Runtime())
+		obj := promiseResult(result).ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
 		assert.Equal(t, int64(200), obj.Get("status").ToInteger())
 		assert.Equal(t, "200 OK", obj.Get("statusText").String())
@@ -56,20 +51,20 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.request(new Request("`+server.URL+`", {
+		export default async () => {
+			const response = await fetch(new Request("`+server.URL+`", {
 				method: "GET",
 			}));
 			return {
 				ok: response.ok,
 				status: response.status,
 				statusText: response.statusText,
-				text: response.text(),
+				text: await response.text(),
 			};
 		}
 		`)
 		require.NoError(t, err)
-		obj := result.ToObject(vm.Runtime())
+		obj := promiseResult(result).ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
 		assert.Equal(t, int64(200), obj.Get("status").ToInteger())
 		assert.Equal(t, "200 OK", obj.Get("statusText").String())
@@ -105,8 +100,8 @@ func TestHttp(t *testing.T) {
 				defer server.Close()
 
 				result, err := vm.RunModule(ctx, `
-				export default () => {
-					const response = http.request("`+server.URL+`", {
+				export default async () => {
+					const response = await fetch("`+server.URL+`", {
 						method: "`+tt.method+`",
 						body: "`+tt.body+`"
 					});
@@ -114,7 +109,7 @@ func TestHttp(t *testing.T) {
 				}
 				`)
 				require.NoError(t, err)
-				assert.Equal(t, int64(200), result.ToInteger())
+				assert.Equal(t, int64(200), promiseResult(result).ToInteger())
 			})
 		}
 	})
@@ -128,8 +123,8 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`", {
+		export default async () => {
+			const response = await fetch("`+server.URL+`", {
 				headers: {
 					"Content-Type": "application/json",
 					"X-Custom": "custom value"
@@ -139,7 +134,7 @@ func TestHttp(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		assert.Equal(t, int64(200), result.ToInteger())
+		assert.Equal(t, int64(200), promiseResult(result).ToInteger())
 	})
 
 	t.Run("request body types", func(t *testing.T) {
@@ -203,8 +198,8 @@ func TestHttp(t *testing.T) {
 				defer server.Close()
 
 				result, err := vm.RunModule(ctx, `
-				export default () => {
-					const response = http.get("`+server.URL+`", {
+				export default async () => {
+					const response = await fetch("`+server.URL+`", {
 						method: "POST",
 						`+tt.input+`
 					});
@@ -212,7 +207,7 @@ func TestHttp(t *testing.T) {
 				}
 				`)
 				require.NoError(t, err)
-				assert.Equal(t, int64(200), result.ToInteger())
+				assert.Equal(t, int64(200), promiseResult(result).ToInteger())
 			})
 		}
 	})
@@ -231,18 +226,18 @@ func TestHttp(t *testing.T) {
 			{
 				name: "text",
 				input: `
-				export default () => {
-					const response = http.get("` + server.URL + `");
-					return response.text();
+				export default async () => {
+					const response = await fetch("` + server.URL + `");
+					return await response.text();
 				}`,
 				expected: `{"message":"hello"}`,
 			},
 			{
 				name: "json",
 				input: `
-				export default () => {
-					const response = http.get("` + server.URL + `");
-					const data = response.json();
+				export default async () => {
+					const response = await fetch("` + server.URL + `");
+					const data = await response.json();
 					return data.message;
 				}`,
 				expected: "hello",
@@ -250,9 +245,9 @@ func TestHttp(t *testing.T) {
 			{
 				name: "arrayBuffer",
 				input: `
-				export default () => {
-					const response = http.get("` + server.URL + `");
-					const buffer = response.arrayBuffer();
+				export default async () => {
+					const response = await fetch("` + server.URL + `");
+					const buffer = await response.arrayBuffer();
 					return String.fromCharCode.apply(String, new Uint8Array(buffer));
 				}`,
 				expected: `{"message":"hello"}`,
@@ -260,10 +255,10 @@ func TestHttp(t *testing.T) {
 			{
 				name: "formData error",
 				input: `
-				export default () => {
-					const response = http.get("` + server.URL + `");
+				export default async () => {
+					const response = await fetch("` + server.URL + `");
 					try {
-						response.formData();
+						await response.formData();
 						return "should not reach here";
 					} catch (e) {
 						return e.toString();
@@ -274,11 +269,11 @@ func TestHttp(t *testing.T) {
 			{
 				name: "body used",
 				input: `
-				export default () => {
-					const response = http.get("` + server.URL + `");
-					response.text();
+				export default async () => {
+					const response = await fetch("` + server.URL + `");
+					await response.text();
 					try {
-						response.text();
+						await response.text();
 						return "should not reach here";
 					} catch (e) {
 						return e.toString();
@@ -292,7 +287,7 @@ func TestHttp(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				result, err := vm.RunModule(ctx, tt.input)
 				require.NoError(t, err)
-				value := result
+				value := promiseResult(result)
 				assert.Contains(t, value.String(), tt.expected)
 			})
 		}
@@ -307,8 +302,8 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`");
+		export default async () => {
+			const response = await fetch("`+server.URL+`");
 			return {
 				contentType: response.headers.get("content-type"),
 				custom: response.headers.get("x-custom"),
@@ -316,7 +311,7 @@ func TestHttp(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		obj := result.ToObject(vm.Runtime())
+		obj := promiseResult(result).ToObject(vm.Runtime())
 		assert.Equal(t, "text/plain", obj.Get("contentType").String())
 		assert.Equal(t, "response header", obj.Get("custom").String())
 	})
@@ -328,8 +323,8 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`");
+		export default async () => {
+			const response = await fetch("`+server.URL+`");
 			return {
 				ok: response.ok,
 				status: response.status,
@@ -337,8 +332,31 @@ func TestHttp(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		obj := result.ToObject(vm.Runtime())
+		obj := promiseResult(result).ToObject(vm.Runtime())
 		assert.False(t, obj.Get("ok").ToBoolean())
 		assert.Equal(t, int64(404), obj.Get("status").ToInteger())
+	})
+
+	t.Run("abort controller", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		}))
+		defer server.Close()
+
+		result, err := vm.RunModule(ctx, `
+		export default async () => {
+			const controller = new AbortController();
+			const promise = fetch("`+server.URL+`", { signal: controller.signal });
+			controller.abort();
+			try {
+				await promise;
+				return "should not reach here";
+			} catch (e) {
+				return e.toString();
+			}
+		}
+		`)
+		require.NoError(t, err)
+		assert.Contains(t, promiseResult(result).String(), "aborted")
 	})
 }

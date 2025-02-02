@@ -2,200 +2,183 @@ package http
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResponse(t *testing.T) {
-	vm := modulestest.New(t, initial)
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/json":
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `{ "foo": "bar", "test": true }`)
-			assert.NoError(t, err)
-		case "/array":
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `[{ "foo": "bar", "test": true }]`)
-			assert.NoError(t, err)
-		case "/text":
-			w.Header().Set("Content-Type", "text/plain")
-			_, err := fmt.Fprint(w, `foo`)
-			assert.NoError(t, err)
-		}
-	}))
-
-	_ = vm.Runtime().Set("url", ts.URL)
-
-	testCase := []string{
-		`const res = http.get(url+'/array');
-		 assert.true(res.ok);`,
-		`const res = http.get(url+'/json');
-		 assert.equal(res.json(), { "foo": "bar", "test": true });
-		 assert.true(res.bodyUsed);
-		 assert.true(res.ok);
-		 assert.equal(res.status, 200);
-		 assert.equal(res.statusText, "200 OK");
-		 assert.equal(res.headers["Content-Type"], "application/json");`,
-		`const res = http.get(url+'/array');
-		 assert.equal(res.json(), [{ "foo": "bar", "test": true }]);
-		 assert.true(res.bodyUsed);
-		 assert.true(res.ok);
-		 assert.equal(res.status, 200);
-		 assert.equal(res.statusText, "200 OK");
-		 assert.equal(res.headers["Content-Type"], "application/json");`,
-		`const res = http.get(url+'/text');
-		 assert.true(!res.bodyUsed);
-		 assert.true(res.ok);
-		 assert.equal(res.statusText, "200 OK");
-		 assert.equal(res.text(), "foo");
-		 assert.true(res.bodyUsed);
-		 try {
-			res.text();
-		 } catch (e) {
-		 	assert.true(e && e.toString().includes("body stream already read"));
-		 }`,
-	}
-
-	for i, s := range testCase {
-		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			_, err := vm.Runtime().RunString(fmt.Sprintf(`{%s}`, s))
-			assert.NoError(t, err)
-		})
-	}
-}
-
-func TestAsyncResponse(t *testing.T) {
-	vm := modulestest.New(t, initial)
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/chunked":
-			w.Header().Set("Content-Type", "text/plain")
-			for i := 0; i < 6; i++ {
-				_, err := fmt.Fprint(w, strconv.Itoa(i), "\r\n")
-				assert.NoError(t, err)
-				w.(http.Flusher).Flush()
-				time.Sleep(time.Millisecond * 50)
-			}
-		case "/json":
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `{ "foo": "bar", "test": true }`)
-			assert.NoError(t, err)
-		case "/array":
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `[{ "foo": "bar", "test": true }]`)
-			assert.NoError(t, err)
-		case "/text":
-			w.Header().Set("Content-Type", "text/plain")
-			_, err := fmt.Fprint(w, `foo`)
-			assert.NoError(t, err)
-		}
-	}))
-
-	_ = vm.Runtime().Set("url", ts.URL)
-
-	testCase := []string{
-		`(async () => {
-			const res = await fetch(url+'/chunked');
-			const reader = res.body.getReader({ mode: "byob" });
-			const chunks = [];
-			let size = 0;
-			const read = async () => {
-				const { value, done } = await reader.read(new Uint8Array(4));
-				if (done) return chunks.join("");
-				const chunk = String.fromCharCode.apply(String, value);
-				chunks.push(chunk);
-				size++;
-				return read();
-			};
-			assert.equal(await read(), "0\r\n1\r\n2\r\n3\r\n4\r\n5\r\n");
-			assert.true(res.bodyUsed);
-			assert.true(res.ok);
-			assert.equal(res.status, 200);
-			assert.equal(res.statusText, "200 OK");
-			assert.equal(res.headers["Content-Type"], "text/plain");
-		})()`,
-		`(async () => {
-			const res = await fetch(url+'/chunked');
-			const reader = res.body.getReader();
-			const chunks = [];
-			let size = 0;
-			while (true) {
-				const { value, done } = await reader.read();
-				if (done) break;
-				const chunk = String.fromCharCode.apply(String, value);
-				chunks.push(chunk);
-				size++;
-			}
-			assert.equal(chunks.join(""), "0\r\n1\r\n2\r\n3\r\n4\r\n5\r\n");
-			assert.true(res.bodyUsed);
-		})()`,
-		`(async () => {
-			const res = await fetch(url+'/chunked');
-			assert.equal(await res.arrayBuffer(), new Uint8Array([48, 13, 10, 49, 13, 10, 50, 13, 10, 51, 13, 10, 52, 13, 10, 53, 13, 10]));
-			assert.true(res.bodyUsed);
-		})()`,
-		`(async () => {
-			const res = await fetch(url+'/json');
-			assert.equal(await res.json(), { "foo": "bar", "test": true });
-			assert.true(res.bodyUsed);
-		 })()`,
-		`(async () => {
-			const res = await fetch(url+'/array');
-			assert.equal(await res.json(), [{ "foo": "bar", "test": true }]);
-			assert.true(res.bodyUsed);
-		 })()`,
-		`(async () => {
-			const res = await fetch(url+'/text');
-			assert.equal(await res.text(), "foo");
-			assert.true(res.bodyUsed);
-		 })()`,
-		`(async () => {
-			const res = await fetch(url+'/text');
-			assert.equal(await res.arrayBuffer(), new Uint8Array([102, 111, 111]));
-			assert.true(res.bodyUsed);
-		 })()`,
-	}
-
-	for i, s := range testCase {
-		t.Run(fmt.Sprintf("Script%v", i), func(t *testing.T) {
-			_, err := vm.RunString(context.Background(), s)
-			assert.NoError(t, err)
-		})
-	}
-}
-
-type testBody struct {
-	closed bool
-}
-
-func (*testBody) Read(p []byte) (n int, err error) {
-	return 0, nil
-}
-
-func (b *testBody) Close() error {
-	b.closed = true
-	return nil
-}
-
-func TestAutoClose(t *testing.T) {
+	t.Parallel()
 	vm := modulestest.New(t)
-	body := new(testBody)
-	res := NewResponse(vm.Runtime(), &http.Response{Body: body, StatusCode: http.StatusOK})
-	ctx := context.WithValue(context.Background(), "res", res)
-	assert.False(t, body.closed)
-	v, err := vm.RunModule(ctx, `export default (res) => res.ok`, res)
-	if assert.NoError(t, err) {
-		assert.True(t, v.ToBoolean())
-		assert.True(t, body.closed)
-	}
+	ctx := context.Background()
+
+	t.Run("constructor", func(t *testing.T) {
+		result, err := vm.RunModule(ctx, `
+		export default () => {
+			const response = new Response("hello world", {
+				status: 201,
+				statusText: "Created",
+				headers: {
+					"Content-Type": "text/plain",
+					"X-Custom": "test"
+				}
+			});
+			return {
+				ok: response.ok,
+				status: response.status,
+				statusText: response.statusText,
+				contentType: response.headers.get("content-type"),
+				customHeader: response.headers.get("x-custom"),
+				type: response.type,
+			};
+		}
+		`)
+		require.NoError(t, err)
+		obj := result.ToObject(vm.Runtime())
+		assert.True(t, obj.Get("ok").ToBoolean())
+		assert.Equal(t, int64(201), obj.Get("status").ToInteger())
+		assert.Equal(t, "201 Created", obj.Get("statusText").String())
+		assert.Equal(t, "text/plain", obj.Get("contentType").String())
+		assert.Equal(t, "test", obj.Get("customHeader").String())
+		assert.Equal(t, "default", obj.Get("type").String())
+	})
+
+	t.Run("response body methods", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{
+				name: "text",
+				input: `
+				export default async () => {
+					const response = new Response("hello world");
+					return await response.text();
+				}`,
+				expected: "hello world",
+			},
+			{
+				name: "json",
+				input: `
+				export default async () => {
+					const response = new Response('{"message":"hello"}');
+					const data = await response.json();
+					return data.message;
+				}`,
+				expected: "hello",
+			},
+			{
+				name: "arrayBuffer",
+				input: `
+				export default async () => {
+					const response = new Response("hello");
+					const buffer = await response.arrayBuffer();
+					return String.fromCharCode.apply(String, new Uint8Array(buffer));
+				}`,
+				expected: "hello",
+			},
+			{
+				name: "body used error",
+				input: `
+				export default async () => {
+					const response = new Response("test");
+					await response.text();
+					try {
+						await response.text();
+						return "should not reach here";
+					} catch (e) {
+						return e.toString();
+					}
+				}`,
+				expected: "body stream already read",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, err := vm.RunModule(ctx, tt.input)
+				require.NoError(t, err)
+				if tt.name == "body used error" {
+					assert.Contains(t, promiseResult(result).String(), tt.expected)
+				} else {
+					assert.Equal(t, tt.expected, promiseResult(result).String())
+				}
+			})
+		}
+	})
+
+	t.Run("clone", func(t *testing.T) {
+		result, err := vm.RunModule(ctx, `
+		export default async () => {
+			const response = new Response("original");
+			const clone = response.clone();
+			
+			const results = {
+				original: await response.text(),
+				clone: await clone.text(),
+			};
+			
+			try {
+				await response.text(); // Should fail
+				results.error = "should have failed";
+			} catch (e) {
+				results.error = e.toString();
+			}
+			
+			return results;
+		}
+		`)
+		require.NoError(t, err)
+		obj := promiseResult(result).ToObject(vm.Runtime())
+		assert.Equal(t, "original", obj.Get("original").String())
+		assert.Equal(t, "original", obj.Get("clone").String())
+		assert.Contains(t, obj.Get("error").String(), "body stream already read")
+	})
+
+	t.Run("Response.json static method", func(t *testing.T) {
+		result, err := vm.RunModule(ctx, `
+		export default async () => {
+			const data = { message: "hello" };
+			const response = Response.json(data);
+			return {
+				contentType: response.headers.get("content-type"),
+				body: await response.text(),
+			};
+		}
+		`)
+		require.NoError(t, err)
+		obj := promiseResult(result).ToObject(vm.Runtime())
+		assert.Equal(t, "application/json", obj.Get("contentType").String())
+		assert.Equal(t, `{"message":"hello"}`, obj.Get("body").String())
+	})
+
+	t.Run("body types", func(t *testing.T) {
+		result, err := vm.RunModule(ctx, `
+		export default async () => {
+			const results = {};
+			
+			const uint8Array = new Uint8Array([104, 101, 108, 108, 111]); // "hello"
+			const response1 = new Response(uint8Array);
+			results.uint8Array = await response1.text();
+			
+			const blob = new Blob(["blob test"]);
+			const response2 = new Response(blob);
+			results.blob = await response2.text();
+			
+			const formData = new FormData({"field": "form value"});
+			const response3 = new Response(formData);
+			results.formData = await response3.text();
+			
+			return results;
+		}
+		`)
+		require.NoError(t, err)
+		obj := promiseResult(result).ToObject(vm.Runtime())
+		assert.Equal(t, "hello", obj.Get("uint8Array").String())
+		assert.Equal(t, "blob test", obj.Get("blob").String())
+		assert.Contains(t, obj.Get("formData").String(), "form value")
+	})
 }

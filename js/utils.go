@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
-	"reflect"
-	"strings"
+	"iter"
 
 	"github.com/grafana/sobek"
 )
@@ -17,7 +15,7 @@ func Throw(rt *sobek.Runtime, err error) {
 	if errors.As(err, &ex) { //nolint:errorlint
 		panic(ex)
 	}
-	panic(rt.ToValue(err))
+	panic(rt.NewGoError(err))
 }
 
 // ToBytes tries to return a byte slice from compatible types.
@@ -96,20 +94,6 @@ func Context(rt *sobek.Runtime) context.Context { return self(rt).ctx }
 // eg: close resources...
 func OnDone(rt *sobek.Runtime, job func()) { self(rt).eventloop.OnDone(job) }
 
-// InitGlobalModule init all implement the Global modules
-func InitGlobalModule(rt *sobek.Runtime) {
-	for name, mod := range AllModule() {
-		if mod, ok := mod.(Global); ok {
-			instance, err := mod.Instantiate(rt)
-			if err != nil {
-				slog.Warn(fmt.Sprintf("instantiate global js module %s failed: %s", name, err))
-				continue
-			}
-			_ = rt.Set(name, instance)
-		}
-	}
-}
-
 func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
 	global := rt.GlobalObject().Get("Object").ToObject(rt)
 	freeze, ok := sobek.AssertFunction(global.Get("freeze"))
@@ -120,33 +104,26 @@ func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
 	return err
 }
 
-// FieldNameMapper provides custom mapping between Go and JavaScript property names.
-type FieldNameMapper struct{}
-
-// FieldName returns a JavaScript name for the given struct field in the given type.
-// If this method returns "" the field becomes hidden.
-func (FieldNameMapper) FieldName(_ reflect.Type, f reflect.StructField) string {
-	if v, ok := f.Tag.Lookup("js"); ok {
-		if v == "-" {
-			return ""
-		}
-		return v
-	}
-	return strings.ToLower(f.Name[0:1]) + f.Name[1:]
+// Iterator returns a JavaScript iterator
+func Iterator(rt *sobek.Runtime, fn iter.Seq[any]) *sobek.Object {
+	p := rt.NewObject()
+	next, _ := iter.Pull(fn)
+	_ = p.SetSymbol(sobek.SymIterator, func(call sobek.FunctionCall) sobek.Value { return call.This })
+	_ = p.Set("next", func(call sobek.FunctionCall) sobek.Value {
+		ret := rt.NewObject()
+		value, ok := next()
+		_ = ret.Set("value", value)
+		_ = ret.Set("done", !ok)
+		return ret
+	})
+	return p
 }
 
-// MethodName returns a JavaScript name for the given method in the given type.
-// If this method returns "" the method becomes hidden.
-func (FieldNameMapper) MethodName(_ reflect.Type, m reflect.Method) string {
-	return strings.ToLower(m.Name[0:1]) + m.Name[1:]
-}
-
-// MapValues returns the values of the map m.
-// The values will be in an indeterminate order.
-func MapValues[M ~map[K]V, K comparable, V any](m M) []V {
-	r := make([]V, 0, len(m))
-	for _, v := range m {
-		r = append(r, v)
+// New create a new object from the constructor name
+func New(rt *sobek.Runtime, name string, args ...sobek.Value) (*sobek.Object, error) {
+	ctor := rt.Get(name)
+	if ctor == nil {
+		panic(rt.NewTypeError("%s is not defined", name))
 	}
-	return r
+	return rt.New(ctor, args...)
 }

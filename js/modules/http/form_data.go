@@ -1,199 +1,282 @@
 package http
 
 import (
-	"fmt"
+	"bytes"
+	"io"
+	"mime/multipart"
+	"reflect"
 	"slices"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 )
 
-// fileData wraps the file data and filename
-type fileData struct {
-	data     []byte
-	filename string
-}
-
-// formData provides a way to construct a set of key/value pairs representing form fields and their values.
+// FormData provides a way to construct a set of key/value pairs representing form fields and their values.
 // which can be sent using the http() method and encoding type were set to "multipart/form-data".
-// Implement the https://developer.mozilla.org/en-US/docs/Web/API/FormData
-type formData struct {
-	keys []string
-	data map[string][]any
-}
-
-// FormData Constructor
+// https://developer.mozilla.org/en-US/docs/Web/API/FormData
 type FormData struct{}
 
-// Instantiate returns module instance
-func (*FormData) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	return rt.ToValue(func(call sobek.ConstructorCall) *sobek.Object {
-		params := call.Argument(0)
-
-		var ret formData
-		if sobek.IsUndefined(params) {
-			ret.data = make(map[string][]any)
-			return ret.object(rt)
-		}
-
-		object := params.ToObject(rt)
-		keys := object.Keys()
-		ret.keys = make([]string, 0, len(keys))
-		ret.data = make(map[string][]any, len(keys))
-
-		for _, key := range keys {
-			value, _ := js.Unwrap(object.Get(key))
-			switch ve := value.(type) {
-			case []byte:
-				// Default filename "blob".
-				ret.data[key] = []any{fileData{
-					data:     ve,
-					filename: "blob",
-				}}
-			case sobek.ArrayBuffer:
-				// Default filename "blob".
-				ret.data[key] = []any{fileData{
-					data:     ve.Bytes(),
-					filename: "blob",
-				}}
-			case []any:
-				ret.data[key] = ve
-			case nil:
-				ret.data[key] = nil
-			default:
-				ret.data[key] = []any{fmt.Sprintf("%s", ve)}
-			}
-			ret.keys = append(ret.keys, key)
-		}
-
-		return ret.object(rt)
-	}), nil
+func (f *FormData) prototype(rt *sobek.Runtime) *sobek.Object {
+	p := rt.NewObject()
+	_ = p.Set("append", f.append)
+	_ = p.Set("delete", f.delete)
+	_ = p.Set("forEach", f.forEach)
+	_ = p.Set("get", f.get)
+	_ = p.Set("getAll", f.getAll)
+	_ = p.Set("has", f.has)
+	_ = p.Set("set", f.set)
+	_ = p.Set("keys", f.keys)
+	_ = p.Set("values", f.values)
+	_ = p.Set("entries", f.entries)
+	_ = p.SetSymbol(sobek.SymIterator, f.entries)
+	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.ConstructorCall) sobek.Value { return rt.ToValue("FormData") })
+	return p
 }
 
-// Global it is a global module
-func (*FormData) Global() {}
+func (f *FormData) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
+	params := call.Argument(0)
 
-func (f *formData) object(rt *sobek.Runtime) *sobek.Object {
-	obj := rt.ToValue(f).ToObject(rt)
+	var ret formData
+	ret.data = make(map[string][]sobek.Value)
 
-	_ = obj.SetSymbol(sobek.SymIterator, func(sobek.ConstructorCall) *sobek.Object {
-		var i int
-		it := rt.NewObject()
-		_ = it.Set("next", func(sobek.FunctionCall) sobek.Value {
-			if i < len(f.keys) {
-				key := f.keys[i]
-				i++
-				return rt.ToValue(iter{Value: rt.ToValue([2]any{key, f.data[key]})})
+	obj := rt.ToValue(&ret).ToObject(rt)
+	_ = obj.SetPrototype(call.This.Prototype())
+
+	if !sobek.IsUndefined(params) {
+		callable, ok := sobek.AssertFunction(obj.Get("append"))
+		if !ok {
+			panic(rt.NewTypeError("invalid formData prototype"))
+		}
+		if params.ExportType().Kind() != reflect.Map {
+			panic(rt.NewTypeError("invalid formData constructor argument"))
+		}
+		object := params.ToObject(rt)
+		for _, key := range object.Keys() {
+			_, err := callable(obj, rt.ToValue(key), object.Get(key))
+			if err != nil {
+				js.Throw(rt, err)
 			}
-			return rt.ToValue(iter{Done: true})
-		})
-		return it
-	})
+		}
+	}
+
 	return obj
 }
 
-// Append method of the formData interface appends a new value onto an existing key inside a formData object,
-// or adds the key if it does not already exist.
-func (f *formData) Append(name string, value any, filename string) sobek.Value {
-	if filename == "" {
-		// Default filename "blob".
-		filename = "blob"
-	}
+func (f *FormData) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	proto := f.prototype(rt)
+	ctor := rt.ToValue(f.constructor).(*sobek.Object)
+	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
+	_ = ctor.Set("prototype", proto)
+	return ctor, nil
+}
 
-	ele, ok := f.data[name]
+func (*FormData) Global() {}
+
+func (*FormData) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	name := call.Argument(0).String()
+	value := call.Argument(1)
+
+	ele, ok := this.data[name]
 	if !ok {
-		f.keys = append(f.keys, name)
-		ele = make([]any, 0)
+		this.keys = append(this.keys, name)
+		ele = make([]sobek.Value, 0)
 	}
 
-	switch v := value.(type) {
-	case []byte:
-		ele = append(ele, fileData{
-			data:     v,
-			filename: filename,
-		})
-	case sobek.ArrayBuffer:
-		ele = append(ele, fileData{
-			data:     v.Bytes(),
-			filename: filename,
-		})
+	switch value.ExportType() {
+	case typeArrayBuffer, typeBlob:
+		filename := call.Argument(2)
+		if f := call.Argument(2); sobek.IsUndefined(f) {
+			// Default filename "blob".
+			filename = rt.ToValue("blob")
+		}
+
+		file, err := js.New(rt, "File", rt.NewArray(value), filename)
+		if err != nil {
+			js.Throw(rt, err)
+		}
+		ele = append(ele, file)
 	default:
-		ele = append(ele, fmt.Sprintf("%v", v))
+		if !sobek.IsUndefined(value) {
+			ele = append(ele, value)
+		}
 	}
 
-	f.data[name] = ele
+	this.data[name] = ele
 
 	return sobek.Undefined()
 }
 
-// Delete method of the formData interface deletes a key and its value(s) from a formData object.
-func (f *formData) Delete(name string) {
-	f.keys = slices.DeleteFunc(f.keys, func(k string) bool { return k == name })
-	delete(f.data, name)
+func (*FormData) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	name := call.Argument(0).String()
+	this.keys = slices.DeleteFunc(this.keys, func(k string) bool { return k == name })
+	delete(this.data, name)
+	return sobek.Undefined()
 }
 
-// Entries method returns an iterator which iterates through all key/value pairs contained in the formData.
-func (f *formData) Entries() any {
-	entries := make([][2]any, 0, len(f.keys))
-	for _, key := range f.keys {
-		entries = append(entries, [2]any{key, f.data[key]})
-	}
-	return entries
-}
-
-// Get method of the formData interface returns the first value associated
-// with a given key from within a formData object.
-// If you expect multiple values and want all of them, use the getAll() method instead.
-func (f *formData) Get(name string) any {
-	if v, ok := f.data[name]; ok {
-		return v[0]
-	}
-	return nil
-}
-
-// GetAll method of the formData interface returns all the values associated
-// with a given key from within a formData object.
-func (f *formData) GetAll(name string) any {
-	v, ok := f.data[name]
-	if ok {
-		return v
-	}
-	return [0]any{}
-}
-
-// Has method of the formData interface returns whether a formData object contains a certain key.
-func (f *formData) Has(name string) bool {
-	_, ok := f.data[name]
-	return ok
-}
-
-// Keys method returns an iterator which iterates through all keys contained in the formData.
-// The keys are strings.
-func (f *formData) Keys() any { return f.keys }
-
-// Set method of the formData interface sets a new value for an existing key inside a formData object,
-// or adds the key/value if it does not already exist.
-func (f *formData) Set(name string, value any, filename string) {
-	if filename == "" {
-		filename = "blob"
+func (*FormData) forEach(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	callback, ok := sobek.AssertFunction(call.Argument(0))
+	if !ok {
+		panic(rt.NewTypeError("callback is not a function"))
 	}
 
-	if _, ok := f.data[name]; !ok {
-		f.keys = append(f.keys, name)
-	}
-
-	switch v := value.(type) {
-	case sobek.ArrayBuffer:
-		f.data[name] = []any{
-			fileData{
-				data:     v.Bytes(),
-				filename: filename,
-			},
+	for _, key := range this.keys {
+		for _, value := range this.data[key] {
+			// forEach callback signature: (value, key, this)
+			_, err := callback(call.Argument(0), rt.ToValue(value), rt.ToValue(key), call.This)
+			if err != nil {
+				js.Throw(rt, err)
+			}
 		}
-	default:
-		f.data[name] = []any{fmt.Sprintf("%v", v)}
 	}
+
+	return sobek.Undefined()
 }
 
-// Values method returns an iterator which iterates through all values contained in the formData.
-func (f *formData) Values() any { return js.MapValues(f.data) }
+func (*FormData) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	name := call.Argument(0).String()
+	if v, ok := this.data[name]; ok {
+		if len(v) > 0 {
+			return rt.ToValue(v[0])
+		}
+	}
+	return sobek.Undefined()
+}
+
+func (*FormData) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	name := call.Argument(0).String()
+	v, ok := this.data[name]
+	if ok {
+		return rt.ToValue(v)
+	}
+	return rt.NewArray()
+}
+
+func (*FormData) has(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	name := call.Argument(0).String()
+	_, ok := this.data[name]
+	return rt.ToValue(ok)
+}
+
+func (*FormData) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	name := call.Argument(0).String()
+	value := call.Argument(1)
+	if _, ok := this.data[name]; !ok {
+		this.keys = append(this.keys, name)
+	}
+
+	switch value.ExportType() {
+	case typeArrayBuffer, typeBlob:
+		filename := call.Argument(2)
+		if f := call.Argument(2); sobek.IsUndefined(f) {
+			// Default filename "blob".
+			filename = rt.ToValue("blob")
+		}
+
+		file, err := js.New(rt, "File", rt.NewArray(value), filename)
+		if err != nil {
+			js.Throw(rt, err)
+		}
+		this.data[name] = []sobek.Value{file}
+	default:
+		if !sobek.IsUndefined(value) {
+			this.data[name] = []sobek.Value{value}
+		}
+	}
+	return sobek.Undefined()
+}
+
+func (*FormData) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	return js.Iterator(rt, func(yield func(any) bool) {
+		for _, key := range this.keys {
+			if !yield(key) {
+				return
+			}
+		}
+	})
+}
+
+func (*FormData) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	return js.Iterator(rt, func(yield func(any) bool) {
+		for _, key := range this.keys {
+			var value any
+			if values := this.data[key]; len(values) > 0 {
+				value = values[0]
+			}
+			if !yield(value) {
+				return
+			}
+		}
+	})
+}
+
+func (*FormData) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toFormData(rt, call.This)
+	return js.Iterator(rt, func(yield func(any) bool) {
+		for _, key := range this.keys {
+			var value any
+			if values := this.data[key]; len(values) > 0 {
+				value = values[0]
+			}
+			if !yield(rt.NewArray(key, value)) {
+				return
+			}
+		}
+	})
+}
+
+type formData struct {
+	keys []string
+	data map[string][]sobek.Value
+}
+
+func (f *formData) encode() (io.Reader, string, error) {
+	buf := new(bytes.Buffer)
+	writer := multipart.NewWriter(buf)
+	for _, key := range f.keys {
+		for _, value := range f.data[key] {
+			switch value.ExportType() {
+			case typeFile:
+				file := value.Export().(*file)
+				fw, err := writer.CreateFormFile(key, file.name)
+				if err != nil {
+					return nil, "", err
+				}
+				if file.blob == nil {
+					fw.Write(nil)
+					continue
+				}
+				if _, err = io.Copy(fw, file.blob.Export().(*blob).data); err != nil {
+					return nil, "", err
+				}
+			default:
+				if err := writer.WriteField(key, value.String()); err != nil {
+					return nil, "", err
+				}
+			}
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, "", err
+	}
+	return buf, writer.FormDataContentType(), nil
+}
+
+var (
+	typeFormData = reflect.TypeOf((*formData)(nil))
+)
+
+func toFormData(rt *sobek.Runtime, value sobek.Value) *formData {
+	if value.ExportType() == typeFormData {
+		return value.Export().(*formData)
+	}
+	panic(rt.NewTypeError(`Value of "this" must be of type FormData`))
+}

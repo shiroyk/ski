@@ -3,97 +3,124 @@ package http
 import (
 	"errors"
 	"net/http"
-	"net/url"
+	pkgurl "net/url"
 	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
-	"github.com/spf13/cast"
 )
 
 // CookieJarModule manages storage and use of cookies in HTTP requests.
 type CookieJarModule struct{ CookieJar }
 
-func (j *CookieJarModule) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	if j.CookieJar == nil {
-		return nil, errors.New("CookieJar can not nil")
-	}
-	return rt.ToValue(map[string]func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value{
-		"get":    j.Get,
-		"getAll": j.GetAll,
-		"set":    j.Set,
-		"del":    j.Del,
-	}), nil
+func (c *CookieJarModule) prototype(rt *sobek.Runtime) *sobek.Object {
+	p := rt.NewObject()
+	_ = p.Set("get", c.get)
+	_ = p.Set("getAll", c.getAll)
+	_ = p.Set("set", c.set)
+	_ = p.Set("del", c.del)
+	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.ConstructorCall) sobek.Value { return rt.ToValue("CookieJarModule") })
+	return p
 }
 
-// Get returns the cookie for the given option.
-func (j *CookieJarModule) Get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	opt, err := cast.ToStringMapStringE(call.Argument(0).Export())
-	if err != nil {
-		js.Throw(rt, errors.New("get parameter must be an object containing name, url"))
+func (*CookieJarModule) constructor(_ sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
+	panic(rt.NewTypeError("Illegal constructor"))
+}
+
+func (c *CookieJarModule) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	if c.CookieJar == nil {
+		return nil, errors.New("CookieJar can not nil")
 	}
-	u, err := url.Parse(opt["url"])
+	proto := c.prototype(rt)
+	ctor := rt.ToValue(c.constructor).(*sobek.Object)
+	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
+	_ = ctor.Set("prototype", proto)
+	_ = ctor.SetPrototype(proto)
+	return ctor, nil
+}
+
+func (c *CookieJarModule) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	url := call.Argument(0)
+	if sobek.IsUndefined(url) || sobek.IsNull(url) {
+		js.Throw(rt, errors.New("get url must not be empty"))
+	}
+	u, err := pkgurl.Parse(url.String())
 	if err != nil {
 		js.Throw(rt, err)
 	}
-	cookies := j.CookieJar.Cookies(u)
-	name := opt["name"]
+
+	cookies := c.Cookies(u)
+	name := call.Argument(1)
+	if sobek.IsUndefined(name) || sobek.IsNull(name) {
+		js.Throw(rt, errors.New("get name must not be empty"))
+	}
+	n := name.String()
 	for _, cookie := range cookies {
-		if cookie.Name == name {
-			return toObj(cookie, rt)
+		if cookie.Name == n {
+			return cookieToObject(cookie, rt.NewObject())
 		}
 	}
-	if len(cookies) > 0 {
-		return toObj(cookies[0], rt)
-	}
+
 	return sobek.Null()
 }
 
-// GetAll returns the cookies for the given option.
-func (j *CookieJarModule) GetAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	opt, err := cast.ToStringMapStringE(call.Argument(0).Export())
-	if err != nil {
-		js.Throw(rt, errors.New("getAll parameter must be an object containing name, url"))
+func (c *CookieJarModule) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	url := call.Argument(0)
+	if sobek.IsUndefined(url) || sobek.IsNull(url) {
+		js.Throw(rt, errors.New("getAll url must not be empty"))
 	}
-	u, err := url.Parse(opt["url"])
+	u, err := pkgurl.Parse(url.String())
 	if err != nil {
 		js.Throw(rt, err)
 	}
-	return toObjs(j.CookieJar.Cookies(u), rt)
+
+	cookies := c.Cookies(u)
+
+	var name string
+	if n := call.Argument(1); !sobek.IsUndefined(n) {
+		name = n.String()
+	}
+
+	result := rt.NewArray()
+
+	for _, cookie := range cookies {
+		if name != "" && cookie.Name != name {
+			continue
+		}
+		obj := cookieToObject(cookie, rt.NewObject())
+		_ = result.Set(result.Get("length").String(), obj)
+	}
+
+	return result
 }
 
-// Set handles the receipt of the cookies in a reply for the given option.
-func (j *CookieJarModule) Set(call sobek.FunctionCall, rt *sobek.Runtime) (ret sobek.Value) {
-	u, err := url.Parse(call.Argument(0).String())
+func (c *CookieJarModule) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	url := call.Argument(0)
+	if sobek.IsUndefined(url) || sobek.IsNull(url) {
+		js.Throw(rt, errors.New("set url must not be empty"))
+	}
+	u, err := pkgurl.Parse(url.String())
 	if err != nil {
-		js.Throw(rt, errors.New("set first parameter must be url string"))
-	}
-	var cookies []*http.Cookie
-	switch e := call.Argument(1).Export().(type) {
-	case map[string]any:
-		cookies = append(cookies, toCookie(e))
-	case []any:
-		for _, cookie := range cookies {
-			cookies = append(cookies, toCookie(cast.ToStringMap(cookie)))
-		}
-	default:
-		js.Throw(rt, errors.New("set second parameter must be cookie object"))
-	}
-	if len(cookies) == 0 {
-		return sobek.Undefined()
+		js.Throw(rt, err)
 	}
 
-	j.CookieJar.SetCookies(u, cookies)
+	options := call.Argument(1).ToObject(rt)
+	cookie := objectToCookie(options)
+	c.SetCookies(u, []*http.Cookie{cookie})
 	return sobek.Undefined()
 }
 
-// Del handles the receipt of the cookies in a reply for the given URL.
-func (j *CookieJarModule) Del(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	u, err := url.Parse(call.Argument(0).String())
+func (c *CookieJarModule) del(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	url := call.Argument(0)
+	if sobek.IsUndefined(url) || sobek.IsNull(url) {
+		js.Throw(rt, errors.New("del url must not be empty"))
+	}
+	u, err := pkgurl.Parse(url.String())
 	if err != nil {
 		js.Throw(rt, err)
 	}
-	j.CookieJar.RemoveCookie(u)
+
+	c.RemoveCookie(u)
 	return sobek.Undefined()
 }
 
@@ -104,52 +131,51 @@ var sameSiteMapping = [...]string{
 	http.SameSiteNoneMode:    "none",
 }
 
-func toObj(cookie *http.Cookie, rt *sobek.Runtime) sobek.Value {
-	o := rt.NewObject()
-	_ = o.Set("domain", rt.ToValue(cookie.Domain))
-	_ = o.Set("expires", rt.ToValue(cookie.Expires.Unix()))
-	_ = o.Set("name", rt.ToValue(cookie.Name))
-	_ = o.Set("path", rt.ToValue(cookie.Path))
-	_ = o.Set("sameSite", rt.ToValue(sameSiteMapping[cookie.SameSite]))
-	_ = o.Set("secure", rt.ToValue(cookie.Secure))
-	_ = o.Set("value", rt.ToValue(cookie.Value))
-	_ = o.Set("toString", func(sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(cookie.String())
-	})
-	return o
+func cookieToObject(cookie *http.Cookie, obj *sobek.Object) *sobek.Object {
+	_ = obj.Set("name", cookie.Name)
+	_ = obj.Set("value", cookie.Value)
+	if !cookie.Expires.IsZero() {
+		_ = obj.Set("expires", cookie.Expires.UnixMilli())
+	}
+	_ = obj.Set("domain", cookie.Domain)
+	_ = obj.Set("path", cookie.Path)
+	_ = obj.Set("secure", cookie.Secure)
+	_ = obj.Set("httpOnly", cookie.HttpOnly)
+	if cookie.SameSite != http.SameSiteDefaultMode {
+		_ = obj.Set("sameSite", sameSiteMapping[cookie.SameSite])
+	}
+	return obj
 }
 
-func toObjs(cookies []*http.Cookie, rt *sobek.Runtime) sobek.Value {
-	ret := make([]sobek.Value, 0, len(cookies))
-	for _, cookie := range cookies {
-		ret = append(ret, toObj(cookie, rt))
+func objectToCookie(options *sobek.Object) *http.Cookie {
+	cookie := new(http.Cookie)
+	for _, key := range options.Keys() {
+		value := options.Get(key)
+		switch key {
+		case "name":
+			cookie.Name = value.String()
+		case "value":
+			cookie.Value = value.String()
+		case "domain":
+			cookie.Domain = value.String()
+		case "path":
+			cookie.Path = value.String()
+		case "secure":
+			cookie.Secure = value.ToBoolean()
+		case "httpOnly":
+			cookie.HttpOnly = value.ToBoolean()
+		case "expires":
+			cookie.Expires = time.UnixMilli(value.ToInteger())
+		case "sameSite":
+			switch value.String() {
+			case "lax":
+				cookie.SameSite = http.SameSiteLaxMode
+			case "strict":
+				cookie.SameSite = http.SameSiteStrictMode
+			case "none":
+				cookie.SameSite = http.SameSiteNoneMode
+			}
+		}
 	}
-	return rt.ToValue(ret)
-}
-
-func toCookie(o map[string]any) *http.Cookie {
-	var sameSite = http.SameSiteDefaultMode
-	switch cast.ToString(o["sameSite"]) {
-	case "lax":
-		sameSite = http.SameSiteLaxMode
-	case "strict":
-		sameSite = http.SameSiteStrictMode
-	case "none":
-		sameSite = http.SameSiteNoneMode
-	}
-	expires := cast.ToInt64(o["expires"])
-	if expires == 0 {
-		expires = time.Now().Add(time.Hour * 72).Unix()
-	}
-	return &http.Cookie{
-		Domain:   cast.ToString(o["domain"]),
-		Expires:  time.Unix(expires, 0),
-		Name:     cast.ToString(o["name"]),
-		Path:     cast.ToString(o["path"]),
-		SameSite: sameSite,
-		Value:    cast.ToString(o["value"]),
-		MaxAge:   cast.ToInt(o["maxAge"]),
-		Secure:   cast.ToBool(o["secure"]),
-		HttpOnly: cast.ToBool(o["httpOnly"]),
-	}
+	return cookie
 }
