@@ -22,6 +22,7 @@ func TestConsole(t *testing.T) {
 	}{
 		{`console.log("hello %s", "ski");`, "hello ski"},
 		{`console.log("json %j", {'foo': 'bar'});`, `json {\"foo\":\"bar\"}`},
+		{`console.log({'foo': 'bar'});`, `{\"foo\":\"bar\"}`},
 	} {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			data.Reset()

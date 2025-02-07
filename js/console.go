@@ -2,6 +2,7 @@ package js
 
 import (
 	"bytes"
+	"encoding/json"
 	"log/slog"
 
 	"github.com/grafana/sobek"
@@ -104,18 +105,26 @@ func bufferFormat(vm *sobek.Runtime, b *bytes.Buffer, f string, args ...sobek.Va
 
 // Format implements js format
 func Format(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	var b bytes.Buffer
 	var f string
 
 	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
-		f = arg.String()
+		m, ok := arg.(json.Marshaler)
+		if ok {
+			data, err := m.MarshalJSON()
+			if err != nil {
+				Throw(rt, err)
+			}
+			f = string(data)
+		} else {
+			f = arg.String()
+		}
 	}
 
-	var args []sobek.Value
-	if len(call.Arguments) > 0 {
-		args = call.Arguments[1:]
+	if len(call.Arguments) > 1 {
+		var b bytes.Buffer
+		bufferFormat(rt, &b, f, call.Arguments[1:]...)
+		f = b.String()
 	}
-	bufferFormat(rt, &b, f, args...)
 
-	return rt.ToValue(b.String())
+	return rt.ToValue(f)
 }
