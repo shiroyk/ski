@@ -1,11 +1,8 @@
 package ski
 
 import (
-	"context"
-	"io"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -33,38 +30,4 @@ func NewFetch() Fetch {
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
-}
-
-type _fetch string
-
-// fetch the resource from the network, default method is GET
-// Method http://example.com
-func fetch(arg Arguments) (Executor, error) {
-	return _fetch(arg.GetString(0)), nil
-}
-
-func (f _fetch) Exec(ctx context.Context, _ any) (any, error) {
-	method, url, found := strings.Cut(string(f), " ")
-	if !found {
-		url = string(f)
-		method = http.MethodGet
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "ski")
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	return string(data), nil
 }

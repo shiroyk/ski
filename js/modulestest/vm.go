@@ -13,15 +13,8 @@ import (
 
 type VM struct{ js.VM }
 
-func (vm *VM) RunString(ctx context.Context, source string) (ret sobek.Value, err error) {
-	vm.Run(ctx, func() {
-		ret, err = vm.Runtime().RunString(source)
-	})
-	return
-}
-
 func (vm *VM) RunModule(ctx context.Context, source string, args ...any) (ret sobek.Value, err error) {
-	module, err := vm.Loader().CompileModule("", source)
+	module, err := js.CompileModule("", source)
 	if err != nil {
 		return
 	}
@@ -29,10 +22,10 @@ func (vm *VM) RunModule(ctx context.Context, source string, args ...any) (ret so
 }
 
 // New returns a test VM instance
-func New(t *testing.T, opts ...js.Option) VM {
-	vm := js.NewVM(append([]js.Option{js.WithModuleLoader(js.NewModuleLoader())}, opts...)...)
-	assertObject := vm.Runtime().NewObject()
-	_ = assertObject.Set("equal", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
+func New(t testing.TB, opts ...js.Option) VM {
+	vm := js.NewVM(opts...)
+	obj := vm.Runtime().NewObject()
+	_ = obj.Set("equal", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
 		a, err := js.Unwrap(call.Argument(0))
 		if err != nil {
 			js.Throw(vm, err)
@@ -50,7 +43,7 @@ func New(t *testing.T, opts ...js.Option) VM {
 		}
 		return
 	})
-	_ = assertObject.Set("true", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
+	_ = obj.Set("true", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
 		var msg string
 		if !sobek.IsUndefined(call.Argument(1)) {
 			msg = call.Argument(1).String()
@@ -61,6 +54,6 @@ func New(t *testing.T, opts ...js.Option) VM {
 		return
 	})
 
-	_ = vm.Runtime().Set("assert", assertObject)
+	_ = vm.Runtime().Set("assert", obj)
 	return VM{vm}
 }

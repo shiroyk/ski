@@ -2,39 +2,47 @@ package js
 
 import (
 	"sync"
+
+	"github.com/grafana/sobek"
 )
 
 // EventLoop implements an eventloop.
 type EventLoop struct {
-	queue    []func()   // queue to store the job to be executed
-	doneJobs []func()   // job of Done
-	enqueue  uint       // Count of job in the event loop
-	cond     *sync.Cond // Condition variable for synchronization
+	queue   []func() error // queue to store the job to be executed
+	cleanup []func()       // job of cleanup
+	enqueue uint           // Count of job in the event loop
+	cond    *sync.Cond     // Condition variable for synchronization
 }
 
 // NewEventLoop create a new EventLoop instance
 func NewEventLoop() *EventLoop {
 	return &EventLoop{
-		cond:     sync.NewCond(new(sync.Mutex)),
-		doneJobs: make([]func(), 0),
+		cond:    sync.NewCond(new(sync.Mutex)),
+		cleanup: make([]func(), 0),
 	}
 }
 
 // Start the event loop and execute the provided function
-func (e *EventLoop) Start(f func()) {
+func (e *EventLoop) Start(task func() error) (err error) {
 	e.cond.L.Lock()
-	e.queue = []func(){f}
+	e.queue = []func() error{task}
 	e.cond.L.Unlock()
 	for {
 		e.cond.L.Lock()
 
 		if len(e.queue) > 0 {
 			queue := e.queue
-			e.queue = make([]func(), 0, len(queue))
+			e.queue = make([]func() error, 0, len(queue))
 			e.cond.L.Unlock()
 
 			for _, job := range queue {
-				job()
+				if err2 := job(); err2 != nil {
+					if err != nil {
+						err = append(err.(joinError), err2)
+					} else {
+						err = joinError{err2}
+					}
+				}
 			}
 			continue
 		}
@@ -45,13 +53,13 @@ func (e *EventLoop) Start(f func()) {
 			continue
 		}
 
-		if len(e.doneJobs) > 0 {
-			done := e.doneJobs
-			e.doneJobs = e.doneJobs[:0]
+		if len(e.cleanup) > 0 {
+			cleanup := e.cleanup
+			e.cleanup = e.cleanup[:0]
 			e.cond.L.Unlock()
 
-			for _, job := range done {
-				job()
+			for _, clean := range cleanup {
+				clean()
 			}
 		} else {
 			e.cond.L.Unlock()
@@ -61,19 +69,19 @@ func (e *EventLoop) Start(f func()) {
 	}
 }
 
-type Enqueue func(func())
+type Enqueue func(func() error)
 
 // EnqueueJob return a function Enqueue to add a job to the job queue.
 // Usage:
 //
-//	func main() {
+//		func main() {
 //		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 //			w.WriteHeader(http.StatusOK)
 //			_, _ = w.Write([]byte(`{"foo":"bar"}`))
 //		}))
 //		defer server.Close()
 //
-//		loop := NewEventLoop()
+//		loop := js.NewEventLoop()
 //		runtime := sobek.New()
 //
 //		_ = runtime.Set("fetch", func(call sobek.FunctionCall) sobek.Value {
@@ -83,18 +91,18 @@ type Enqueue func(func())
 //			go func() {
 //				res, err := http.Get(call.Argument(0).String())
 //				if err != nil {
-//					enqueue(func() { reject(err) })
+//					enqueue(func() error { return reject(err) })
 //					return
 //				}
-//				loop.OnDone(func() { res.Body.Close() })
+//				loop.Cleanup(func() { res.Body.Close() })
 //
 //				data, err := io.ReadAll(res.Body)
 //				if err != nil {
-//					enqueue(func() { reject(err) })
+//					enqueue(func() error { return reject(err) })
 //					return
 //				}
 //
-//				enqueue(func() { resolve(string(data)) })
+//				enqueue(func() error { return resolve(string(data)) })
 //			}()
 //
 //			return runtime.ToValue(promise)
@@ -105,10 +113,13 @@ type Enqueue func(func())
 //			err error
 //		)
 //
-//		loop.Start(func() { ret, err = runtime.RunString(fmt.Sprintf(`fetch("%s")`, server.URL)) })
+//		err = loop.Start(func() error {
+//			ret, err = runtime.RunString(fmt.Sprintf(`fetch("%s")`, server.URL))
+//			return err
+//		})
 //
 //		if err != nil {
-//			fmt.Println(err)
+//			panic(err)
 //		}
 //		promise, ok := ret.Export().(*sobek.Promise)
 //		if !ok {
@@ -120,7 +131,7 @@ type Enqueue func(func())
 //		case sobek.PromiseStatePending:
 //			panic("unexpect pending state")
 //		case sobek.PromiseStateRejected:
-//			fmt.Println(promise.Result().String())
+//			panic(promise.Result().(error))
 //		case sobek.PromiseStateFulfilled:
 //			fmt.Println(promise.Result().Export())
 //		}
@@ -130,35 +141,49 @@ func (e *EventLoop) EnqueueJob() Enqueue {
 	called := false
 	e.enqueue++
 	e.cond.L.Unlock()
-	return func(job func()) {
+	return func(job func() error) {
 		e.cond.L.Lock()
-		if called {
-			e.cond.L.Unlock()
+		defer e.cond.L.Unlock()
+		switch {
+		case called:
 			panic("Enqueue already called")
+		case e.enqueue == 0:
+			return // Eventloop stopped
 		}
 		e.queue = append(e.queue, job) // Add the job to the queue
 		called = true
 		e.enqueue--
 		e.cond.Signal() // Signal the condition variable
-		e.cond.L.Unlock()
 	}
 }
 
 // Stop the eventloop
 func (e *EventLoop) Stop() {
 	e.cond.L.Lock()
-	defer e.cond.L.Unlock()
 	// clean the queue
 	e.queue = e.queue[:0]
 	e.enqueue = 0
-	e.doneJobs = e.doneJobs[:0]
+	cleanup := e.cleanup
+	e.cleanup = e.cleanup[:0]
 	e.cond.Signal()
+	e.cond.L.Unlock()
+
+	for _, job := range cleanup {
+		job()
+	}
 }
 
-// OnDone add a function to execute when done.
-func (e *EventLoop) OnDone(job func()) {
+// Cleanup add a function to execute when run finish.
+func (e *EventLoop) Cleanup(job ...func()) {
 	e.cond.L.Lock()
 	defer e.cond.L.Unlock()
 
-	e.doneJobs = append(e.doneJobs, job)
+	e.cleanup = append(e.cleanup, job...)
 }
+
+// EnqueueJob return a function Enqueue to add a job to the job queue.
+func EnqueueJob(rt *sobek.Runtime) Enqueue { return self(rt).eventloop.EnqueueJob() }
+
+// Cleanup add a function to execute when the VM has finished running.
+// eg: close resources...
+func Cleanup(rt *sobek.Runtime, job ...func()) { self(rt).eventloop.Cleanup(job...) }

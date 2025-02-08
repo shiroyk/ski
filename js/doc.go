@@ -3,10 +3,9 @@
 // Run ESM/CJS modules:
 //
 //	func main() {
-//		module, err := js.GetScheduler().Loader().CompileModule("", "module.exports = () => 'some value'")
+//		module, err := js.CompileModule("", "module.exports = () => 'some value'")
 //		if err != nil {
-//			fmt.Println(err)
-//			return
+//			panic(err)
 //		}
 //
 //		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -14,19 +13,9 @@
 //
 //		value, err := js.RunModule(ctx, module)
 //		if err != nil {
-//			fmt.Println(err)
-//			return
+//			panic(err)
 //		}
 //
 //		fmt.Println(value.Export())
-//	}
-//
-// Configure JS Scheduler:
-//
-//	func init() {
-//		js.SetScheduler(js.NewScheduler(js.SchedulerOptions{
-//			MaxVMs: 8,
-//			Loader: js.NewModuleLoader(),
-//		}))
 //	}
 package js

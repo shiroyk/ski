@@ -54,45 +54,8 @@ func Unwrap(value sobek.Value) (any, error) {
 	}
 }
 
-// ModuleInstance return the sobek.ModuleInstance.
-func ModuleInstance(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFunc, module sobek.CyclicModuleRecord) (sobek.ModuleInstance, error) {
-	instance := rt.GetModuleInstance(module)
-	if instance == nil {
-		if err := module.Link(); err != nil {
-			return nil, err
-		}
-		promise := rt.CyclicModuleRecordEvaluate(module, resolve)
-		switch promise.State() {
-		case sobek.PromiseStateRejected:
-			return nil, promise.Result().Export().(error)
-		case sobek.PromiseStateFulfilled:
-		default:
-		}
-		return rt.GetModuleInstance(module), nil
-	}
-	return instance, nil
-}
-
-// ModuleCallable return the sobek.CyclicModuleRecord default export as sobek.Callable.
-func ModuleCallable(rt *sobek.Runtime, resolve sobek.HostResolveImportedModuleFunc, module sobek.CyclicModuleRecord) (sobek.Callable, error) {
-	instance, err := ModuleInstance(rt, resolve, module)
-	if err != nil {
-		return nil, err
-	}
-	value := instance.GetBindingValue("default")
-	call, ok := sobek.AssertFunction(value)
-	if !ok {
-		return nil, errors.New("module default export is not a function")
-	}
-	return call, nil
-}
-
 // Context returns the current context of the sobek.Runtime
 func Context(rt *sobek.Runtime) context.Context { return self(rt).ctx }
-
-// OnDone add a function to execute when the VM has finished running.
-// eg: close resources...
-func OnDone(rt *sobek.Runtime, job func()) { self(rt).eventloop.OnDone(job) }
 
 func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
 	global := rt.GlobalObject().Get("Object").ToObject(rt)
@@ -105,9 +68,9 @@ func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
 }
 
 // Iterator returns a JavaScript iterator
-func Iterator(rt *sobek.Runtime, fn iter.Seq[any]) *sobek.Object {
+func Iterator(rt *sobek.Runtime, seq iter.Seq[any]) *sobek.Object {
 	p := rt.NewObject()
-	next, _ := iter.Pull(fn)
+	next, _ := iter.Pull(seq)
 	_ = p.SetSymbol(sobek.SymIterator, func(call sobek.FunctionCall) sobek.Value { return call.This })
 	_ = p.Set("next", func(call sobek.FunctionCall) sobek.Value {
 		ret := rt.NewObject()

@@ -27,7 +27,7 @@ func (c *valuesCtx) Value(key any) any {
 
 func (c *valuesCtx) SetValue(key, value any) { c.values.Store(key, value) }
 
-var _ctxKey byte
+type valuesCtxKey struct{}
 
 // NewContext returns a new can store multiple values context with values
 func NewContext(parent context.Context, values map[any]any) Context {
@@ -41,14 +41,14 @@ func NewContext(parent context.Context, values map[any]any) Context {
 		}
 	}
 	ctx := &valuesCtx{Context: parent, values: m}
-	m.Store(&_ctxKey, ctx)
+	m.Store(valuesCtxKey{}, ctx)
 	return ctx
 }
 
 // WithValue if parent exists multiple values Context then set the key/value.
 // or returns a copy of parent in which the value associated with key is val.
 func WithValue(ctx context.Context, key, value any) context.Context {
-	if v, ok := ctx.Value(&_ctxKey).(*valuesCtx); ok {
+	if v, ok := ctx.Value(valuesCtxKey{}).(*valuesCtx); ok {
 		v.SetValue(key, value)
 		return ctx
 	}

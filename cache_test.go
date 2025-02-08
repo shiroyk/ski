@@ -18,7 +18,7 @@ func TestCache(t *testing.T) {
 		t.Fatal("retrieved values before adding it")
 	}
 
-	_ = c.Set(ctx, key, []byte(value))
+	_ = c.Set(ctx, key, []byte(value), 0)
 	v, _ := c.Get(ctx, key)
 	assert.Equal(t, value, string(v))
 
@@ -26,11 +26,11 @@ func TestCache(t *testing.T) {
 	v, _ = c.Get(ctx, key)
 	assert.Empty(t, v)
 
-	_ = c.Set(WithCacheTimeout(ctx, time.Millisecond), key, []byte(value))
+	_ = c.Set(ctx, key, []byte(value), time.Millisecond)
 	v1, _ := c.Get(ctx, key)
 	assert.Equal(t, value, string(v1))
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	v, _ = c.Get(ctx, key)
 	assert.Empty(t, v, "not expired: %v", key)

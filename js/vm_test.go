@@ -1,146 +1,180 @@
 package js
 
 import (
-	"bytes"
 	"context"
-	"log/slog"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
-	_ "unsafe"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestVMContext(t *testing.T) {
-	t.Parallel()
-	ctx := ski.WithValue(ski.NewContext(context.Background(), nil), "foo", "bar")
-	vm := NewVM(WithModuleLoader(NewModuleLoader()))
-
-	v, err := runMod(ctx, vm, `module.exports = () => {$ctx.a = "1"; return $ctx.foo}`)
-	if assert.NoError(t, err) {
-		assert.Equal(t, "bar", v.Export())
-		assert.Equal(t, "1", ctx.Value("a"))
-		assert.Equal(t, context.Background(), Context(vm.Runtime()))
-	}
+type valuesContext struct {
+	context.Context
+	values map[any]any
 }
 
-func TestVMRunModule(t *testing.T) {
-	t.Parallel()
-	vm := NewVM()
+func (v *valuesContext) Value(key any) any {
+	return v.values[key]
+}
 
-	testCases := []struct {
-		script string
-		want   any
-	}{
-		{"export default () => 1", 1},
-		{"export default function () {let a = 1; return a + 1}", 2},
-		{"export default async () => 3", 3},
-		{"const a = async () => 5; let b = await a(); export default () => b - 1", 4},
-		{"export default () => 3 + 2", 5},
-	}
+func (v *valuesContext) SetValue(key, value any) {
+	v.values[key] = value
+}
 
-	for _, c := range testCases {
-		t.Run(c.script, func(t *testing.T) {
-			v, err := runMod(context.Background(), vm, c.script)
-			if assert.NoError(t, err) {
-				vv, err := Unwrap(v)
-				if assert.NoError(t, err) {
-					assert.EqualValues(t, c.want, vv)
-				}
-			}
+func TestVM(t *testing.T) {
+	t.Run("basic execution", func(t *testing.T) {
+		vm := NewVM()
+		rt := vm.Runtime()
+
+		result, err := rt.RunString("1 + 2")
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), result.ToInteger())
+
+		err = rt.Set("add", func(call sobek.FunctionCall) sobek.Value {
+			a := call.Argument(0).ToInteger()
+			b := call.Argument(1).ToInteger()
+			return rt.ToValue(a + b)
 		})
-	}
-}
+		require.NoError(t, err)
 
-func TestTimeout(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
-	defer cancel()
+		result, err = rt.RunString("add(2, 3)")
+		require.NoError(t, err)
+		assert.Equal(t, int64(5), result.ToInteger())
+	})
 
-	start := time.Now()
-	_, err := runMod(ctx, NewVM(), "export default () => {while(true){}}")
-	took := time.Since(start)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Greater(t, time.Millisecond*300, took)
-}
+	t.Run("module execution", func(t *testing.T) {
+		vm := NewVM()
 
-func TestWithInitial(t *testing.T) {
-	t.Parallel()
-	vm := NewVM(WithInitial(func(rt *sobek.Runtime) {
-		_ = rt.Set("init", true)
-	}))
-	v, err := runMod(context.Background(), vm, `export default () => init`)
-	if assert.NoError(t, err) {
-		assert.Equal(t, true, v.Export())
-	}
-}
+		module, err := Loader().CompileModule("test", `
+			export default function(a, b) { 
+				return a + b 
+			}
+		`)
+		require.NoError(t, err)
 
-func TestNewPromise(t *testing.T) {
-	t.Parallel()
-	vm := NewVM()
+		result, err := vm.RunModule(context.Background(), module, 2, 3)
+		require.NoError(t, err)
+		assert.Equal(t, int64(5), result.ToInteger())
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
+	t.Run("context values", func(t *testing.T) {
+		vm := NewVM()
 
-	goFunc := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-		return rt.ToValue(NewPromise(rt, func() (any, error) {
-			time.Sleep(time.Second)
-			return max(call.Argument(0).ToInteger(), call.Argument(1).ToInteger()), nil
+		ctx := &valuesContext{context.Background(), map[any]any{"test": "value"}}
+
+		val, err := vm.RunString(ctx, `$ctx.foo = "bar"; $ctx.test`)
+		require.NoError(t, err)
+
+		assert.Equal(t, "value", val.String())
+		assert.Equal(t, "bar", ctx.Value("foo"))
+	})
+
+	t.Run("context timeout", func(t *testing.T) {
+		vm := NewVM()
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		start := time.Now()
+		_, err := vm.RunString(ctx, "{while(true){}}")
+		assert.Error(t, err)
+		assert.Less(t, time.Since(start), time.Millisecond*110)
+		assert.True(t, errors.Is(err, context.DeadlineExceeded))
+	})
+
+	t.Run("promise handling", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"ok"}`))
 		}))
-	}
-	_ = vm.Runtime().Set("max", goFunc)
+		defer server.Close()
 
-	start := time.Now()
+		vm := NewVM()
+		rt := vm.Runtime()
 
-	result, err := runMod(ctx, vm, `export default () => max(1, 2)`)
-	if assert.NoError(t, err) {
+		err := rt.Set("fetch", func(call sobek.FunctionCall) sobek.Value {
+			return rt.ToValue(NewPromise(rt,
+				func() (*http.Response, error) {
+					return http.Get(call.Argument(0).String())
+				},
+				func(res *http.Response, err error) (any, error) {
+					if err != nil {
+						return nil, err
+					}
+					defer res.Body.Close()
+					var data map[string]string
+					err = json.NewDecoder(res.Body).Decode(&data)
+					require.NoError(t, err)
+					data["status"] = res.Status
+					return data, nil
+				}))
+		})
+		require.NoError(t, err)
+
+		result, err := vm.RunString(context.Background(), `
+			(async function() {
+				const res = await fetch("`+server.URL+`");
+				return res;
+			})()
+		`)
+		require.NoError(t, err)
+
 		value, err := Unwrap(result)
-		if assert.NoError(t, err) {
-			assert.EqualValues(t, 2, value)
-			assert.EqualValues(t, 1, int(time.Now().Sub(start).Seconds()))
-		}
-	}
-}
-
-type testScheduler struct{ vm VM }
-
-func (t *testScheduler) release(vm VM)  { t.vm = vm }
-func (*testScheduler) Get() (VM, error) { return nil, nil }
-func (*testScheduler) Close() error     { return nil }
-
-func TestVMPanic(t *testing.T) {
-	t.Parallel()
-	scheduler := new(testScheduler)
-	vm := NewVM(func(vm *vmImpl) {
-		vm.release = func() { scheduler.release(vm) }
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{
+			"status":  "200 OK",
+			"message": "ok",
+		}, value)
 	})
 
-	ctx, cancel := context.WithTimeout(ski.NewContext(context.Background(), nil), time.Second)
-	defer cancel()
+	t.Run("error handling", func(t *testing.T) {
+		vm := NewVM()
 
-	log := new(bytes.Buffer)
+		_, err := vm.RunString(context.Background(), "1 + )")
+		assert.Error(t, err)
 
-	logger := slog.New(slog.NewTextHandler(log, nil))
+		_, err = vm.RunString(context.Background(), "undefined.method()")
+		assert.Error(t, err)
 
-	_ = vm.Runtime().Set("some", func() {
-		OnDone(vm.Runtime(), func() { assert.Equal(t, Context(vm.Runtime()), ctx) })
-		OnDone(vm.Runtime(), func() { panic("some panic") })
+		assert.NotPanics(t, func() {
+			var p []string
+			err = vm.Run(context.Background(), func() error { p[1] = ""; return nil })
+			assert.Error(t, err)
+		})
 	})
-	_, err := runMod(ski.WithLogger(ctx, logger), vm, `export default () => {some(); (() => other.error)()}`)
-	if assert.Error(t, err) {
-		assert.ErrorContains(t, err, "other is not defined")
-		assert.NotNil(t, scheduler.vm)
-		assert.Equal(t, context.Background(), Context(vm.Runtime()))
-		assert.Contains(t, log.String(), "vm run error: some panic")
-	}
-}
 
-func runMod(ctx context.Context, vm VM, script string) (sobek.Value, error) {
-	mod, err := vm.Loader().CompileModule("", script)
-	if err != nil {
-		return nil, err
-	}
-	return vm.RunModule(ctx, mod)
+	t.Run("eventloop", func(t *testing.T) {
+		vm := NewVM()
+		rt := vm.Runtime()
+
+		var results []int
+		err := rt.Set("setTimeout", func(call sobek.FunctionCall) sobek.Value {
+			enqueue := self(rt).eventloop.EnqueueJob()
+			callback, _ := sobek.AssertFunction(call.Argument(0))
+			time.AfterFunc(time.Duration(call.Argument(1).ToInteger())*time.Millisecond, func() {
+				enqueue(func() error { callback(sobek.Undefined()); return nil })
+			})
+			return sobek.Undefined()
+		})
+		require.NoError(t, err)
+		err = rt.Set("addResult", func(call sobek.FunctionCall) sobek.Value {
+			results = append(results, int(call.Argument(0).ToInteger()))
+			return sobek.Undefined()
+		})
+		require.NoError(t, err)
+
+		_, err = vm.RunString(context.Background(), `
+				setTimeout(() => addResult(1), 0);
+				Promise.resolve().then(() => addResult(2));
+				addResult(3);
+			`)
+		require.NoError(t, err)
+
+		assert.Equal(t, []int{3, 2, 1}, results)
+	})
 }

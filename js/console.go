@@ -2,49 +2,64 @@ package js
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
+	"reflect"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 )
 
-// console implements the js console
-type console struct{}
-
-// EnableConsole enables the console with the slog.Logger
-func EnableConsole(rt *sobek.Runtime) {
-	_ = rt.Set("console", new(console))
+func EnableConsole(rt *sobek.Runtime, attr ...slog.Attr) {
+	v, _ := console(attr).Instantiate(rt)
+	_ = rt.Set("console", v)
 }
 
-func (c *console) log(level slog.Level, call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	ski.Logger(Context(rt)).Log(Context(rt), level, Format(call, rt).String())
+// console implements the js console
+type console []slog.Attr
+
+func (c console) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	ret := rt.NewObject()
+	_ = ret.Set("log", c.log)
+	_ = ret.Set("info", c.info)
+	_ = ret.Set("warn", c.warn)
+	_ = ret.Set("error", c.error)
+	return ret, nil
+}
+
+func (c console) output(level slog.Level, call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	ctx := Context(rt)
+	var args []sobek.Value
+	if len(call.Arguments) > 1 {
+		args = call.Arguments[1:]
+	}
+	Logger(ctx).LogAttrs(ctx, level, Format(rt, call.Argument(0), args...).String(), c...)
 	return sobek.Undefined()
 }
 
-// Log calls slog.Log.
-func (c *console) Log(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return c.log(slog.LevelInfo, call, rt)
+// log calls slog.Log.
+func (c console) log(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return c.output(slog.LevelInfo, call, rt)
 }
 
-// Info calls slog.Info.
-func (c *console) Info(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return c.log(slog.LevelInfo, call, rt)
+// info calls slog.Info.
+func (c console) info(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return c.output(slog.LevelInfo, call, rt)
 }
 
-// Warn calls slog.Warn.
-func (c *console) Warn(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return c.log(slog.LevelWarn, call, rt)
+// warn calls slog.Warn.
+func (c console) warn(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return c.output(slog.LevelWarn, call, rt)
 }
 
-// Warn calls slog.Error.
-func (c *console) Error(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return c.log(slog.LevelError, call, rt)
+// error calls slog.Error.
+func (c console) error(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return c.output(slog.LevelError, call, rt)
 }
 
-// Debug calls slog.Debug.
-func (c *console) Debug(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return c.log(slog.LevelDebug, call, rt)
+// debug calls slog.Debug.
+func (c console) debug(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return c.output(slog.LevelDebug, call, rt)
 }
 
 func runeFormat(rt *sobek.Runtime, f rune, val sobek.Value, w *bytes.Buffer) bool {
@@ -54,9 +69,9 @@ func runeFormat(rt *sobek.Runtime, f rune, val sobek.Value, w *bytes.Buffer) boo
 	case 'd':
 		w.WriteString(val.ToNumber().String())
 	case 'j':
-		if json, ok := rt.Get("JSON").(*sobek.Object); ok {
-			if stringify, ok := sobek.AssertFunction(json.Get("stringify")); ok {
-				res, err := stringify(json, val)
+		if j, ok := rt.Get("JSON").(*sobek.Object); ok {
+			if stringify, ok := sobek.AssertFunction(j.Get("stringify")); ok {
+				res, err := stringify(j, val)
 				if err != nil {
 					panic(err)
 				}
@@ -99,32 +114,60 @@ func bufferFormat(vm *sobek.Runtime, b *bytes.Buffer, f string, args ...sobek.Va
 
 	for _, arg := range args[argNum:] {
 		b.WriteByte(' ')
-		b.WriteString(arg.String())
+		b.WriteString(valueString(arg))
 	}
 }
 
-// Format implements js format
-func Format(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	var f string
-
-	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
-		m, ok := arg.(json.Marshaler)
-		if ok {
-			data, err := m.MarshalJSON()
-			if err != nil {
-				Throw(rt, err)
-			}
-			f = string(data)
-		} else {
-			f = arg.String()
+func valueString(v sobek.Value) string {
+	if m, ok := v.(json.Marshaler); ok {
+		data, err := m.MarshalJSON()
+		if err == nil {
+			return string(data)
 		}
 	}
+	return v.String()
+}
 
-	if len(call.Arguments) > 1 {
-		var b bytes.Buffer
-		bufferFormat(rt, &b, f, call.Arguments[1:]...)
-		f = b.String()
+// Format implements js format
+func Format(rt *sobek.Runtime, msg sobek.Value, args ...sobek.Value) sobek.Value {
+	if sobek.IsUndefined(msg) {
+		return sobek.Undefined()
 	}
 
-	return rt.ToValue(f)
+	if msg.ExportType().Kind() == reflect.String {
+		s := msg.String()
+		if len(args) > 0 {
+			var b bytes.Buffer
+			bufferFormat(rt, &b, s, args...)
+			s = b.String()
+		}
+		return rt.ToValue(s)
+	}
+
+	var b bytes.Buffer
+	b.WriteString(valueString(msg))
+	for _, arg := range args {
+		b.WriteRune(' ')
+		b.WriteString(valueString(arg))
+	}
+	return rt.ToValue(b.String())
+}
+
+type loggerKey struct{}
+
+// Logger get slog.Logger from the context
+func Logger(ctx context.Context) *slog.Logger {
+	if logger := ctx.Value(loggerKey{}); logger != nil {
+		return logger.(*slog.Logger)
+	}
+	return slog.Default()
+}
+
+// WithLogger set the slog.Logger to context
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+	if c, ok := ctx.(interface{ SetValue(key, value any) }); ok {
+		c.SetValue(loggerKey{}, logger)
+		return ctx
+	}
+	return context.WithValue(ctx, loggerKey{}, logger)
 }

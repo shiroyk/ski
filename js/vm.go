@@ -1,7 +1,6 @@
 package js
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -10,78 +9,75 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
+	"github.com/shiroyk/ski/modules"
 )
 
 // VM the js runtime.
 // An instance of VM can only be used by a single goroutine at a time.
 type VM interface {
 	// RunModule run the sobek.CyclicModuleRecord.
-	// To compile the module, sobek.ParseModule or ModuleLoader.CompileModule
+	// To compile the module, sobek.ParseModule or Loader.CompileModule.
+	// module default export must be a function.
 	RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (sobek.Value, error)
+	// RunString executes the given string
+	RunString(ctx context.Context, str string) (sobek.Value, error)
 	// Run execute the given function in the EventLoop.
 	// when context done interrupt VM execution and release the VM.
 	// This is usually used when needs to be called repeatedly many times.
 	// like this:
 	//
 	//	func main() {
-	//		scheduler := js.NewScheduler(js.SchedulerOptions{
-	//			InitialVMs: 2,
-	//			Loader:     js.NewModuleLoader(),
-	//		})
-	//		run := func(ctx context.Context, scheduler js.Scheduler) int64 {
-	//			vm, err := scheduler.Get()
-	//			if err != nil {
-	//				panic(err)
-	//			}
-	//			rt := vm.Runtime()
-	//
-	//			module, err := scheduler.Loader().CompileModule("sum", "module.exports = (a, b) => a + b")
-	//			if err != nil {
-	//				panic(module)
-	//			}
-	//
-	//			sum, err := js.ModuleCallable(rt, module)
-	//			if err != nil {
-	//				panic(err)
-	//			}
-	//
-	//			var total int64
-	//			vm.Run(ctx, func() {
-	//				for i := 0; i < 8; i++ {
-	//					v, err := sum(sobek.Undefined(), rt.ToValue(i), rt.ToValue(total))
-	//					if err != nil {
-	//						panic(err)
-	//					}
-	//					total = v.ToInteger()
-	//				}
-	//			})
-	//
-	//			return total
-	//		}
-	//
 	//		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	//		defer cancel()
 	//
-	//		fmt.Println(run(ctx, scheduler))
+	//		vm := js.NewVM()
+	//		rt := vm.Runtime()
+	//
+	//		module, err := js.CompileModule("add", "export default (a, b) => a + b")
+	//		if err != nil {
+	//			panic(module)
+	//		}
+	//
+	//		add, err := js.ModuleCallable(rt, module)
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//
+	//		var total int64
+	//		vm.Run(ctx, func() error {
+	//			for i := 0; i < 8; i++ {
+	//				v, err := add(sobek.Undefined(), rt.ToValue(i), rt.ToValue(total))
+	//				if err != nil {
+	//					panic(err)
+	//				}
+	//				total = v.ToInteger()
+	//			}
+	//			return nil
+	//		})
+	//
+	//		fmt.Println(total)
 	//	}
-	Run(context.Context, func())
-	// Loader return the ModuleLoader
-	Loader() ModuleLoader
+	Run(context.Context, func() error) error
 	// Runtime return the js runtime
 	Runtime() *sobek.Runtime
 }
 
 type Option func(*vmImpl)
 
-// WithInitial call sobek.Runtime on VM create, be care require and module not working when init.
+// WithInitial call on VM create.
 func WithInitial(fn func(*sobek.Runtime)) Option {
 	return func(vm *vmImpl) { fn(vm.runtime) }
 }
 
-// WithModuleLoader set a ModuleLoader, if not present require and es module will not work.
-func WithModuleLoader(loader ModuleLoader) Option {
-	return func(vm *vmImpl) { vm.loader = loader }
+// WithRelease call on VM run finish.
+func WithRelease(fn func(VM)) Option {
+	return func(vm *vmImpl) {
+		if prev := vm.release; prev != nil {
+			vm.release = func() { prev(); fn(vm) }
+		} else {
+			vm.release = func() { fn(vm) }
+		}
+	}
 }
 
 // NewVM creates a new JavaScript VM
@@ -90,13 +86,17 @@ func NewVM(opts ...Option) VM {
 	rt := sobek.New()
 	rt.SetFieldNameMapper(fieldNameMapper{})
 	EnableConsole(rt)
+	Loader().EnableRequire(rt).EnableImportModuleDynamically(rt)
 
 	// init global modules
-	for name, mod := range AllModule() {
-		if mod, ok := mod.(Global); ok {
+	for name, mod := range modules.All() {
+		if mod, ok := mod.(modules.Global); ok {
 			instance, err := mod.Instantiate(rt)
 			if err != nil {
 				slog.Warn(fmt.Sprintf("instantiate global js module %s failed: %s", name, err))
+				continue
+			}
+			if instance == nil {
 				continue
 			}
 			_ = rt.Set(name, instance)
@@ -114,11 +114,7 @@ func NewVM(opts ...Option) VM {
 	if vm.release == nil {
 		vm.release = func() {}
 	}
-	if vm.loader == nil {
-		vm.loader = new(emptyLoader)
-	}
 
-	vm.loader.EnableRequire(rt).EnableImportModuleDynamically(rt)
 	_ = rt.GlobalObject().SetSymbol(symbolVM, &vmself{vm})
 	_ = rt.GlobalObject().DefineDataProperty("$ctx", jsContext(vm.vmctx, rt),
 		sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
@@ -132,7 +128,6 @@ type (
 		runtime   *sobek.Runtime
 		eventloop *EventLoop
 		release   func()
-		loader    ModuleLoader
 	}
 
 	vmctx struct{ ctx context.Context }
@@ -140,20 +135,16 @@ type (
 	vmself struct{ vm *vmImpl }
 )
 
-// Loader return the ModuleLoader
-func (vm *vmImpl) Loader() ModuleLoader { return vm.loader }
-
 // Runtime return the js runtime
 func (vm *vmImpl) Runtime() *sobek.Runtime { return vm.runtime }
 
 // RunModule run the sobek.CyclicModuleRecord.
 // The module default export must be a function.
 func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (ret sobek.Value, err error) {
-	vm.Run(ctx, func() {
-		var call sobek.Callable
-		call, err = ModuleCallable(vm.runtime, vm.loader.ResolveModule, module)
+	err = vm.Run(ctx, func() error {
+		call, err := ModuleCallable(vm.runtime, module)
 		if err != nil {
-			return
+			return err
 		}
 
 		values := make([]sobek.Value, len(args))
@@ -162,6 +153,16 @@ func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord
 		}
 
 		ret, err = call(sobek.Undefined(), values...)
+		return err
+	})
+	return
+}
+
+// RunString executes the given string
+func (vm *vmImpl) RunString(ctx context.Context, str string) (ret sobek.Value, err error) {
+	err = vm.Run(ctx, func() error {
+		ret, err = vm.runtime.RunString(str)
+		return err
 	})
 	return
 }
@@ -172,57 +173,45 @@ func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord
 // like this:
 //
 //	func main() {
-//		scheduler := js.NewScheduler(js.SchedulerOptions{
-//			InitialVMs: 2,
-//			Loader:     js.NewModuleLoader(),
-//		})
-//		run := func(ctx context.Context, scheduler js.Scheduler) int64 {
-//			vm, err := scheduler.Get()
-//			if err != nil {
-//				panic(err)
-//			}
-//			rt := vm.Runtime()
-//
-//			module, err := scheduler.Loader().CompileModule("sum", "module.exports = (a, b) => a + b")
-//			if err != nil {
-//				panic(module)
-//			}
-//
-//			sum, err := js.ModuleCallable(rt, module)
-//			if err != nil {
-//				panic(err)
-//			}
-//
-//			var total int64
-//			vm.Run(ctx, func() {
-//				for i := 0; i < 8; i++ {
-//					v, err := sum(sobek.Undefined(), rt.ToValue(i), rt.ToValue(total))
-//					if err != nil {
-//						panic(err)
-//					}
-//					total = v.ToInteger()
-//				}
-//			})
-//
-//			return total
-//		}
-//
 //		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 //		defer cancel()
 //
-//		fmt.Println(run(ctx, scheduler))
+//		vm := js.NewVM()
+//		rt := vm.Runtime()
+//
+//		module, err := js.CompileModule("add", "export default (a, b) => a + b")
+//		if err != nil {
+//			panic(module)
+//		}
+//
+//		add, err := js.ModuleCallable(rt, module)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		var total int64
+//		vm.Run(ctx, func() error {
+//			for i := 0; i < 8; i++ {
+//				v, err := add(sobek.Undefined(), rt.ToValue(i), rt.ToValue(total))
+//				if err != nil {
+//					panic(err)
+//				}
+//				total = v.ToInteger()
+//			}
+//			return nil
+//		})
+//
+//		fmt.Println(total)
 //	}
-func (vm *vmImpl) Run(ctx context.Context, task func()) {
+func (vm *vmImpl) Run(ctx context.Context, task func() error) (err error) {
 	defer func() {
 		if x := recover(); x != nil {
-			stack := vm.runtime.CaptureCallStack(20, nil)
-			buf := new(bytes.Buffer)
-			for _, frame := range stack {
-				frame.Write(buf)
+			if e, ok := x.(error); ok {
+				err = e
+			} else {
+				err = fmt.Errorf(`%s`, x)
 			}
-			ski.Logger(ctx).Error(fmt.Sprintf("vm run error: %s", x),
-				slog.String("go_stack", string(debug.Stack())),
-				slog.String("js_stack", buf.String()))
+			Logger(ctx).Error(err.Error(), slog.String("stack", string(debug.Stack())))
 		}
 		vm.ctx = context.Background()
 		vm.release()
@@ -231,18 +220,19 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 	vm.runtime.ClearInterrupt()
 	vm.ctx = ctx
 
-	go func() {
-		select {
-		case <-ctx.Done():
-			// interrupt the running JavaScript.
-			vm.runtime.Interrupt(ctx.Err())
-			// stop the event loop.
-			vm.eventloop.Stop()
-			return
-		}
-	}()
+	if _, ok := ctx.Deadline(); ok {
+		go func() {
+			select {
+			case <-ctx.Done():
+				// interrupt the running JavaScript.
+				vm.runtime.Interrupt(ctx.Err())
+				// stop the event loop.
+				vm.eventloop.Stop()
+			}
+		}()
+	}
 
-	vm.eventloop.Start(task)
+	return vm.eventloop.Start(task)
 }
 
 // NewPromise return a sobek.Promise object.
@@ -266,6 +256,9 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 //			return rt.ToValue(js.NewPromise(rt,
 //				func() (*http.Response, error) { return http.Get(call.Argument(0).String()) },
 //				func(res *http.Response, err error) (any, error) {
+//					if err != nil {
+//						return nil, err
+//					}
 //					defer res.Body.Close()
 //					data, err := io.ReadAll(res.Body)
 //					if err != nil {
@@ -278,7 +271,7 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 //
 //		start := time.Now()
 //
-//		result, err := vm.Runtime().RunString(ctx, fmt.Sprintf(`fetch("%s")`, server.URL))
+//		result, err := vm.RunString(ctx, fmt.Sprintf(`fetch("%s")`, server.URL))
 //		if err != nil {
 //			panic(err)
 //		}
@@ -290,9 +283,10 @@ func (vm *vmImpl) Run(ctx context.Context, task func()) {
 //		fmt.Println(value)
 //		fmt.Println(time.Since(start))
 //	}
-func NewPromise[T any](runtime *sobek.Runtime, async func() (T, error), then ...func(T, error) (any, error)) *sobek.Promise {
-	enqueue := self(runtime).eventloop.EnqueueJob()
-	promise, resolve, reject := runtime.NewPromise()
+func NewPromise[T any](rt *sobek.Runtime, async func() (T, error), then ...func(T, error) (any, error)) *sobek.Promise {
+	enqueue := self(rt).eventloop.EnqueueJob()
+	promise, resolve, reject := rt.NewPromise()
+
 	thenFun := func(r T, e error) (any, error) { return r, e }
 	if len(then) > 0 {
 		thenFun = then[0]
@@ -301,17 +295,20 @@ func NewPromise[T any](runtime *sobek.Runtime, async func() (T, error), then ...
 	go func() {
 		defer func() {
 			if x := recover(); x != nil {
-				reject(x)
+				err := reject(x)
+				if err != nil {
+					slog.Warn(fmt.Sprintf(`reject failed: %s`, err))
+				}
 			}
 		}()
+
 		result, err := async()
-		enqueue(func() {
-			var value any = result
-			value, err = thenFun(result, err)
+		enqueue(func() error {
+			value, err := thenFun(result, err)
 			if err != nil {
-				reject(err)
+				return reject(err)
 			} else {
-				resolve(value)
+				return resolve(value)
 			}
 		})
 	}()
@@ -325,7 +322,6 @@ var (
 	symbolVM          = sobek.NewSymbol("Symbol.__vm__")
 )
 
-// jsContext create the js context object
 func jsContext(ctx *vmctx, rt *sobek.Runtime) *sobek.Object {
 	obj := rt.ToValue(ctx).ToObject(rt)
 	proto := rt.NewObject()
@@ -344,8 +340,8 @@ func jsContext(ctx *vmctx, rt *sobek.Runtime) *sobek.Object {
 			return rt.ToValue(toCtx(rt, target).Value(property))
 		},
 		Set: func(target *sobek.Object, property string, value sobek.Value, receiver sobek.Value) (success bool) {
-			e := toCtx(rt, target)
-			if c, ok := e.(ski.Context); ok {
+			ctx2 := toCtx(rt, target)
+			if c, ok := ctx2.(interface{ SetValue(key, value any) }); ok {
 				c.SetValue(property, value.Export())
 				return true
 			}
@@ -361,7 +357,7 @@ func toCtx(rt *sobek.Runtime, v sobek.Value) context.Context {
 			return u.ctx
 		}
 	}
-	panic(rt.NewTypeError(`value of "this" must be of type vmctx`))
+	panic(rt.NewTypeError("value of this must be of type vmctx"))
 }
 
 // self get VM self
