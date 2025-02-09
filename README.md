@@ -154,9 +154,9 @@ func main() {
 	module, err := js.CompileModule(`module`, `
         import { default as $ } from "ski/gq";
 
-		export default function () {
-        	return $('<div><span>hello</ span></ div>').find('span').text();
-    	}
+	export default function () {
+	    return $('<div><span>hello</ span></ div>').find('span').text();
+	}
 	`)
 	if err != nil {
 		panic(err)
