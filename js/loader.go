@@ -8,19 +8,17 @@ import (
 	"github.com/shiroyk/ski/modules"
 )
 
-type wrap struct{ modules.Loader }
-
 var loader atomic.Value
 
 func init() {
 	SetLoader(modules.NewLoader())
 }
 
-// Loader get Loader
-func Loader() modules.Loader { return loader.Load().(wrap).Loader }
+// Loader get modules.Loader
+func Loader() modules.Loader { return loader.Load().(modules.Loader) }
 
-// SetLoader set the Loader
-func SetLoader(ml modules.Loader) { loader.Store(wrap{ml}) }
+// SetLoader set the modules.Loader
+func SetLoader(ml modules.Loader) { loader.Store(ml) }
 
 // ModuleInstance return the sobek.ModuleInstance.
 func ModuleInstance(rt *sobek.Runtime, module sobek.CyclicModuleRecord) (sobek.ModuleInstance, error) {
