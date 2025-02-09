@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -358,5 +359,24 @@ func TestFetch(t *testing.T) {
 		`)
 		require.NoError(t, err)
 		assert.Contains(t, promiseResult(result).String(), "aborted")
+	})
+
+	t.Run("type error", func(t *testing.T) {
+		result, err := vm.RunModule(ctx, `
+		export default () => {
+			return fetch()
+		}
+		`)
+		require.NoError(t, err)
+		promise, ok := result.Export().(*sobek.Promise)
+		if !ok {
+			t.Fatalf("result is not a promise")
+		}
+		switch promise.State() {
+		case sobek.PromiseStateRejected:
+			assert.Equal(t, `TypeError: fetch requires at least 1 argument`, promise.Result().String())
+		default:
+			panic("unexpected promise state")
+		}
 	})
 }

@@ -18,11 +18,11 @@ type Fetch struct{ ski.Fetch }
 
 func (fetch *Fetch) fetch(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if len(call.Arguments) < 1 {
-		panic(rt.NewTypeError("fetch requires at least 1 argument"))
+		return reject(rt, rt.NewTypeError("fetch requires at least 1 argument"))
 	}
 	resource := call.Argument(0)
 	if sobek.IsUndefined(resource) {
-		panic(rt.NewTypeError("fetch requires at least 1 argument"))
+		return reject(rt, rt.NewTypeError("fetch requires at least 1 argument"))
 	}
 
 	var req *request

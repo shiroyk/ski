@@ -250,7 +250,7 @@ func (*ReadableStreamBYOBReader) Global() {}
 func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
 	if len(call.Arguments) < 1 {
-		panic(rt.NewTypeError("ReadableStreamBYOBReader.read requires a buffer argument"))
+		return reject(rt, rt.NewTypeError("ReadableStreamBYOBReader.read requires a buffer argument"))
 	}
 
 	data := call.Argument(0)
@@ -261,7 +261,7 @@ func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime
 	case typeBytes:
 		buffer = data.Export().([]byte)
 	default:
-		panic(rt.NewTypeError("argument must be an ArrayBuffer or Uint8Array"))
+		return reject(rt, rt.NewTypeError("argument must be an ArrayBuffer or Uint8Array"))
 	}
 
 	return rt.ToValue(js.NewPromise(rt, func() (int, error) { return this.read(buffer) },
