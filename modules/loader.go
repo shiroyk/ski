@@ -257,6 +257,9 @@ func (ml *loader) reversePath(referencingScriptOrModule any) *url.URL {
 func (ml *loader) loadAsFileOrDirectory(modPath *url.URL, modName string) (sobek.ModuleRecord, error) {
 	mod, err := ml.loadAsFile(modPath, modName)
 	if err != nil {
+		if isSyntaxError(err) {
+			return nil, err
+		}
 		return ml.loadAsDirectory(modPath.JoinPath(modName))
 	}
 	return mod, nil
@@ -266,8 +269,14 @@ func (ml *loader) loadAsFile(modPath *url.URL, modName string) (module sobek.Mod
 	if module, err = ml.loadModule(modPath, modName); err == nil {
 		return
 	}
+	if isSyntaxError(err) {
+		return nil, err
+	}
 	if module, err = ml.loadModule(modPath, modName+".js"); err == nil {
 		return
+	}
+	if isSyntaxError(err) {
+		return nil, err
 	}
 	return ml.loadModule(modPath, modName+".json")
 }
@@ -393,4 +402,9 @@ func isBasePath(path string) bool {
 	}
 
 	return result
+}
+
+func isSyntaxError(err error) bool {
+	_, ok := err.(*sobek.CompilerSyntaxError)
+	return ok
 }
