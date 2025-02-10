@@ -3,9 +3,7 @@ package js
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"log/slog"
-	"reflect"
 
 	"github.com/grafana/sobek"
 )
@@ -29,11 +27,7 @@ func (c console) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 
 func (c console) output(level slog.Level, call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	ctx := Context(rt)
-	var args []sobek.Value
-	if len(call.Arguments) > 1 {
-		args = call.Arguments[1:]
-	}
-	Logger(ctx).LogAttrs(ctx, level, Format(rt, call.Argument(0), args...).String(), c...)
+	Logger(ctx).LogAttrs(ctx, level, Format(rt, call.Arguments...), c...)
 	return sobek.Undefined()
 }
 
@@ -119,38 +113,34 @@ func bufferFormat(vm *sobek.Runtime, b *bytes.Buffer, f string, args ...sobek.Va
 }
 
 func valueString(v sobek.Value) string {
-	if m, ok := v.(json.Marshaler); ok {
-		data, err := m.MarshalJSON()
-		if err == nil {
-			return string(data)
+	if obj, ok := v.(*sobek.Object); ok {
+		switch obj.ClassName() {
+		case "Error":
+			if stack := obj.Get("stack"); stack != nil {
+				return stack.String()
+			}
+		default:
+			data, err := obj.MarshalJSON()
+			if err == nil {
+				return string(data)
+			}
 		}
 	}
 	return v.String()
 }
 
-// Format implements js format
-func Format(rt *sobek.Runtime, msg sobek.Value, args ...sobek.Value) sobek.Value {
-	if sobek.IsUndefined(msg) {
-		return sobek.Undefined()
+// Format js console format
+func Format(rt *sobek.Runtime, args ...sobek.Value) string {
+	var s string
+	if len(args) > 0 {
+		s = valueString(args[0])
 	}
-
-	if msg.ExportType().Kind() == reflect.String {
-		s := msg.String()
-		if len(args) > 0 {
-			var b bytes.Buffer
-			bufferFormat(rt, &b, s, args...)
-			s = b.String()
-		}
-		return rt.ToValue(s)
+	if len(args) > 1 {
+		var b bytes.Buffer
+		bufferFormat(rt, &b, s, args[1:]...)
+		s = b.String()
 	}
-
-	var b bytes.Buffer
-	b.WriteString(valueString(msg))
-	for _, arg := range args {
-		b.WriteRune(' ')
-		b.WriteString(valueString(arg))
-	}
-	return rt.ToValue(b.String())
+	return s
 }
 
 type loggerKey struct{}

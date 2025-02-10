@@ -25,7 +25,7 @@ var (
 	// ErrIllegalModuleName module name is illegal
 	ErrIllegalModuleName = errors.New("illegal module name")
 	// ErrNotFoundModule not found module
-	ErrNotFoundModule = errors.New("not found module")
+	ErrNotFoundModule = errors.New("cannot found module")
 )
 
 type (
@@ -333,7 +333,7 @@ func (ml *loader) loadNodeModules(base *url.URL, modName string) (mod sobek.Modu
 		start = parent
 	}
 
-	return nil, fmt.Errorf("not found module %s at %s", modName, base)
+	return nil, fmt.Errorf("%w '%s'", ErrNotFoundModule, modName)
 }
 
 func (ml *loader) loadModule(modPath *url.URL, modName string) (sobek.ModuleRecord, error) {

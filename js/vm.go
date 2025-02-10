@@ -85,7 +85,7 @@ func WithRelease(fn func(VM)) Option {
 func NewVM(opts ...Option) VM {
 	rt := sobek.New()
 	rt.SetFieldNameMapper(fieldNameMapper{})
-	EnableConsole(rt)
+	EnableConsole(rt, slog.String("source", "console"))
 	Loader().EnableRequire(rt).EnableImportModuleDynamically(rt)
 
 	// init global modules
