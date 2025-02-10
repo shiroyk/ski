@@ -105,6 +105,9 @@ func TestModuleLoader(t *testing.T) {
 		"json1.json": &fstest.MapFile{
 			Data: []byte(`{"key": "json1"}`),
 		},
+		"syntaxError.js": &fstest.MapFile{
+			Data: []byte(`a {}`),
+		},
 	}
 	ml := modules.NewLoader(modules.WithFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
 		switch specifier.Scheme {
@@ -214,6 +217,48 @@ func TestModuleLoader(t *testing.T) {
 				default:
 					require.FailNow(t, "unexpected promise state")
 				}
+			})
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		testCases := []struct {
+			name, script string
+			expected     string
+		}{
+			{
+				name:     "import syntax",
+				script:   `import test from "./syntaxError"`,
+				expected: "SyntaxError",
+			},
+			{
+				name:     "require syntax",
+				script:   `require("./syntaxError")`,
+				expected: `Error: SyntaxError: file://syntaxError.js:`,
+			},
+			{
+				name:     "not found error",
+				script:   `import test from "some"`,
+				expected: "cannot found module",
+			},
+			{
+				name:     "native not found",
+				script:   `import test from "ski/some_module"`,
+				expected: "cannot found module",
+			},
+			{
+				name:     "require not found",
+				script:   `require("some")`,
+				expected: "Error: cannot found module 'some'",
+			},
+		}
+
+		for _, tt := range testCases {
+			t.Run(tt.name, func(t *testing.T) {
+				mod, err := ml.CompileModule("", tt.script)
+				require.NoError(t, err)
+				_, err = vm.RunModule(context.Background(), mod)
+				assert.ErrorContains(t, err, tt.expected)
 			})
 		}
 	})

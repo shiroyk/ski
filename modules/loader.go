@@ -153,13 +153,13 @@ func (ml *loader) require(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	name := call.Argument(0).String()
 	mod, err := ml.ResolveModule(ml.getCurrentModuleRecord(rt), name)
 	if err != nil {
-		panic(rt.NewGoError(err))
+		throwError(rt, err)
 	}
 
 	instance := rt.GetModuleInstance(mod)
 	if instance == nil {
 		if err = mod.Link(); err != nil {
-			panic(rt.NewGoError(err))
+			throwError(rt, err)
 		}
 		cm, ok := mod.(sobek.CyclicModuleRecord)
 		if !ok {
@@ -167,7 +167,7 @@ func (ml *loader) require(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		}
 		promise := rt.CyclicModuleRecordEvaluate(cm, ml.ResolveModule)
 		if promise.State() == sobek.PromiseStateRejected {
-			panic(promise.Result())
+			throwError(rt, err)
 		}
 		instance = rt.GetModuleInstance(mod)
 	}
@@ -204,7 +204,7 @@ func (ml *loader) ResolveModule(referencingScriptOrModule any, name string) (sob
 			ml.goModules[name] = mod
 			return mod, nil
 		}
-		return nil, ErrNotFoundModule
+		return nil, fmt.Errorf("%w '%s'", ErrNotFoundModule, name)
 	default:
 		return ml.resolve(ml.reversePath(referencingScriptOrModule), name)
 	}
@@ -412,6 +412,19 @@ func isBasePath(path string) bool {
 	}
 
 	return result
+}
+
+// throwError throw js error
+func throwError(rt *sobek.Runtime, err error) sobek.Value {
+	ctor, ok := sobek.AssertConstructor(rt.Get("Error"))
+	if !ok {
+		panic(rt.ToValue(err.Error()))
+	}
+	obj, err := ctor(nil, rt.ToValue(err.Error()))
+	if err != nil {
+		panic(rt.ToValue(err.Error()))
+	}
+	panic(obj)
 }
 
 func isSyntaxError(err error) bool {
