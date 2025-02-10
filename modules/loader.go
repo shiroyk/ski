@@ -168,7 +168,7 @@ func (ml *loader) require(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		}
 		promise := rt.CyclicModuleRecordEvaluate(cm, ml.ResolveModule)
 		if promise.State() == sobek.PromiseStateRejected {
-			panic(rt.NewGoError(promise.Result().(error)))
+			panic(promise.Result())
 		}
 		instance = rt.GetModuleInstance(mod)
 	}
@@ -228,7 +228,7 @@ func (ml *loader) resolve(base *url.URL, specifier string) (sobek.ModuleRecord, 
 		return ml.loadModule(uri, "")
 	}
 
-	return ml.loadNodeModules(specifier)
+	return ml.loadNodeModules(base, specifier)
 }
 
 func (ml *loader) reversePath(referencingScriptOrModule any) *url.URL {
@@ -301,18 +301,19 @@ func (ml *loader) loadAsDirectory(modPath *url.URL) (module sobek.ModuleRecord, 
 	return ml.loadModule(modPath, "index.js")
 }
 
-func (ml *loader) loadNodeModules(modName string) (mod sobek.ModuleRecord, err error) {
-	start := ml.base.Path
+func (ml *loader) loadNodeModules(base *url.URL, modName string) (mod sobek.ModuleRecord, err error) {
+	start := base.Path
+	clone := *base
+	modPath := &clone
+	modPath.Path = ""
 	for {
-		var p string
-		if path.Base(start) != "node_modules" {
-			p = path.Join(start, "node_modules")
-		} else {
-			p = start
+		modPath.Path = filepath.Join(start, "node_modules")
+
+		mod, err = ml.loadAsFileOrDirectory(modPath, modName)
+		if mod != nil || isSyntaxError(err) {
+			return mod, err
 		}
-		if mod, err = ml.loadAsFileOrDirectory(ml.base.JoinPath(p), modName); mod != nil || err != nil {
-			return
-		}
+
 		if start == ".." { // Dir('..') is '.'
 			break
 		}
@@ -323,7 +324,7 @@ func (ml *loader) loadNodeModules(modName string) (mod sobek.ModuleRecord, err e
 		start = parent
 	}
 
-	return nil, fmt.Errorf("not found module %s at %s", modName, ml.base)
+	return nil, fmt.Errorf("not found module %s at %s", modName, base)
 }
 
 func (ml *loader) loadModule(modPath *url.URL, modName string) (sobek.ModuleRecord, error) {

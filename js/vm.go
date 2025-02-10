@@ -16,8 +16,8 @@ import (
 // An instance of VM can only be used by a single goroutine at a time.
 type VM interface {
 	// RunModule run the sobek.CyclicModuleRecord.
-	// To compile the module, sobek.ParseModule or Loader.CompileModule.
-	// module default export must be a function.
+	// To compile the module, sobek.ParseModule or CompileModule.
+	// Any additional arguments are passed to the default export function arguments.
 	RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (sobek.Value, error)
 	// RunString executes the given string
 	RunString(ctx context.Context, str string) (sobek.Value, error)
@@ -139,12 +139,19 @@ type (
 func (vm *vmImpl) Runtime() *sobek.Runtime { return vm.runtime }
 
 // RunModule run the sobek.CyclicModuleRecord.
-// The module default export must be a function.
+// To compile the module, sobek.ParseModule or CompileModule.
+// Any additional arguments are passed to the default export function arguments.
 func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (ret sobek.Value, err error) {
 	err = vm.Run(ctx, func() error {
-		call, err := ModuleCallable(vm.runtime, module)
+		instance, err := ModuleInstance(vm.runtime, module)
 		if err != nil {
 			return err
+		}
+
+		call, ok := sobek.AssertFunction(instance.GetBindingValue("default"))
+		if !ok {
+			ret = sobek.Undefined()
+			return nil
 		}
 
 		values := make([]sobek.Value, len(args))

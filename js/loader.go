@@ -30,7 +30,7 @@ func ModuleInstance(rt *sobek.Runtime, module sobek.CyclicModuleRecord) (sobek.M
 		promise := rt.CyclicModuleRecordEvaluate(module, Loader().ResolveModule)
 		switch promise.State() {
 		case sobek.PromiseStateRejected:
-			return nil, promise.Result().Export().(error)
+			return nil, errors.New(promise.Result().String())
 		case sobek.PromiseStateFulfilled:
 		default:
 		}
