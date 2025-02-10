@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -106,7 +105,7 @@ func DefaultFileLoader(fetch func(*http.Request) (*http.Response, error)) FileLo
 			defer res.Body.Close()
 			return io.ReadAll(res.Body)
 		case "file":
-			return fs.ReadFile(os.DirFS("."), specifier.Path)
+			return os.ReadFile(specifier.Path)
 		default:
 			return nil, fmt.Errorf("scheme not supported %s", specifier.Scheme)
 		}
