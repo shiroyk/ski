@@ -281,21 +281,31 @@ func (ml *loader) loadAsFile(modPath *url.URL, modName string) (module sobek.Mod
 	return ml.loadModule(modPath, modName+".json")
 }
 
-func (ml *loader) loadAsDirectory(modPath *url.URL) (module sobek.ModuleRecord, err error) {
+func (ml *loader) loadAsDirectory(modPath *url.URL) (mod sobek.ModuleRecord, err error) {
 	buf, err := ml.fileLoader(modPath.JoinPath("package.json"), "package.json")
 	if err != nil {
 		return ml.loadModule(modPath, "index.js")
 	}
+
 	var pkg struct {
-		Main string `json:"main"`
+		Main   string `json:"main"`
+		Module string `json:"module"`
 	}
-	err = json.Unmarshal(buf, &pkg)
-	if err != nil || len(pkg.Main) == 0 {
+	if err = json.Unmarshal(buf, &pkg); err != nil {
 		return ml.loadModule(modPath, "index.js")
 	}
 
-	if module, err = ml.loadAsFile(modPath, pkg.Main); module != nil || err != nil {
-		return
+	for _, entry := range []string{pkg.Main, pkg.Module} {
+		if len(entry) > 0 {
+			if mod, err = ml.loadAsFile(modPath, entry); err != nil {
+				if isSyntaxError(err) {
+					return nil, err
+				}
+				err = nil
+			} else {
+				return
+			}
+		}
 	}
 
 	return ml.loadModule(modPath, "index.js")

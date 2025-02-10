@@ -70,7 +70,7 @@ func TestModuleLoader(t *testing.T) {
 				export default () => msg + msg6;`),
 		},
 		"node_modules/module5/package.json": &fstest.MapFile{
-			Data: []byte(`{"main": "lib/index.js"}`),
+			Data: []byte(`{"module": "lib/index.js"}`),
 		},
 		"node_modules/module6/lib/index.js": &fstest.MapFile{
 			Data: []byte(`
