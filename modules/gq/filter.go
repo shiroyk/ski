@@ -62,7 +62,7 @@ func (Gq) filter(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // first reduces the set of matched elements to the first in the set
 func (Gq) first(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	sel := thisToSel(rt, call.This)
-	ret := rt.ToValue(sel.First()).(*sobek.Object)
+	ret := rt.ToValue(&gq{sel.First()}).(*sobek.Object)
 	_ = ret.SetPrototype(call.This.ToObject(rt).Prototype())
 	return ret
 }
