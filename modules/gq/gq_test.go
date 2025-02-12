@@ -37,6 +37,14 @@ func TestGq(t *testing.T) {
 			assert.Equal(t, int64(0), v.ToInteger())
 		})
 
+		t.Run("selection", func(t *testing.T) {
+			v, err := vm.RunString(ctx, `
+				$($('<div>test</div>')).text()
+			`)
+			require.NoError(t, err)
+			assert.Equal(t, "test", v.String())
+		})
+
 		t.Run("html string", func(t *testing.T) {
 			v, err := vm.RunString(ctx, `
 				$('<div>test</div>').text()

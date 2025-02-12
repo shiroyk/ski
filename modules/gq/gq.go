@@ -47,7 +47,7 @@ func (g Gq) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Ob
 	case htmlutil.TypeNodes:
 		selection = nodesToSel(sel.Export().([]*html.Node))
 	case typeSelection:
-		selection = sel.Export().(*goquery.Selection)
+		selection = sel.Export().(*gq).sel
 	default:
 		str := strings.TrimSpace(sel.String())
 		if len(str) > 3 && str[0] == '<' && str[len(str)-1] == '>' {
