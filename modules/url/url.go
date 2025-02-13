@@ -49,6 +49,7 @@ func (u *URL) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("port", rt.ToValue(u.port), rt.ToValue(u.setPort), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("protocol", rt.ToValue(u.protocol), rt.ToValue(u.setProtocol), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("username", rt.ToValue(u.username), rt.ToValue(u.setUsername), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("search", rt.ToValue(u.search), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("searchParams", rt.ToValue(u.searchParams), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("URL") })
 	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value { return rt.ToValue(call.Argument(0).ExportType() == typeURL) })
@@ -280,6 +281,15 @@ func (*URL) setUsername(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	}
 	this.url.User = pkgurl.UserPassword(username, password)
 	return sobek.Undefined()
+}
+
+func (*URL) search(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toURL(rt, call.This)
+	search := this.searchParams.String()
+	if len(search) > 0 {
+		search = "?" + search
+	}
+	return rt.ToValue(search)
 }
 
 func (*URL) searchParams(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {

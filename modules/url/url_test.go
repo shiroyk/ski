@@ -77,7 +77,8 @@ func TestURL(t *testing.T) {
 					port: url.port,
 					protocol: url.protocol,
 					username: url.username,
-					search: url.searchParams.toString()
+					search: url.search,
+					searchParams: url.searchParams.toString()
 				})
 			}
 		`)
@@ -94,7 +95,8 @@ func TestURL(t *testing.T) {
 		assert.Equal(t, "8080", obj.Get("port").String())
 		assert.Equal(t, "https:", obj.Get("protocol").String())
 		assert.Equal(t, "user", obj.Get("username").String())
-		assert.Equal(t, "query=1", obj.Get("search").String())
+		assert.Equal(t, "?query=1", obj.Get("search").String())
+		assert.Equal(t, "query=1", obj.Get("searchParams").String())
 	})
 
 	t.Run("setters", func(t *testing.T) {
@@ -119,15 +121,19 @@ func TestURL(t *testing.T) {
 	t.Run("searchParams", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
 			export default () => {
-				const url = new URL('https://example.com?a=1&b=2');
+				const url = new URL('https://example.com');
+				const search = url.search;
 				url.searchParams.append('c', '3');
 				url.searchParams.set('b', '22');
 				url.searchParams.delete('a');
-				return url.toString()
+				return [search, url.search, url.searchParams.toString()]
 			}
 		`)
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com?b=22&c=3", result.String())
+		arr := result.ToObject(vm.Runtime())
+		assert.Equal(t, "", arr.Get("0").String())
+		assert.Equal(t, "?c=3&b=22", arr.Get("1").String())
+		assert.Equal(t, "c=3&b=22", arr.Get("2").String())
 	})
 
 	t.Run("toString", func(t *testing.T) {
