@@ -51,43 +51,37 @@ func (u *URL) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("username", rt.ToValue(u.username), rt.ToValue(u.setUsername), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("search", rt.ToValue(u.search), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("searchParams", rt.ToValue(u.searchParams), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+
+	_ = p.Set("parse", u.parse)
+	_ = p.Set("toJSON", u.toJSON)
+
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("URL") })
 	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value { return rt.ToValue(call.Argument(0).ExportType() == typeURL) })
-	_ = p.Set("toJSON", u.toJSON)
 	return p
 }
 
 func (u *URL) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
-	if len(call.Arguments) < 1 {
+	if len(call.Arguments) == 0 {
 		panic(rt.NewTypeError("URL constructor requires at least 1 argument"))
 	}
 
-	rawURL := call.Argument(0).String()
-	baseURL := ""
-	if v := call.Argument(1); !sobek.IsUndefined(v) {
-		baseURL = v.String()
-	}
-
 	var (
+		rawURL    = call.Argument(0).String()
 		parsedURL *pkgurl.URL
 		err       error
 	)
 
-	if baseURL != "" {
-		base, err := pkgurl.Parse(baseURL)
+	if base := call.Argument(1); !sobek.IsUndefined(base) {
+		baseURL, err := pkgurl.Parse(base.String())
 		if err != nil {
 			js.Throw(rt, err)
 		}
-		ref, err := pkgurl.Parse(rawURL)
-		if err != nil {
-			js.Throw(rt, err)
-		}
-		parsedURL = base.ResolveReference(ref)
+		parsedURL, err = baseURL.Parse(rawURL)
 	} else {
 		parsedURL, err = pkgurl.Parse(rawURL)
-		if err != nil {
-			js.Throw(rt, err)
-		}
+	}
+	if err != nil {
+		js.Throw(rt, err)
 	}
 
 	searchParams, err := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
@@ -107,6 +101,7 @@ func (u *URL) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	proto := u.prototype(rt)
 	ctor := rt.ToValue(u.constructor).(*sobek.Object)
 	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
+	_ = ctor.SetPrototype(proto)
 	_ = ctor.Set("prototype", proto)
 	return ctor, nil
 }
@@ -295,6 +290,43 @@ func (*URL) search(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*URL) searchParams(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURL(rt, call.This)
 	return this.searchParams
+}
+
+func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	if len(call.Arguments) == 0 {
+		return sobek.Null()
+	}
+
+	var (
+		rawURL    = call.Argument(0).String()
+		parsedURL *pkgurl.URL
+		err       error
+	)
+
+	if base := call.Argument(1); !sobek.IsUndefined(base) {
+		baseURL, err := pkgurl.Parse(base.String())
+		if err != nil {
+			return sobek.Null()
+		}
+		parsedURL, err = baseURL.Parse(rawURL)
+	} else {
+		parsedURL, err = pkgurl.Parse(rawURL)
+	}
+	if err != nil {
+		return sobek.Null()
+	}
+
+	searchParams, err := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
+	if err != nil {
+		return sobek.Null()
+	}
+
+	obj := rt.ToValue(&url{
+		url:          parsedURL,
+		searchParams: searchParams,
+	}).(*sobek.Object)
+	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
+	return obj
 }
 
 func (*URL) toJSON(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {

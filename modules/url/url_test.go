@@ -118,6 +118,46 @@ func TestURL(t *testing.T) {
 		assert.Equal(t, "http://newuser:newpass@newhost:9091/newpath#newhash", result.String())
 	})
 
+	t.Run("parse", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			url      string
+			base     string
+			expected string
+		}{
+			{
+				name:     "absolute url",
+				url:      "https://example.com/path?query=1#hash",
+				expected: "https://example.com/path?query=1#hash",
+			},
+			{
+				name:     "relative url with base",
+				url:      "/path?query=1#hash",
+				base:     "https://example.com",
+				expected: "https://example.com/path?query=1#hash",
+			},
+			{
+				name:     "invalid url",
+				url:      "://invalid",
+				expected: "null",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var result sobek.Value
+				var err error
+				if tt.base == "" {
+					result, err = vm.RunString(ctx, `URL.parse("`+tt.url+`")`)
+				} else {
+					result, err = vm.RunString(ctx, `URL.parse("`+tt.url+`", "`+tt.base+`")`)
+				}
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result.String())
+			})
+		}
+	})
+
 	t.Run("searchParams", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
 			export default () => {
