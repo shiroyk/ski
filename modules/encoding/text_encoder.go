@@ -64,5 +64,3 @@ func (t *TextEncoder) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	_ = ctor.Set("prototype", proto)
 	return ctor, nil
 }
-
-func (*TextEncoder) Global() {}

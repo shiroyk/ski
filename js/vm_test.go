@@ -98,21 +98,24 @@ func TestVM(t *testing.T) {
 		rt := vm.Runtime()
 
 		err := rt.Set("fetch", func(call sobek.FunctionCall) sobek.Value {
-			return rt.ToValue(NewPromise(rt,
-				func() (*http.Response, error) {
-					return http.Get(call.Argument(0).String())
-				},
-				func(res *http.Response, err error) (any, error) {
+			enqueue := EnqueueJob(rt)
+			promise, resolve, reject := rt.NewPromise()
+			go func() {
+				res, err := http.Get(call.Argument(0).String())
+				enqueue(func() error {
 					if err != nil {
-						return nil, err
+						return reject(err)
+					} else {
+						defer res.Body.Close()
+						var data map[string]string
+						err = json.NewDecoder(res.Body).Decode(&data)
+						require.NoError(t, err)
+						data["status"] = res.Status
+						return resolve(data)
 					}
-					defer res.Body.Close()
-					var data map[string]string
-					err = json.NewDecoder(res.Body).Decode(&data)
-					require.NoError(t, err)
-					data["status"] = res.Status
-					return data, nil
-				}))
+				})
+			}()
+			return rt.ToValue(promise)
 		})
 		require.NoError(t, err)
 

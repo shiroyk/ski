@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"sync"
+
 	"github.com/grafana/sobek"
 )
 
@@ -98,6 +100,7 @@ type goModule struct {
 	mod           Module
 	exportedNames []string
 	callback      []func([]string)
+	once          sync.Once
 }
 
 func (gm *goModule) Link() error { return nil }
@@ -115,25 +118,13 @@ func (gm *goModule) Instantiate(rt *sobek.Runtime) (sobek.CyclicModuleInstance, 
 		return nil, ErrInvalidModule
 	}
 	exports := instance.ToObject(rt)
-	if gm.exportedNames == nil {
-		gm.exportedNames = exports.GetOwnPropertyNames()
-		if gm.exportedNames == nil {
-			gm.exportedNames = []string{}
-		}
-		for _, callback := range gm.callback {
-			callback(gm.exportedNames)
-		}
-	}
+	gm.once.Do(func() { gm.exportedNames = exports.GetOwnPropertyNames() })
 	return &goModuleInstance{exports}, nil
 }
 
 func (gm *goModule) GetExportedNames(callback func([]string), _ ...sobek.ModuleRecord) bool {
-	if gm.exportedNames != nil {
-		callback(gm.exportedNames)
-		return true
-	}
-	gm.callback = append(gm.callback, callback)
-	return false
+	callback(gm.exportedNames)
+	return true
 }
 
 func (gm *goModule) ResolveExport(exportName string, _ ...sobek.ResolveSetElement) (*sobek.ResolvedBinding, bool) {

@@ -13,6 +13,94 @@ Key features:
 - Promise-based asynchronous operations
 
 ## Modules
+Partial Node.js compatibility and web standard implementations.
+- [buffer](#buffer)
+- [encoding](#encoding)
+- [fetch](#fetch)
+- [stream](#stream)
+- [timers](#timers)
+- [url](#url)
+### buffer
+buffer module implements.
+- Blob
+- File
+```js
+export default async function () {
+  const blob = new Blob(["hello world"], { type: "text/plain" });
+  console.log(await blob.text());
+}
+```
+### encoding
+encoding module provides base64 decode/encode and TextDecoder/TextEncoder.
+- base64
+- TextDecoder
+- TextEncoder
+```js
+export default function () {
+  const encoder = new TextEncoder();
+  const data = encoder.encode("hello");
+  return encoding.base64.encode(data);
+}
+```
+### fetch
+fetch module provides HTTP client functionality. Web API implementations:
+- fetch
+- FormData
+- Headers
+- Request
+- Response
+- AbortController
+- AbortSignal
+
+Other:
+- cookieJar
+- http
+```js
+export default async () => {
+  const res = await fetch("http://example.com", {
+    headers: {
+      "X-Custom": "custom value"
+    }
+  });
+  console.log(await response.text());
+}
+```
+### stream
+stream module implements.
+- ReadableStream
+```js
+export default async () => {
+  const res = new Response("test");
+  const reader = await res.body.getReader();
+  // ...
+}
+```
+### timers
+timers module provides JavaScript timer functions.
+```js
+export default async () => {
+  return await new Promise((resolve) => {
+    let count = 0;
+    const id = setInterval(() => {
+      count++;
+    }, 100);
+
+    setTimeout(() => {
+      clearInterval(id);
+      resolve(count);
+    }, 250);
+  });
+}
+```
+### url
+url module implements [WHATWG URL Standard](https://url.spec.whatwg.org/).
+- URL
+- URLSearchParams
+```js
+export default async () => {
+  console.log(new URL('http://example.com'));
+}
+```
 ### cache
 cache module provides for store string or bytes.
 ```js
@@ -46,20 +134,6 @@ export default function () {
   return crypto.md5('hello').hex();
 }
 ```
-### encoding
-encoding module provides base64 decode/encode and TextDecoder/TextEncoder.
-- base64
-- TextDecoder
-- TextEncoder
-```js
-import encoding from "ski/encoding";
-
-export default function () {
-  const encoder = new TextEncoder();
-  const data = encoder.encode("hello");
-  return encoding.base64.encode(data);
-}
-```
 ### gq
 gq module provides jQuery-like selector and traversing methods.
 ```js
@@ -67,35 +141,6 @@ import { default as $ } from "ski/gq";
 
 export default function () {
   return $('<div><span>hello</span></div>').find('span').text();
-}
-```
-### http
-http module provides HTTP client functionality and Web API implementations.
-
-Web API implementations:
-- Blob
-- fetch
-- File
-- FormData
-- Headers
-- Request
-- Response
-- ReadableStream
-- URL
-- URLSearchParams
-- AbortController
-
-Other:
-- cookieJar
-- http
-```js
-export default async () => {
-    const res = await fetch("http://example.com", {
-      headers: {
-        "X-Custom": "custom value"
-      }
-    });
-    console.log(await response.text());
 }
 ```
 ### jq
@@ -106,23 +151,6 @@ import jq from "ski/jq";
 export default () => {
   let data = JSON.parse(`{"hello": 1}`);
   console.log(jq('$.hello').get(data));
-}
-```
-### timers
-timers module provides JavaScript timer functions.
-```js
-export default async () => {
-  return await new Promise((resolve) => {
-    let count = 0;
-    const id = setInterval(() => {
-      count++;
-    }, 100);
-
-    setTimeout(() => {
-      clearInterval(id);
-      resolve(count);
-    }, 250);
-  });
 }
 ```
 ### xpath

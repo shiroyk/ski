@@ -57,3 +57,19 @@ func New(t testing.TB, opts ...js.Option) VM {
 	_ = vm.Runtime().Set("assert", obj)
 	return VM{vm}
 }
+
+// PromiseResult get the promise result
+func PromiseResult(value sobek.Value) sobek.Value {
+	promise, ok := value.Export().(*sobek.Promise)
+	if !ok {
+		return value
+	}
+	switch promise.State() {
+	case sobek.PromiseStateRejected:
+		return promise.Result()
+	case sobek.PromiseStateFulfilled:
+		return promise.Result()
+	default:
+		panic("unexpected promise state")
+	}
+}

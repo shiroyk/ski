@@ -25,7 +25,7 @@ func TestCache(t *testing.T) {
 			cache.set("cache1", "1");
 			cache.del("cache1");
 			assert.true(!cache.get("cache1"), "cache should be deleted");
-			cache.set("cache2", "2", "1s");
+			cache.set("cache2", "2", 500);
 			assert.equal(cache.get("not exists"), undefined);
 			assert.equal(cache.get("not exists"), undefined);
 			assert.equal(cache.get("cache2"), "2");

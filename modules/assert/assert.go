@@ -52,7 +52,7 @@ func (Assert) equal(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		if len(call.Arguments) > 3 {
 			args = call.Arguments[3:]
 		}
-		message = js.Format(rt, msg, args...).String()
+		message = js.Format(rt, args...)
 	} else {
 		message = fmt.Sprintf(`Expected equal but got %s  %s`, a.String(), b.String())
 	}

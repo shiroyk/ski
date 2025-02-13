@@ -34,7 +34,14 @@ type Module interface {
 	Instantiate(*sobek.Runtime) (sobek.Value, error)
 }
 
-// Global implements the interface will load into global when the VM create.
+// Global is an interface that marks a Module to be loaded into the global scope when a VM is created.
+// Modules implementing this interface will be automatically loaded and their exports will be made available
+// as global variables, without requiring explicit imports.
+//
+// The Loader.InitGlobal method handles the initialization of global modules by:
+// 1. Finding all registered modules that implement Global
+// 2. Instantiating them using their Instantiate method
+// 3. Adding their exports to the global scope of the JavaScript runtime
 type Global interface {
 	Module
 	Global() // mark as global module
@@ -58,7 +65,9 @@ type Global interface {
 //		// Implementation
 //	}
 func Register(name string, mod Module) {
-	if _, ok := mod.(Global); !ok {
+	switch mod.(type) {
+	case Global:
+	default:
 		name = prefix + name
 	}
 	registry.Lock()
@@ -91,6 +100,7 @@ func All() map[string]Module {
 }
 
 const prefix = "ski/"
+const nodePrefix = "node:"
 
 var registry = struct {
 	sync.RWMutex

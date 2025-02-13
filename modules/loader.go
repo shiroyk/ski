@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,6 +40,8 @@ type (
 		EnableRequire(*sobek.Runtime) Loader
 		// EnableImportModuleDynamically sobek runtime SetImportModuleDynamically
 		EnableImportModuleDynamically(*sobek.Runtime) Loader
+		// InitGlobal instantiate Global module and add their exports to the global scope of the JavaScript runtime.
+		InitGlobal(*sobek.Runtime) Loader
 	}
 
 	// Option the new Loader options.
@@ -139,6 +142,33 @@ func (ml *loader) EnableRequire(rt *sobek.Runtime) Loader {
 	return ml
 }
 
+// InitGlobal instantiate Global module and add their exports to the global scope of the JavaScript runtime.
+func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
+	for name, module := range All() {
+		if _, ok := module.(Global); !ok {
+			continue
+		}
+		ml.Lock()
+		mod, ok := ml.goModules[name]
+		if !ok {
+			mod = &goModule{mod: module}
+			ml.goModules[name] = mod
+		}
+		ml.Unlock()
+		promise := rt.CyclicModuleRecordEvaluate(mod, ml.ResolveModule)
+		if promise.State() == sobek.PromiseStateRejected {
+			slog.Warn(fmt.Sprintf("instantiate global js module %s failed: %s", name, promise.Result().String()))
+			continue
+		}
+		instance := rt.GetModuleInstance(mod)
+		exports := instance.(*goModuleInstance)
+		for _, key := range exports.GetOwnPropertyNames() {
+			_ = rt.Set(key, exports.Get(key))
+		}
+	}
+	return ml
+}
+
 // EnableImportModuleDynamically sobek runtime SetImportModuleDynamically
 func (ml *loader) EnableImportModuleDynamically(rt *sobek.Runtime) Loader {
 	rt.SetImportModuleDynamically(func(scriptOrModule any, specifier sobek.Value, promiseCapability any) {
@@ -167,7 +197,7 @@ func (ml *loader) require(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		}
 		promise := rt.CyclicModuleRecordEvaluate(cm, ml.ResolveModule)
 		if promise.State() == sobek.PromiseStateRejected {
-			throwError(rt, err)
+			throwError(rt, errors.New(promise.Result().String()))
 		}
 		instance = rt.GetModuleInstance(mod)
 	}
@@ -193,6 +223,19 @@ func (ml *loader) getCurrentModuleRecord(rt *sobek.Runtime) sobek.ModuleRecord {
 // ResolveModule resolve the module returns the sobek.ModuleRecord.
 func (ml *loader) ResolveModule(referencingScriptOrModule any, name string) (sobek.ModuleRecord, error) {
 	switch {
+	case strings.HasPrefix(name, nodePrefix):
+		ml.Lock()
+		if mod, ok := ml.goModules[name]; ok {
+			ml.Unlock()
+			return mod, nil
+		}
+		if e, ok := Get(name); ok {
+			mod := &goModule{mod: e}
+			ml.goModules[name] = mod
+			ml.Unlock()
+			return mod, nil
+		}
+		return ml.resolve(ml.reversePath(referencingScriptOrModule), name)
 	case strings.HasPrefix(name, prefix):
 		ml.Lock()
 		defer ml.Unlock()

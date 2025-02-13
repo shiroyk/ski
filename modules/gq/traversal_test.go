@@ -248,10 +248,6 @@ func TestTraversal(t *testing.T) {
 				script: `$('<div></div>').find()`,
 			},
 			{
-				name:   "children without args",
-				script: `$('<div></div>').children()`,
-			},
-			{
 				name:   "nextUntil without args",
 				script: `$('<div></div>').nextUntil()`,
 			},

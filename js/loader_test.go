@@ -31,10 +31,30 @@ func (gomod2) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 type gomod3 struct{}
 
 func (gomod3) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	return rt.ToValue(map[string]string{"key": "gomod3"}), nil
+	return rt.ToValue(map[string]string{"globalgomod3": "gomod3"}), nil
 }
 
 func (gomod3) Global() {}
+
+type nodeURL struct{}
+
+func (nodeURL) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	ret := rt.NewObject()
+	ctor := rt.ToValue(func(call sobek.ConstructorCall) *sobek.Object {
+		u, err := url.Parse(call.Argument(0).String())
+		if err != nil {
+			panic(err)
+		}
+		instance := rt.ToValue(u).ToObject(rt)
+		_ = instance.SetPrototype(call.This.Prototype())
+		return instance
+	}).ToObject(rt)
+	_ = ctor.SetPrototype(rt.NewObject())
+	_ = ret.Set("URL", ctor)
+	return ret, nil
+}
+
+func (nodeURL) Global() {}
 
 func TestModuleLoader(t *testing.T) {
 	mfs := fstest.MapFS{
@@ -129,13 +149,14 @@ func TestModuleLoader(t *testing.T) {
 	modules.Register("gomod1", new(gomod1))
 	modules.Register("gomod2", new(gomod2))
 	modules.Register("gomod3", new(gomod3))
+	modules.Register("node:url", new(nodeURL))
 	vm := NewTestVM(t)
 
 	t.Run("script", func(t *testing.T) {
 		scriptCases := []struct{ name, s string }{
 			{"gomod1", `assert.equal(require("ski/gomod1").key, "gomod1")`},
 			{"gomod2", `assert.equal(require("ski/gomod2").key, "gomod2")`},
-			{"gomod3", `assert.equal(gomod3.key, "gomod3")`},
+			{"gomod3", `assert.equal(globalgomod3, "gomod3")`},
 			{"remote cjs", `assert.equal(require("https://foo.com/foo.min.js?type=cjs").foo, "bargomod1")`},
 			{"remote esm", `(async () => assert.equal(await require("https://foo.com/foo.min.js?type=esm")(), "gomod114"))()`},
 			{"module1", `assert.equal(require("module1")(), "module1")`},
@@ -150,6 +171,11 @@ func TestModuleLoader(t *testing.T) {
 			{"cjs_script1", `assert.equal(require("./cjs_script1")(), "/module4/cjs_script1")`},
 			{"cjs_script2", `assert.equal(require("./cjs_script2").value(), 555)`},
 			{"json1", `assert.equal(require("./json1.json").key, "json1")`},
+			{"node url", `
+			const NODE_URL = require("node:url").URL;
+			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
+			assert.true(require("node:url").URL.prototype === URL.prototype, 'prototype not equal');
+			`},
 		}
 
 		for _, script := range scriptCases {
@@ -163,38 +189,41 @@ func TestModuleLoader(t *testing.T) {
 	t.Run("module", func(t *testing.T) {
 		moduleCases := []struct{ name, s string }{
 			{"gomod1", `import gomod1 from "ski/gomod1";
-			export default () => assert.equal(gomod1.key, "gomod1")`},
+			assert.equal(gomod1.key, "gomod1")`},
 			{"gomod2", `import gomod2 from "ski/gomod2";
-			export default () => assert.equal(gomod2.key, "gomod2")`},
-			{"gomod3", `export default () => assert.equal(gomod3.key, "gomod3")`},
+			assert.equal(gomod2.key, "gomod2")`},
+			{"gomod3", `assert.equal(globalgomod3, "gomod3")`},
 			{"remote cjs", `import foo from "https://foo.com/foo.min.js?type=cjs";
-			export default () => assert.equal(foo.foo, "bargomod1")`},
+			assert.equal(foo.foo, "bargomod1")`},
 			{"remote esm", `import foo from "https://foo.com/foo.min.js?type=esm";
 			export default async () => assert.equal(await foo(), "gomod114")`},
 			{"module1", `import module1 from "module1";
-			export default () => assert.equal(module1(), "module1");`},
+			assert.equal(module1(), "module1");`},
 			{"module2", `import m2 from "module2";
-			export default () => assert.equal(m2(), "module1/module2");`},
+			assert.equal(m2(), "module1/module2");`},
 			{"module3", `import module3 from "module3";
-			export default () => assert.equal(module3(), "module1/module2/module3");`},
+			assert.equal(module3(), "module1/module2/module3");`},
 			{"module4", `import module4 from "module4";
-			export default () => assert.equal(module4(), "/module4");`},
+			assert.equal(module4(), "/module4");`},
 			{"module5", `import module5 from "module5";
-			export default () => assert.equal(module5(), "/module5/module6");`},
+			assert.equal(module5(), "/module5/module6");`},
 			{"module6", `import module6 from "module6";
-			export default () => assert.equal(module6(), "/module6/module5");`},
+			assert.equal(module6(), "/module6/module5");`},
 			{"module7", `import module7 from "module7";
 			export default async () => assert.equal(await module7(), "dynamic import /module6");`},
 			{"es_script1", `import es from "./es_script1";
-			export default () => assert.equal(es(), "module1/module2/module3/es_script1");`},
+			assert.equal(es(), "module1/module2/module3/es_script1");`},
 			{"es_script2", `import { value } from "./es_script2";
-			export default () => assert.equal(value(), 555);`},
+			assert.equal(value(), 555);`},
 			{"cjs_script1", `import cjs from "./cjs_script1";
-			export default () => assert.equal(cjs(), "/module4/cjs_script1");`},
+			assert.equal(cjs(), "/module4/cjs_script1");`},
 			{"cjs_script2", `import { value } from "./cjs_script2";
-			export default () => assert.equal(value(), 555);`},
+			assert.equal(value(), 555);`},
 			{"json1", `import j from "./json1.json";
-			export default () => assert.equal(j.key, "json1");`},
+			assert.equal(j.key, "json1");`},
+			{"node url", `import {URL as NODE_URL} from "node:url";
+			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
+			assert.true(NODE_URL.prototype === URL.prototype, 'prototype not equal');`},
 		}
 
 		for _, script := range moduleCases {
@@ -269,6 +298,10 @@ func NewTestVM(t *testing.T, opts ...Option) VM {
 	p := vm.Runtime().NewObject()
 	_ = p.Set("equal", func(call sobek.FunctionCall) sobek.Value {
 		assert.Equal(t, call.Argument(0).Export(), call.Argument(1).Export(), call.Argument(2).String())
+		return sobek.Undefined()
+	})
+	_ = p.Set("true", func(call sobek.FunctionCall) sobek.Value {
+		assert.True(t, call.Argument(0).ToBoolean(), call.Argument(1).String())
 		return sobek.Undefined()
 	})
 	_ = vm.Runtime().Set("assert", p)

@@ -17,14 +17,15 @@ func init() {
 
 func (t *Timers) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	_ = rt.GlobalObject().SetSymbol(symTimers, &timers{timer: make(map[int64]*timer)})
-	_ = rt.Set("setTimeout", t.setTimeout)
-	_ = rt.Set("clearTimeout", t.clearTimeout)
-	_ = rt.Set("setInterval", t.setInterval)
-	_ = rt.Set("clearInterval", t.clearInterval)
-	return nil, nil
+	ret := rt.NewObject()
+	_ = ret.Set("setTimeout", t.setTimeout)
+	_ = ret.Set("clearTimeout", t.clearTimeout)
+	_ = ret.Set("setInterval", t.setInterval)
+	_ = ret.Set("clearInterval", t.clearInterval)
+	return ret, nil
 }
 
-func (*Timers) Global() {}
+func (t *Timers) Global() {}
 
 func (*Timers) setTimeout(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	callback, ok := sobek.AssertFunction(call.Argument(0))

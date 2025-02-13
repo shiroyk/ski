@@ -2,7 +2,6 @@ package timers
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -31,7 +30,7 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		elapsed := promiseResult(result).ToInteger()
+		elapsed := modulestest.PromiseResult(result).ToInteger()
 		assert.GreaterOrEqual(t, elapsed, int64(100))
 	})
 
@@ -46,7 +45,7 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		assert.Equal(t, int64(3), promiseResult(result).ToInteger())
+		assert.Equal(t, int64(3), modulestest.PromiseResult(result).ToInteger())
 	})
 
 	t.Run("clearTimeout", func(t *testing.T) {
@@ -65,7 +64,7 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		assert.False(t, promiseResult(result).ToBoolean())
+		assert.False(t, modulestest.PromiseResult(result).ToBoolean())
 	})
 
 	t.Run("setInterval", func(t *testing.T) {
@@ -84,7 +83,7 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		assert.Equal(t, int64(3), promiseResult(result).ToInteger())
+		assert.Equal(t, int64(3), modulestest.PromiseResult(result).ToInteger())
 	})
 
 	t.Run("setInterval with arguments", func(t *testing.T) {
@@ -103,7 +102,7 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		assert.Equal(t, int64(9), promiseResult(result).ToInteger())
+		assert.Equal(t, int64(9), modulestest.PromiseResult(result).ToInteger())
 	})
 
 	t.Run("clearInterval", func(t *testing.T) {
@@ -123,7 +122,7 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		assert.LessOrEqual(t, promiseResult(result).ToInteger(), int64(3))
+		assert.LessOrEqual(t, modulestest.PromiseResult(result).ToInteger(), int64(3))
 		assert.Equal(t, 0, len(rtTimers(vm.Runtime()).timer))
 	})
 
@@ -152,7 +151,7 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		assert.Equal(t, int64(0), promiseResult(result).ToInteger())
+		assert.Equal(t, int64(0), modulestest.PromiseResult(result).ToInteger())
 		assert.Equal(t, 0, len(rtTimers(vm.Runtime()).timer))
 	})
 
@@ -175,24 +174,9 @@ func TestTimers(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		count := promiseResult(result).ToInteger()
+		count := modulestest.PromiseResult(result).ToInteger()
 		assert.GreaterOrEqual(t, count, int64(5))
 		assert.LessOrEqual(t, count, int64(15))
 		assert.Equal(t, 0, len(rtTimers(vm.Runtime()).timer))
 	})
-}
-
-func promiseResult(value sobek.Value) sobek.Value {
-	promise, ok := value.Export().(*sobek.Promise)
-	if !ok {
-		return value
-	}
-	switch promise.State() {
-	case sobek.PromiseStateRejected:
-		panic(fmt.Sprintf("promise rejected: %s", promise.Result().String()))
-	case sobek.PromiseStateFulfilled:
-		return promise.Result()
-	default:
-		panic("unexpected promise state")
-	}
 }
