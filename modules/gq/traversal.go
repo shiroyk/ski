@@ -28,15 +28,16 @@ func (Gq) find(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // children gets the children of each element in the set of matched elements
 func (Gq) children(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	sel := thisToSel(rt, call.This)
-	if len(call.Arguments) == 0 {
-		panic(rt.NewTypeError("children requires at least 1 argument"))
-	}
-	v := call.Argument(0)
-	switch v.ExportType() {
-	case typeSelector:
-		sel = sel.ChildrenMatcher(v.Export().(*selector).sel)
-	default:
-		sel = sel.ChildrenFiltered(v.String())
+	if len(call.Arguments) > 0 {
+		v := call.Argument(0)
+		switch v.ExportType() {
+		case typeSelector:
+			sel = sel.ChildrenMatcher(v.Export().(*selector).sel)
+		default:
+			sel = sel.ChildrenFiltered(v.String())
+		}
+	} else {
+		sel = sel.Children()
 	}
 	ret := rt.ToValue(&gq{sel}).(*sobek.Object)
 	_ = ret.SetPrototype(call.This.ToObject(rt).Prototype())
@@ -298,7 +299,18 @@ func (Gq) closest(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // contents gets the children including text and comment nodes
 func (Gq) contents(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	sel := thisToSel(rt, call.This)
-	sel = sel.Contents()
+
+	if len(call.Arguments) > 0 {
+		v := call.Argument(0)
+		switch v.ExportType() {
+		case typeSelector:
+			sel = sel.ContentsMatcher(v.Export().(*selector).sel)
+		default:
+			sel = sel.ContentsFiltered(v.String())
+		}
+	} else {
+		sel = sel.Contents()
+	}
 
 	ret := rt.ToValue(&gq{sel}).(*sobek.Object)
 	_ = ret.SetPrototype(call.This.ToObject(rt).Prototype())

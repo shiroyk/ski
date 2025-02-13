@@ -39,6 +39,14 @@ func TestTraversal(t *testing.T) {
 	})
 
 	t.Run("children", func(t *testing.T) {
+		t.Run("without filter", func(t *testing.T) {
+			v, err := vm.RunString(ctx, `
+				$('<div><span>1</span><p>2</p></div>').children().text()
+			`)
+			require.NoError(t, err)
+			assert.Equal(t, "12", v.String())
+		})
+
 		t.Run("with selector", func(t *testing.T) {
 			v, err := vm.RunString(ctx, `
 				$('<div><span>1</span><p>2</p></div>').children('span').text()
