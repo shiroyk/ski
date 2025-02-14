@@ -104,6 +104,9 @@ func TestModuleLoader(t *testing.T) {
 		"node_modules/module7/index.js": &fstest.MapFile{
 			Data: []byte(`export default async () => "dynamic import " + (await import('module6')).msg;`),
 		},
+		"node_modules/node:file/index.js": &fstest.MapFile{
+			Data: []byte(`export default () => "node file module"`),
+		},
 		"es_script1.js": &fstest.MapFile{
 			Data: []byte(`
 				import module3 from "module3";
@@ -176,6 +179,9 @@ func TestModuleLoader(t *testing.T) {
 			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
 			assert.true(require("node:url").URL.prototype === URL.prototype, 'prototype not equal');
 			`},
+			{"node file", `
+			assert.equal(require("node:file").default(), "node file module");
+			`},
 		}
 
 		for _, script := range scriptCases {
@@ -224,6 +230,9 @@ func TestModuleLoader(t *testing.T) {
 			{"node url", `import {URL as NODE_URL} from "node:url";
 			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
 			assert.true(NODE_URL.prototype === URL.prototype, 'prototype not equal');`},
+			{"node file", `import node_file from "node:file";
+			assert.equal(node_file(), "node file module");
+			`},
 		}
 
 		for _, script := range moduleCases {

@@ -223,31 +223,16 @@ func (ml *loader) getCurrentModuleRecord(rt *sobek.Runtime) sobek.ModuleRecord {
 // ResolveModule resolve the module returns the sobek.ModuleRecord.
 func (ml *loader) ResolveModule(referencingScriptOrModule any, name string) (sobek.ModuleRecord, error) {
 	switch {
-	case strings.HasPrefix(name, nodePrefix):
-		ml.Lock()
-		if mod, ok := ml.goModules[name]; ok {
-			ml.Unlock()
-			return mod, nil
-		}
-		if e, ok := Get(name); ok {
-			mod := &goModule{mod: e}
-			ml.goModules[name] = mod
-			ml.Unlock()
-			return mod, nil
-		}
-		return ml.resolve(ml.reversePath(referencingScriptOrModule), name)
 	case strings.HasPrefix(name, prefix):
-		ml.Lock()
-		defer ml.Unlock()
-		if mod, ok := ml.goModules[name]; ok {
-			return mod, nil
-		}
-		if e, ok := Get(name); ok {
-			mod := &goModule{mod: e}
-			ml.goModules[name] = mod
+		if mod, ok := ml.resolveGo(name); ok {
 			return mod, nil
 		}
 		return nil, fmt.Errorf("%w '%s'", ErrNotFoundModule, name)
+	case strings.HasPrefix(name, nodePrefix):
+		if mod, ok := ml.resolveGo(name); ok {
+			return mod, nil
+		}
+		fallthrough
 	default:
 		return ml.resolve(ml.reversePath(referencingScriptOrModule), name)
 	}
@@ -271,6 +256,20 @@ func (ml *loader) resolve(base *url.URL, specifier string) (sobek.ModuleRecord, 
 	}
 
 	return ml.loadNodeModules(base, specifier)
+}
+
+func (ml *loader) resolveGo(specifier string) (sobek.ModuleRecord, bool) {
+	ml.Lock()
+	defer ml.Unlock()
+	if mod, ok := ml.goModules[specifier]; ok {
+		return mod, ok
+	}
+	if module, ok := Get(specifier); ok {
+		mod := &goModule{mod: module}
+		ml.goModules[specifier] = mod
+		return mod, ok
+	}
+	return nil, false
 }
 
 func (ml *loader) reversePath(referencingScriptOrModule any) *url.URL {
