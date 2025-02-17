@@ -14,7 +14,6 @@ var (
 	TypeBlob        = reflect.TypeOf((*blob)(nil))
 	TypeBytes       = reflect.TypeOf(([]byte)(nil))
 	TypeArrayBuffer = reflect.TypeOf(sobek.ArrayBuffer{})
-	TypeBuffer      = reflect.TypeOf((*buffer)(nil))
 )
 
 // Blob interface represents a blob, which is a file-like object of immutable,
