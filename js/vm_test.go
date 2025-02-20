@@ -75,6 +75,18 @@ func TestVM(t *testing.T) {
 		assert.Equal(t, "bar", ctx.Value("foo"))
 	})
 
+	t.Run("context cancel", func(t *testing.T) {
+		vm := NewVM()
+		ctx, cancel := context.WithCancel(context.Background())
+		time.AfterFunc(100*time.Millisecond, func() { cancel() })
+
+		start := time.Now()
+		_, err := vm.RunString(ctx, "{while(true){}}")
+		assert.Error(t, err)
+		assert.Less(t, time.Since(start), time.Millisecond*110)
+		assert.True(t, errors.Is(err, context.Canceled))
+	})
+
 	t.Run("context timeout", func(t *testing.T) {
 		vm := NewVM()
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

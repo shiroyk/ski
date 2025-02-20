@@ -211,10 +211,10 @@ func (vm *vmImpl) Run(ctx context.Context, task func() error) (err error) {
 	vm.runtime.ClearInterrupt()
 	vm.ctx = ctx
 
-	if _, ok := ctx.Deadline(); ok {
+	if done := ctx.Done(); done != nil {
 		go func() {
 			select {
-			case <-ctx.Done():
+			case <-done:
 				// interrupt the running JavaScript.
 				vm.runtime.Interrupt(ctx.Err())
 				// stop the event loop.
