@@ -41,7 +41,7 @@ type SchedulerOptions struct {
 }
 
 func init() {
-	scheduler.Store(NewScheduler(SchedulerOptions{}))
+	SetScheduler(NewScheduler(SchedulerOptions{}))
 }
 
 // SetScheduler set the default Scheduler

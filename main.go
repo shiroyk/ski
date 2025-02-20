@@ -43,3 +43,22 @@ func RunString(ctx context.Context, str string) (sobek.Value, error) {
 	}
 	return vm.RunString(ctx, str)
 }
+
+// Run executes the given function
+//
+// example:
+//
+//	err := ski.Run(context.Background(), func(rt *sobek.Runtime) error {
+//		_, err := rt.RunString(`console.log('hello world')`)
+//		return err
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+func Run(ctx context.Context, fn func(*sobek.Runtime) error) error {
+	vm, err := GetScheduler().Get()
+	if err != nil {
+		return err
+	}
+	return vm.Run(ctx, func() error { return fn(vm.Runtime()) })
+}
