@@ -158,6 +158,46 @@ func TestURL(t *testing.T) {
 		}
 	})
 
+	t.Run("canParse", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			url      string
+			base     string
+			expected bool
+		}{
+			{
+				name:     "absolute url",
+				url:      "https://example.com/path?query=1#hash",
+				expected: true,
+			},
+			{
+				name:     "relative url with base",
+				url:      "/path?query=1#hash",
+				base:     "https://example.com",
+				expected: true,
+			},
+			{
+				name:     "invalid url",
+				url:      "://invalid",
+				expected: false,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var result sobek.Value
+				var err error
+				if tt.base == "" {
+					result, err = vm.RunString(ctx, `URL.canParse("`+tt.url+`")`)
+				} else {
+					result, err = vm.RunString(ctx, `URL.canParse("`+tt.url+`", "`+tt.base+`")`)
+				}
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result.Export())
+			})
+		}
+	})
+
 	t.Run("searchParams", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
 			export default () => {
