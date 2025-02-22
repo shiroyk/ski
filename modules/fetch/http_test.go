@@ -2,9 +2,11 @@ package fetch
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -161,19 +163,29 @@ func TestHttp(t *testing.T) {
 			},
 			{
 				name:         "ArrayBuffer body",
-				input:        `body: new ArrayBuffer(5)`,
-				expectedBody: "\x00\x00\x00\x00\x00",
+				input:        `body: new ArrayBuffer(1)`,
+				expectedBody: "\x00",
 			},
 			{
 				name:         "Uint8Array body",
-				input:        `body: new Uint8Array(5)`,
-				expectedBody: "\x00\x00\x00\x00\x00",
+				input:        `body: new Uint8Array(1)`,
+				expectedBody: "\x00",
+			},
+			{
+				name:         "Uint16Array body",
+				input:        `body: new Uint16Array(1)`,
+				expectedBody: "\x00\x00",
+			},
+			{
+				name:         "DataView body",
+				input:        `body: new DataView(new ArrayBuffer(1))`,
+				expectedBody: "\x00",
 			},
 			{
 				name:         "JSON body",
-				input:        `body: { message: "hello" }`,
+				input:        `body: JSON.stringify({message: "hello"})`,
 				expectedBody: `{"message":"hello"}`,
-				contentType:  "application/json",
+				contentType:  "text/plain;charset=UTF-8",
 			},
 			{
 				name:         "FormData body",
@@ -189,30 +201,32 @@ func TestHttp(t *testing.T) {
 			},
 		}
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if tt.contentType != "" {
-						assert.Contains(t, r.Header.Get("Content-Type"), tt.contentType)
-					}
-					body, err := io.ReadAll(r.Body)
-					if assert.NoError(t, err) {
-						assert.Contains(t, string(body), tt.expectedBody)
-					}
-				}))
-				defer server.Close()
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			i, err := strconv.Atoi(r.URL.Query().Get("i"))
+			require.NoError(t, err)
+			tt := tests[i]
+			if tt.contentType != "" {
+				assert.Contains(t, r.Header.Get("Content-Type"), tt.contentType)
+			}
+			body, err := io.ReadAll(r.Body)
+			if assert.NoError(t, err) {
+				assert.Contains(t, string(body), tt.expectedBody)
+			}
+		}))
+		defer server.Close()
 
+		for i, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
 				result, err := vm.RunModule(ctx, `
-				export default () => {
-					const response = http.get("`+server.URL+`", {
-						method: "POST",
+				export default (url) => {
+					const response = http.post(url, {
 						`+tt.input+`
 					});
 					return response.status;
 				}
-				`)
+				`, fmt.Sprintf("%s?i=%d", server.URL, i))
 				require.NoError(t, err)
-				assert.Equal(t, int64(200), result.ToInteger())
+				assert.Equal(t, int64(200), modulestest.PromiseResult(result).ToInteger())
 			})
 		}
 	})

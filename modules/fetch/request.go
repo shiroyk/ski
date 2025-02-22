@@ -341,8 +341,6 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	if b := init.Get("body"); b != nil {
 		var body io.Reader = http.NoBody
 		switch b.ExportType() {
-		case buffer.TypeBlob, buffer.TypeFile:
-			body = buffer.GetBlobData(rt, b)
 		case typeFormData:
 			data := b.Export().(*formData)
 			reader, contentType, err := data.encode(rt)
@@ -356,23 +354,12 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 			h := req.headers.Export().(headers)
 			h["content-type"] = []string{"application/x-www-form-url"}
 			body = strings.NewReader(b.String())
-		case buffer.TypeArrayBuffer:
-			body = bytes.NewReader(b.Export().(sobek.ArrayBuffer).Bytes())
-		case buffer.TypeBytes:
-			body = bytes.NewReader(b.Export().([]byte))
 		case stream.TypeReadableStream:
 			body = stream.GetStreamSource(rt, b)
 		default:
-			switch b.ExportType().Kind() {
-			case reflect.Map, reflect.Array, reflect.Slice:
-				h := req.headers.Export().(headers)
-				h["content-type"] = []string{"application/json"}
-				data, err := b.ToObject(rt).MarshalJSON()
-				if err != nil {
-					js.Throw(rt, err)
-				}
+			if data, ok := buffer.GetBuffer(rt, b); ok {
 				body = bytes.NewReader(data)
-			default:
+			} else {
 				body = strings.NewReader(b.String())
 				h := req.headers.Export().(headers)
 				if _, ok := h["content-type"]; !ok {

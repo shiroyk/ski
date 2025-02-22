@@ -73,15 +73,41 @@ func TestBlob(t *testing.T) {
 			},
 			{
 				name:  "Uint8Array content",
-				input: `new Blob([new Uint8Array(5)], { type: "application/octet-stream" })`,
+				input: `new Blob([new Uint8Array(1)], { type: "application/octet-stream" })`,
 				expected: struct {
 					size  int64
 					type_ string
 					data  string
 				}{
-					size:  5,
+					size:  1,
 					type_: "application/octet-stream",
-					data:  "\x00\x00\x00\x00\x00",
+					data:  "\x00",
+				},
+			},
+			{
+				name:  "Uint16Array content",
+				input: `new Blob([new Uint16Array(1)], { type: "application/octet-stream" })`,
+				expected: struct {
+					size  int64
+					type_ string
+					data  string
+				}{
+					size:  2,
+					type_: "application/octet-stream",
+					data:  "\x00\x00",
+				},
+			},
+			{
+				name:  "BigUint64Array content",
+				input: `new Blob([new BigUint64Array(1)], { type: "application/octet-stream" })`,
+				expected: struct {
+					size  int64
+					type_ string
+					data  string
+				}{
+					size:  8,
+					type_: "application/octet-stream",
+					data:  "\x00\x00\x00\x00\x00\x00\x00\x00",
 				},
 			},
 			{
@@ -192,6 +218,26 @@ func TestBlob(t *testing.T) {
 				obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
 				assert.Equal(t, tt.expected, obj.String())
 			})
+		}
+	})
+}
+
+func TestIsTypedArray(t *testing.T) {
+	vm := modulestest.New(t)
+
+	t.Run("typed array", func(t *testing.T) {
+		for _, typ := range typedArrayTypes {
+			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
+			require.NoError(t, err)
+			assert.True(t, IsTypedArray(vm.Runtime(), v))
+		}
+	})
+
+	t.Run("not typed array", func(t *testing.T) {
+		for _, typ := range []string{"Array", "ArrayBuffer"} {
+			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
+			require.NoError(t, err)
+			assert.False(t, IsTypedArray(vm.Runtime(), v))
 		}
 	})
 }

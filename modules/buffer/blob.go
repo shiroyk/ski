@@ -47,25 +47,15 @@ func (b *Blob) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 	}
 	buf := new(bytes.Buffer)
 
-	rt.ForOf(blobParts, func(part sobek.Value) (ok bool) {
-		switch part.ExportType() {
-		case TypeBlob:
-			blob := part.Export().(*blob)
-			if _, err := io.Copy(buf, blob.data); err != nil {
-				js.Throw(rt, err)
-			}
-		case TypeBytes:
-			if _, err := buf.Write(part.Export().([]byte)); err != nil {
-				js.Throw(rt, err)
-			}
-		case TypeArrayBuffer:
-			if _, err := buf.Write(part.Export().(sobek.ArrayBuffer).Bytes()); err != nil {
-				js.Throw(rt, err)
-			}
-		default:
-			if _, err := buf.WriteString(part.String()); err != nil {
-				js.Throw(rt, err)
-			}
+	var err error
+	rt.ForOf(blobParts, func(part sobek.Value) bool {
+		if buffer, ok := GetBuffer(rt, part); ok {
+			_, err = buf.Write(buffer)
+		} else {
+			_, err = buf.WriteString(part.String())
+		}
+		if err != nil {
+			js.Throw(rt, err)
 		}
 		return true
 	})
@@ -205,16 +195,4 @@ func toBlob(rt *sobek.Runtime, value sobek.Value) *blob {
 		return toBlob(rt, value.Export().(*file).blob)
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type Blob`))
-}
-
-// GetBlobData extracts the underlying BlobData from a Blob or File.
-func GetBlobData(rt *sobek.Runtime, value sobek.Value) BlobData {
-	switch value.ExportType() {
-	case TypeBlob:
-		return value.Export().(*blob).data
-	case TypeFile:
-		return toBlob(rt, value.Export().(*file).blob).data
-	default:
-		panic(rt.NewTypeError(`Value is not a Blob`))
-	}
 }

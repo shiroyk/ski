@@ -85,8 +85,6 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 	var body io.Reader = http.NoBody
 	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
 		switch arg.ExportType() {
-		case buffer.TypeBlob, buffer.TypeFile:
-			body = buffer.GetBlobData(rt, arg)
 		case typeFormData:
 			data := arg.Export().(*formData)
 			reader, _, err := data.encode(rt)
@@ -94,12 +92,12 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 				js.Throw(rt, err)
 			}
 			body = reader
-		case buffer.TypeArrayBuffer:
-			body = bytes.NewReader(arg.Export().(sobek.ArrayBuffer).Bytes())
-		case buffer.TypeBytes:
-			body = bytes.NewReader(arg.Export().([]byte))
 		default:
-			body = strings.NewReader(arg.String())
+			if data, ok := buffer.GetBuffer(rt, arg); ok {
+				body = bytes.NewReader(data)
+			} else {
+				body = strings.NewReader(arg.String())
+			}
 		}
 	}
 
