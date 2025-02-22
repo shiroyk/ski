@@ -49,7 +49,7 @@ func TestFormData(t *testing.T) {
 			export default () => {
 				const form = new FormData();
 				form.append("text", "hello");
-				form.append("file", new ArrayBuffer(5), "test.txt");
+				form.append("file", new Blob(['hello']), "test.txt");
 				form.append("multi", "1");
 				form.append("multi", "2");
 				return {
@@ -143,7 +143,7 @@ func TestFormData(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
 			export default () => {
 				const form = new FormData();
-				const buffer = new ArrayBuffer(5);
+				const buffer = new Blob(['data']);
 				form.append("file1", buffer);
 				form.append("file2", buffer, "test.bin");
 				return {

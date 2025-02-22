@@ -86,7 +86,7 @@ func (*FormData) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	}
 
 	switch value.ExportType() {
-	case buffer.TypeArrayBuffer, buffer.TypeBlob:
+	case buffer.TypeBlob, buffer.TypeFile:
 		filename := call.Argument(2)
 		if f := call.Argument(2); sobek.IsUndefined(f) {
 			// Default filename "blob".
@@ -174,7 +174,7 @@ func (*FormData) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 
 	switch value.ExportType() {
-	case buffer.TypeArrayBuffer, buffer.TypeBlob:
+	case buffer.TypeBlob, buffer.TypeFile:
 		filename := call.Argument(2)
 		if f := call.Argument(2); sobek.IsUndefined(f) {
 			// Default filename "blob".
