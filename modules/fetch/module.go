@@ -14,6 +14,7 @@ func init() {
 	fetch := ski.NewFetch().(*http.Client)
 	fetch.Jar = jar
 	modules.Register("http", &Http{fetch})
+	modules.Register("cookieJar", &CookieJarModule{jar})
 	modules.Register("fetch", &Module{fetch, jar})
 }
 
@@ -30,8 +31,6 @@ func (m *Module) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 		return nil, errors.New("CookieJar can not nil")
 	}
 	ret := rt.NewObject()
-	cookieJar, _ := (&CookieJarModule{m.CookieJar}).Instantiate(rt)
-	_ = ret.Set("cookieJar", cookieJar)
 	fetch, _ := (&Fetch{m.Fetch}).Instantiate(rt)
 	_ = ret.Set("fetch", fetch)
 	request, _ := new(Request).Instantiate(rt)
