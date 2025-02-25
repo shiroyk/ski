@@ -99,7 +99,6 @@ func (cmi *cjsModuleInstance) ExecuteModule(rt *sobek.Runtime, _, _ func(any) er
 type goModule struct {
 	mod           Module
 	exportedNames []string
-	callback      []func([]string)
 	once          sync.Once
 }
 

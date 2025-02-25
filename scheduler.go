@@ -169,7 +169,6 @@ func (s *schedulerImpl) Close() error {
 	if s.closed.Swap(true) {
 		return ErrSchedulerClosed
 	}
-	s.Shrink()
 	close(s.vms)
 	return nil
 }

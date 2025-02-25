@@ -1,6 +1,9 @@
 package js
 
-import "unsafe"
+import (
+	"errors"
+	"unsafe"
+)
 
 type joinError []error
 
@@ -21,3 +24,5 @@ func (e joinError) Error() string {
 }
 
 func (e joinError) Unwrap() []error { return e }
+
+var errCallableDefault = errors.New("module default export is not a function")

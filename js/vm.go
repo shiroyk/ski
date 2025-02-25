@@ -99,8 +99,9 @@ func NewVM(opts ...Option) VM {
 		vm.release = func() {}
 	}
 
-	_ = rt.GlobalObject().SetSymbol(symbolVM, &vmself{vm})
-	_ = rt.GlobalObject().DefineDataProperty("$ctx", jsContext(vm.vmctx, rt),
+	global := rt.GlobalObject()
+	_ = global.SetSymbol(symbolVM, &vmself{vm})
+	_ = global.DefineDataProperty("$ctx", jsContext(vm.vmctx, rt),
 		sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
 	return vm
@@ -211,17 +212,13 @@ func (vm *vmImpl) Run(ctx context.Context, task func() error) (err error) {
 	vm.runtime.ClearInterrupt()
 	vm.ctx = ctx
 
-	if done := ctx.Done(); done != nil {
-		go func() {
-			select {
-			case <-done:
-				// interrupt the running JavaScript.
-				vm.runtime.Interrupt(ctx.Err())
-				// stop the event loop.
-				vm.eventloop.Stop()
-			}
-		}()
-	}
+	context.AfterFunc(ctx, func() {
+		// interrupt the running JavaScript.
+		err2 := ctx.Err()
+		vm.runtime.Interrupt(err2)
+		// stop the event loop.
+		vm.eventloop.Stop(err2)
+	})
 
 	return vm.eventloop.Start(task)
 }

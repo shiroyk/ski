@@ -157,20 +157,14 @@ func (e *EventLoop) EnqueueJob() Enqueue {
 	}
 }
 
-// Stop the eventloop
-func (e *EventLoop) Stop() {
+// Stop the eventloop with the provided error
+func (e *EventLoop) Stop(err error) {
 	e.cond.L.Lock()
+	defer e.cond.L.Unlock()
 	// clean the queue
-	e.queue = e.queue[:0]
+	e.queue = append(e.queue[:0], func() error { return err })
 	e.enqueue = 0
-	cleanup := e.cleanup
-	e.cleanup = e.cleanup[:0]
 	e.cond.Signal()
-	e.cond.L.Unlock()
-
-	for _, job := range cleanup {
-		job()
-	}
 }
 
 // Cleanup add a function to execute when run finish.

@@ -43,11 +43,11 @@ func (*Timers) setTimeout(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		args = call.Arguments[2:]
 	}
 
-	ctx := js.Context(rt)
 	enqueue := js.EnqueueJob(rt)
 	t := rtTimers(rt).new(delay, false)
+	js.Cleanup(rt, t.stop)
 	task := func() error {
-		t.stop()
+		defer t.stop()
 		_, err := callback(sobek.Undefined(), args...)
 		return err
 	}
@@ -57,9 +57,7 @@ func (*Timers) setTimeout(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		case <-t.timer.C:
 			enqueue(task)
 		case <-t.done:
-			enqueue(func() error { return nil })
-		case <-ctx.Done():
-			t.stop()
+			enqueue(nothing)
 		}
 	}()
 
@@ -88,9 +86,9 @@ func (*Timers) setInterval(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 		args = call.Arguments[2:]
 	}
 
-	ctx := js.Context(rt)
 	enqueue := js.EnqueueJob(rt)
 	t := rtTimers(rt).new(delay, true)
+	js.Cleanup(rt, t.stop)
 	task := func() error { _, err := callback(sobek.Undefined(), args...); return err }
 
 	go func() {
@@ -100,10 +98,7 @@ func (*Timers) setInterval(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 				enqueue(task)
 				enqueue = js.EnqueueJob(rt)
 			case <-t.done:
-				enqueue(func() error { return nil })
-				return
-			case <-ctx.Done():
-				t.stop()
+				enqueue(nothing)
 				return
 			}
 		}
@@ -181,3 +176,5 @@ func rtTimers(rt *sobek.Runtime) *timers {
 	}
 	panic(rt.NewTypeError(`symbol value of "timers" must be Timers`))
 }
+
+func nothing() error { return nil }

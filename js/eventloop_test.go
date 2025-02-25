@@ -146,17 +146,16 @@ func TestEventLoop(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
 		defer cancel()
 
-		go func() {
-			_ = loop.Start(func() error {
-				loop.EnqueueJob()
-				loop.Cleanup(func() { cleanupCalled = true })
-				return nil
-			})
-		}()
+		context.AfterFunc(ctx, func() { loop.Stop(context.Canceled) })
 
-		<-ctx.Done()
-		loop.Stop()
+		err := loop.Start(func() error {
+			loop.EnqueueJob()
+			loop.Cleanup(func() { cleanupCalled = true })
+			return nil
+		})
+
 		assert.True(t, cleanupCalled)
+		assert.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("multiple stops", func(t *testing.T) {
@@ -168,9 +167,9 @@ func TestEventLoop(t *testing.T) {
 			return nil
 		})
 
-		loop.Stop()
-		loop.Stop()
-		loop.Stop()
+		loop.Stop(context.Canceled)
+		loop.Stop(context.Canceled)
+		loop.Stop(context.Canceled)
 
 		assert.Equal(t, 1, cleanupCount)
 	})
@@ -181,7 +180,7 @@ func TestEventLoop(t *testing.T) {
 
 		_ = loop.Start(func() error {
 			enqueue := loop.EnqueueJob()
-			loop.Stop()
+			loop.Stop(context.Canceled)
 			enqueue(func() error { executed = true; return nil })
 			return nil
 		})
@@ -255,28 +254,20 @@ func TestEventLoop(t *testing.T) {
 
 	t.Run("error after stop", func(t *testing.T) {
 		loop := NewEventLoop()
-		errChan := make(chan error, 1)
 
-		go func() {
-			errChan <- loop.Start(func() error {
-				enqueue := loop.EnqueueJob()
-				go func() {
-					time.Sleep(time.Millisecond * 100)
-					enqueue(func() error { return errors.New("should not execute") })
-				}()
-				return nil
+		time.AfterFunc(time.Millisecond*50, func() {
+			loop.Stop(context.Canceled)
+		})
+
+		err := loop.Start(func() error {
+			enqueue := loop.EnqueueJob()
+			time.AfterFunc(time.Millisecond*100, func() {
+				enqueue(func() error { return errors.New("should not execute") })
 			})
-		}()
+			return nil
+		})
 
-		time.Sleep(time.Millisecond * 50)
-		loop.Stop()
-
-		select {
-		case err := <-errChan:
-			assert.NoError(t, err)
-		case <-time.After(time.Second):
-			t.Fatal("timeout waiting for loop to stop")
-		}
+		assert.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("concurrent errors", func(t *testing.T) {

@@ -48,7 +48,7 @@ func ModuleCallable(rt *sobek.Runtime, module sobek.CyclicModuleRecord) (sobek.C
 	value := instance.GetBindingValue("default")
 	call, ok := sobek.AssertFunction(value)
 	if !ok {
-		return nil, errors.New("module default export is not a function")
+		return nil, errCallableDefault
 	}
 	return call, nil
 }

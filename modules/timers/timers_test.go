@@ -3,6 +3,7 @@ package timers
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -177,6 +178,20 @@ func TestTimers(t *testing.T) {
 		count := modulestest.PromiseResult(result).ToInteger()
 		assert.GreaterOrEqual(t, count, int64(5))
 		assert.LessOrEqual(t, count, int64(15))
+		assert.Equal(t, 0, len(rtTimers(vm.Runtime()).timer))
+	})
+
+	t.Run("interrupt", func(t *testing.T) {
+		ctx2, cancel := context.WithTimeout(ctx, time.Millisecond*100)
+		defer cancel()
+		_, err := vm.RunModule(ctx2, `
+		export default async () => {
+			return await new Promise((resolve) => {
+				setTimeout(resolve, 1000);
+			})
+		}
+		`)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Equal(t, 0, len(rtTimers(vm.Runtime()).timer))
 	})
 }
