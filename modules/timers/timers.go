@@ -33,10 +33,11 @@ func (*Timers) setTimeout(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		panic(rt.NewTypeError("setTimeout: first argument must be a function"))
 	}
 
-	delay := time.Duration(call.Argument(1).ToInteger()) * time.Millisecond
-	if delay < 0 {
-		delay = 0
+	i := call.Argument(1).ToInteger()
+	if i < 1 || i > 2147483647 {
+		i = 1
 	}
+	delay := time.Duration(i) * time.Millisecond
 
 	var args []sobek.Value
 	if len(call.Arguments) > 2 {
@@ -54,7 +55,7 @@ func (*Timers) setTimeout(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 
 	go func() {
 		select {
-		case <-t.timer.C:
+		case <-t.timer:
 			enqueue(task)
 		case <-t.done:
 			enqueue(nothing)
@@ -76,10 +77,11 @@ func (*Timers) setInterval(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 		panic(rt.NewTypeError("setInterval: first argument must be a function"))
 	}
 
-	delay := time.Duration(call.Argument(1).ToInteger()) * time.Millisecond
-	if delay < 0 {
-		delay = 0
+	i := call.Argument(1).ToInteger()
+	if i < 1 || i > 2147483647 {
+		i = 1
 	}
+	delay := time.Duration(i) * time.Millisecond
 
 	var args []sobek.Value
 	if len(call.Arguments) > 2 {
@@ -94,7 +96,7 @@ func (*Timers) setInterval(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	go func() {
 		for {
 			select {
-			case <-t.ticker.C:
+			case <-t.timer:
 				enqueue(task)
 				enqueue = js.EnqueueJob(rt)
 			case <-t.done:
@@ -115,8 +117,7 @@ func (*Timers) clearInterval(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 
 type timer struct {
 	id      int64
-	timer   *time.Timer
-	ticker  *time.Ticker
+	timer   <-chan time.Time
 	done    chan struct{}
 	cleanup func()
 }
@@ -130,12 +131,6 @@ func (t *timer) stop() {
 	default:
 	}
 	close(t.done)
-	if t.timer != nil {
-		t.timer.Stop()
-	}
-	if t.ticker != nil {
-		t.ticker.Stop()
-	}
 	t.cleanup()
 }
 
@@ -147,18 +142,27 @@ type timers struct {
 func (t *timers) new(delay time.Duration, repeat bool) *timer {
 	t.id++
 	id := t.id
-	nt := &timer{
-		id:      id,
-		done:    make(chan struct{}),
-		cleanup: func() { delete(t.timer, id) },
+	n := &timer{
+		id:   id,
+		done: make(chan struct{}),
 	}
 	if repeat {
-		nt.ticker = time.NewTicker(delay)
+		t1 := time.NewTicker(delay)
+		n.timer = t1.C
+		n.cleanup = func() {
+			delete(t.timer, id)
+			t1.Stop()
+		}
 	} else {
-		nt.timer = time.NewTimer(delay)
+		t1 := time.NewTimer(delay)
+		n.timer = t1.C
+		n.cleanup = func() {
+			delete(t.timer, id)
+			t1.Stop()
+		}
 	}
-	t.timer[id] = nt
-	return nt
+	t.timer[id] = n
+	return n
 }
 
 func (t *timers) stop(id int64) {
