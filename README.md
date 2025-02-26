@@ -129,38 +129,120 @@ export default function () {
 }
 ```
 
-## Usage
-
+## Example
+Vue.js Server side rendering.
 ```go
 package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"io"
+	"log/slog"
+	"net/http"
 
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
-
-	_ "github.com/shiroyk/ski/modules/timers"
+	"github.com/shiroyk/ski/js/promise"
 )
+
+func httpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	addr := call.Argument(0).String()
+	handler, ok := sobek.AssertFunction(call.Argument(1))
+	if !ok {
+		panic(rt.NewTypeError("second argument must be a function"))
+	}
+
+	server := &http.Server{
+		Addr: addr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			done := make(chan struct{})
+			js.EnqueueJob(rt)(func() error {
+				v, err := handler(sobek.Undefined(), rt.ToValue(func(body string) {
+					io.WriteString(w, body)
+					close(done)
+				}), rt.ToValue(r.URL.Path))
+				if err == nil {
+					_, err = promise.Result(v)
+				}
+				if err == nil {
+					return nil
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				io.WriteString(w, err.Error())
+				close(done)
+				return nil
+			})
+			<-done
+		}),
+	}
+
+	enqueue := js.EnqueueJob(rt)
+
+	go func() {
+		slog.Info("server listing on http://" + server.Addr)
+		err := server.ListenAndServe()
+		if err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				err = nil
+			}
+		}
+		enqueue(func() error { return err })
+	}()
+
+	return sobek.Undefined()
+}
 
 func main() {
 	module, err := js.CompileModule(`module`, `
-        import { default as $ } from "ski/gq";
+		import { h, createSSRApp } from "https://unpkg.com/vue@3/dist/vue.runtime.esm-browser.js";
+		import { renderToString } from "https://unpkg.com/@vue/server-renderer@3/dist/server-renderer.esm-browser.js";
 
-	export default function () {
-	    return $('<div><span>hello</ span></ div>').find('span').text();
-	}
-	`)
+        server("localhost:8000", async (ok) => {
+			const app = createSSRApp({
+				data: () => ({ count: 1 }),
+				render() { return h('div', { onClick: () => this.count++ }, this.count) },
+			});
+			const html = await renderToString(app);
+			ok(`+"`"+`
+				<!DOCTYPE html>
+				<html>
+				  <head>
+					<title>Vue SSR Example</title>
+					<script type="importmap">
+					  {
+						"imports": {
+						  "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+						}
+					  }
+					</script>
+					<script type="module">
+						import { h, createSSRApp } from 'vue';
+						createSSRApp({
+							data: () => ({ count: 1 }),
+							render() { return h('div', { onClick: () => this.count++ }, this.count) },
+						}).mount('#app');
+					</script>
+				  </head>
+				  <body>
+					<div id="app">${html}</div>
+				  </body>
+				</html>`+"`"+`);
+		});
+    `)
 	if err != nil {
 		panic(err)
 	}
 
-	result, err := ski.RunModule(context.Background(), module, 100)
+	err = ski.Run(context.Background(), func(rt *sobek.Runtime) error {
+		_ = rt.Set("server", httpServer)
+		_, err = js.ModuleInstance(rt, module)
+		return err
+	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(result.Export())
 }
 ```
 ## License

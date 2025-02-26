@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 
@@ -65,6 +66,10 @@ func run() (err error) {
 	ret, err := js.RunModule(js.WithLogger(ctx, logger), module)
 	if err != nil {
 		return err
+	}
+
+	if ret == nil || sobek.IsUndefined(ret) {
+		return nil
 	}
 
 	v, err := js.Unwrap(ret)
