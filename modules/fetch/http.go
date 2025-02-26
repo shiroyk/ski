@@ -6,16 +6,15 @@ import (
 	"net/http"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 )
 
 // Http module for fetching resources (including across the network).
-type Http struct{ ski.Fetch }
+type Http struct{ Client }
 
 func (h *Http) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	if h.Fetch == nil {
-		return nil, errors.New("fetch can not nil")
+	if h.Client == nil {
+		return nil, errors.New("http client can not nil")
 	}
 	obj := rt.NewObject()
 	_ = obj.Set("get", h.get)

@@ -5,8 +5,8 @@ import (
 	"github.com/shiroyk/ski/js"
 )
 
-// GetBlobData extracts the underlying BlobData from a Blob or File.
-func GetBlobData(rt *sobek.Runtime, value sobek.Value) BlobData {
+// GetReader extracts the underlying Reader from a Blob or File.
+func GetReader(rt *sobek.Runtime, value sobek.Value) Reader {
 	switch value.ExportType() {
 	case TypeBlob:
 		return value.Export().(*blob).data

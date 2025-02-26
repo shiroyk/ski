@@ -1,38 +1,37 @@
 package cache
 
 import (
+	"context"
 	"testing"
+	"time"
 
-	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
-	"github.com/shiroyk/ski/js"
-	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCache(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
-		cache := Cache{ski.NewCache()}
-		instantiate, err := cache.Instantiate(rt)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = rt.Set("cache", instantiate)
-	}))
+	c := NewCache()
+	ctx := context.Background()
 
-	_, err := vm.Runtime().RunString(`
-			cache.set("cache1", "1");
-			cache.del("cache1");
-			assert.true(!cache.get("cache1"), "cache should be deleted");
-			cache.set("cache2", "2", 500);
-			assert.equal(cache.get("not exists"), undefined);
-			assert.equal(cache.get("not exists"), undefined);
-			assert.equal(cache.get("cache2"), "2");
-			cache.setBytes("cache3", new Uint8Array([50]));
-			assert.equal(new Uint8Array(cache.getBytes("cache3"))[0], 50);
-			cache.setBytes("cache4", new Uint8Array([60]).buffer);
-			assert.equal(new Uint8Array(cache.getBytes("cache4"))[0], 60);
-		`)
-	assert.NoError(t, err)
+	key, value := "testCacheKey", "testCacheValue"
+	if v, _ := c.Get(ctx, key); len(v) != 0 {
+		t.Fatal("retrieved values before adding it")
+	}
+
+	_ = c.Set(ctx, key, []byte(value), 0)
+	v, _ := c.Get(ctx, key)
+	assert.Equal(t, value, string(v))
+
+	_ = c.Del(ctx, key)
+	v, _ = c.Get(ctx, key)
+	assert.Empty(t, v)
+
+	_ = c.Set(ctx, key, []byte(value), time.Millisecond)
+	v1, _ := c.Get(ctx, key)
+	assert.Equal(t, value, string(v1))
+
+	time.Sleep(100 * time.Millisecond)
+
+	v, _ = c.Get(ctx, key)
+	assert.Empty(t, v, "not expired: %v", key)
 }

@@ -154,7 +154,7 @@ func (*Blob) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 type blob struct {
-	data  BlobData
+	data  Reader
 	size  int64
 	type_ string
 }
@@ -172,7 +172,7 @@ func (b *blob) reset() error {
 	return err
 }
 
-type BlobData interface {
+type Reader interface {
 	io.Reader
 	io.ReaderAt
 	io.Seeker

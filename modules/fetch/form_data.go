@@ -252,7 +252,7 @@ func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
 				if err != nil {
 					return nil, "", err
 				}
-				data := buffer.GetBlobData(rt, value)
+				data := buffer.GetReader(rt, value)
 				if data == nil {
 					fw.Write(nil)
 					continue

@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js/promise"
 )
 
@@ -14,7 +13,7 @@ import (
 // fetching a resource from the network, returning a promise
 // which is fulfilled once the response is available.
 // https://developer.mozilla.org/en-US/docs/Web/API/fetch
-type Fetch struct{ ski.Fetch }
+type Fetch struct{ Client }
 
 func (fetch *Fetch) fetch(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if len(call.Arguments) < 1 {
@@ -50,8 +49,8 @@ func (fetch *Fetch) fetch(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 }
 
 func (fetch *Fetch) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	if fetch.Fetch == nil {
-		return nil, errors.New("fetch can not be nil")
+	if fetch.Client == nil {
+		return nil, errors.New("http client can not be nil")
 	}
 	proto := rt.NewObject()
 	_ = proto.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("fetch") })

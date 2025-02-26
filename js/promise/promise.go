@@ -1,6 +1,7 @@
 package promise
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -94,4 +95,31 @@ func Reject(rt *sobek.Runtime, reason any) sobek.Value {
 	promise, _, rejectFn := rt.NewPromise()
 	_ = rejectFn(reason)
 	return rt.ToValue(promise)
+}
+
+// Resolve with value
+func Resolve(rt *sobek.Runtime, value any) sobek.Value {
+	promise, resolve, _ := rt.NewPromise()
+	_ = resolve(value)
+	return rt.ToValue(promise)
+}
+
+// Result returns the promise result, if it not promise return origin value.
+func Result(value sobek.Value) (any, error) {
+	if value == nil {
+		return nil, nil
+	}
+	v := value.Export()
+	promise, ok := v.(*sobek.Promise)
+	if !ok {
+		return v, nil
+	}
+	switch promise.State() {
+	case sobek.PromiseStateRejected:
+		return nil, errors.New(promise.Result().String())
+	case sobek.PromiseStateFulfilled:
+		return promise.Result().Export(), nil
+	default:
+		return nil, errors.New("unexpected promise pending state")
+	}
 }

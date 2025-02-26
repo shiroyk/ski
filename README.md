@@ -2,15 +2,9 @@
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/shiroyk/ski)
 [![Go Report Card](https://goreportcard.com/badge/github.com/shiroyk/ski)](https://goreportcard.com/report/github.com/shiroyk/ski)
 ![GitHub](https://img.shields.io/github/license/shiroyk/ski)<br/>
-**ski** is a tool written in Go for testing or extracting data.<br/>
 
 ## Description
-**ski** is a JavaScript runtime environment and module system implemented in pure Go, designed for testing DOM or extracting data. It provides a set of built-in modules for common tasks like caching, cryptography, encoding, fetch, and DOM manipulation.
-
-Key features:
-- JavaScript module system with ES6 import/export support
-- Built-in modules for caching, crypto operations, encoding, fetch, and DOM traversal
-- Promise-based asynchronous operations
+**ski** is a collection of Goja modules, provides a set of built-in modules for common tasks like caching, cryptography, encoding, fetch.
 
 ## Modules
 Partial Node.js compatibility and web standard implementations.
@@ -134,34 +128,6 @@ export default function () {
   return crypto.md5('hello').hex();
 }
 ```
-### gq
-gq module provides jQuery-like selector and traversing methods.
-```js
-import { default as $ } from "ski/gq";
-
-export default function () {
-  return $('<div><span>hello</span></div>').find('span').text();
-}
-```
-### jq
-jq module provides JSON path expressions for filtering and extracting JSON elements.
-```js
-import jq from "ski/jq";
-
-export default () => {
-  let data = JSON.parse(`{"hello": 1}`);
-  console.log(jq('$.hello').get(data));
-}
-```
-### xpath
-xpath module provides selecting nodes from XML, HTML or other documents using XPath expression.
-```js
-import xpath from "ski/xpath";
-
-export default () => {
-  console.log(xpath('//span').innerText("<div><span>hello</span></div>"));
-}
-```
 
 ## Usage
 
@@ -175,7 +141,7 @@ import (
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 
-	_ "github.com/shiroyk/ski/modules/gq" // register gq module
+	_ "github.com/shiroyk/ski/modules/timers"
 )
 
 func main() {
@@ -190,7 +156,7 @@ func main() {
 		panic(err)
 	}
 
-	result, err := ski.RunModule(context.Background(), module)
+	result, err := ski.RunModule(context.Background(), module, 100)
 	if err != nil {
 		panic(err)
 	}

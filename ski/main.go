@@ -25,9 +25,6 @@ import (
 	_ "github.com/shiroyk/ski/modules/cache"
 	_ "github.com/shiroyk/ski/modules/crypto"
 	_ "github.com/shiroyk/ski/modules/encoding/base64"
-	_ "github.com/shiroyk/ski/modules/gq"
-	_ "github.com/shiroyk/ski/modules/jq"
-	_ "github.com/shiroyk/ski/modules/xpath"
 )
 
 const defaultTimeout = time.Minute

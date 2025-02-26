@@ -1,95 +1,61 @@
-// Package cache the cache JS implementation
 package cache
 
 import (
-	"errors"
+	"context"
+	"sync"
 	"time"
-
-	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
-	"github.com/shiroyk/ski/js"
-	"github.com/shiroyk/ski/modules"
 )
 
-func init() {
-	modules.Register("cache", &Cache{ski.NewCache()})
+// A Cache interface is used to store bytes.
+type Cache interface {
+	Get(ctx context.Context, key string) ([]byte, error)
+	Set(ctx context.Context, key string, value []byte, timeout time.Duration) error
+	Del(ctx context.Context, key string) error
 }
 
-// Cache interface is used to store string or bytes.
-type Cache struct{ ski.Cache }
-
-func (c *Cache) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	if c.Cache == nil {
-		return nil, errors.New("Cache can not nil")
-	}
-	return rt.ToValue(map[string]func(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value{
-		"get":      c.Get,
-		"getBytes": c.GetBytes,
-		"set":      c.Set,
-		"setBytes": c.SetBytes,
-		"del":      c.Del,
-	}), nil
+// memoryCache is an implementation of Cache that stores bytes in in-memory.
+type memoryCache struct {
+	sync.Mutex
+	items   map[string][]byte
+	timeout map[string]int64
 }
 
-// Get returns string.
-func (c *Cache) Get(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
-	if bytes, err := c.Cache.Get(js.Context(vm), call.Argument(0).String()); err == nil && bytes != nil {
-		return vm.ToValue(string(bytes))
+// Get returns the []byte and true, if not existing returns false.
+func (c *memoryCache) Get(_ context.Context, key string) ([]byte, error) {
+	c.Lock()
+	defer c.Unlock()
+	if ddl, exist := c.timeout[key]; exist {
+		if time.Now().UnixMilli() > ddl {
+			delete(c.items, key)
+			delete(c.timeout, key)
+			return nil, nil
+		}
 	}
-	return sobek.Undefined()
+	return c.items[key], nil
 }
 
-// GetBytes returns ArrayBuffer.
-func (c *Cache) GetBytes(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
-	if bytes, err := c.Cache.Get(js.Context(vm), call.Argument(0).String()); err == nil && bytes != nil {
-		return vm.ToValue(vm.NewArrayBuffer(bytes))
-	}
-	return sobek.Undefined()
+// Set saves []byte to the cache with key
+func (c *memoryCache) Set(_ context.Context, key string, value []byte, timeout time.Duration) error {
+	c.Lock()
+	defer c.Unlock()
+	c.items[key] = value
+	c.timeout[key] = time.Now().Add(timeout).UnixMilli()
+	return nil
 }
 
-// Set saves string to the cache with key.
-func (c *Cache) Set(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
-	ctx := js.Context(vm)
-
-	var timeout time.Duration
-	if v := call.Argument(2); !sobek.IsUndefined(v) {
-		timeout = time.Millisecond * time.Duration(v.ToInteger())
-	}
-
-	err := c.Cache.Set(ctx, call.Argument(0).String(), []byte(call.Argument(1).String()), timeout)
-	if err != nil {
-		js.Throw(vm, err)
-	}
-
-	return sobek.Undefined()
+// Del removes key from the cache
+func (c *memoryCache) Del(_ context.Context, key string) error {
+	c.Lock()
+	defer c.Unlock()
+	delete(c.items, key)
+	delete(c.timeout, key)
+	return nil
 }
 
-// SetBytes saves ArrayBuffer to the cache with key.
-func (c *Cache) SetBytes(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
-	ctx := js.Context(vm)
-	value, err := js.ToBytes(call.Argument(1).Export())
-	if err != nil {
-		js.Throw(vm, err)
+// NewCache returns a new Cache that will store items in in-memory.
+func NewCache() Cache {
+	return &memoryCache{
+		items:   make(map[string][]byte),
+		timeout: make(map[string]int64),
 	}
-
-	var timeout time.Duration
-	if v := call.Argument(2); !sobek.IsUndefined(v) {
-		timeout = time.Millisecond * time.Duration(v.ToInteger())
-	}
-
-	err = c.Cache.Set(ctx, call.Argument(0).String(), value, timeout)
-	if err != nil {
-		js.Throw(vm, err)
-	}
-
-	return sobek.Undefined()
-}
-
-// Del removes key from the cache.
-func (c *Cache) Del(call sobek.FunctionCall, vm *sobek.Runtime) sobek.Value {
-	err := c.Cache.Del(js.Context(vm), call.Argument(0).String())
-	if err != nil {
-		js.Throw(vm, err)
-	}
-	return sobek.Undefined()
 }
