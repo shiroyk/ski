@@ -196,41 +196,41 @@ func httpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func main() {
 	module, err := js.CompileModule(`module`, `
-		import { h, createSSRApp } from "https://unpkg.com/vue@3/dist/vue.runtime.esm-browser.js";
-		import { renderToString } from "https://unpkg.com/@vue/server-renderer@3/dist/server-renderer.esm-browser.js";
+	import { h, createSSRApp } from "https://unpkg.com/vue@3/dist/vue.runtime.esm-browser.js";
+	import { renderToString } from "https://unpkg.com/@vue/server-renderer@3/dist/server-renderer.esm-browser.js";
 
         server("localhost:8000", async (ok) => {
-			const app = createSSRApp({
-				data: () => ({ count: 1 }),
-				render() { return h('div', { onClick: () => this.count++ }, this.count) },
-			});
-			const html = await renderToString(app);
-			ok(`+"`"+`
-				<!DOCTYPE html>
-				<html>
-				  <head>
-					<title>Vue SSR Example</title>
-					<script type="importmap">
-					  {
-						"imports": {
-						  "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
-						}
-					  }
-					</script>
-					<script type="module">
-						import { h, createSSRApp } from 'vue';
-						createSSRApp({
-							data: () => ({ count: 1 }),
-							render() { return h('div', { onClick: () => this.count++ }, this.count) },
-						}).mount('#app');
-					</script>
-				  </head>
-				  <body>
-					<div id="app">${html}</div>
-				  </body>
-				</html>`+"`"+`);
+		const app = createSSRApp({
+			data: () => ({ count: 1 }),
+			render() { return h('div', { onClick: () => this.count++ }, this.count) },
 		});
-    `)
+		const html = await renderToString(app);
+		ok(`+"`"+`
+			<!DOCTYPE html>
+			<html>
+			  <head>
+				<title>Vue SSR Example</title>
+				<script type="importmap">
+				  {
+					"imports": {
+					  "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+					}
+				  }
+				</script>
+				<script type="module">
+					import { h, createSSRApp } from 'vue';
+					createSSRApp({
+						data: () => ({ count: 1 }),
+						render() { return h('div', { onClick: () => this.count++ }, this.count) },
+					}).mount('#app');
+				</script>
+			  </head>
+			  <body>
+				<div id="app">${html}</div>
+			  </body>
+			</html>`+"`"+`);
+	});
+    	`)
 	if err != nil {
 		panic(err)
 	}
