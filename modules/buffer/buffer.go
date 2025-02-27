@@ -47,7 +47,6 @@ func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 		panic(rt.NewTypeError("Uint8Array is undefined"))
 	}
 	_ = p.SetPrototype(u8.ToObject(rt).Prototype())
-	_ = p.SetSymbol(symBuffer, symBuffer)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Buffer") })
 
 	_ = p.Set("toString", b.toString)
@@ -276,7 +275,7 @@ func (*Buffer) toJSON(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*Buffer) equals(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	buf1 := toBuffer(rt, call.This)
-	if IsBuffer(rt, call.Argument(0)) {
+	if !IsBuffer(rt, call.Argument(0)) {
 		return rt.ToValue(false)
 	}
 	buf2 := call.Argument(0).Export().([]byte)
@@ -290,8 +289,8 @@ func (*Buffer) compare(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if !IsBuffer(rt, b1) {
 		panic(rt.NewTypeError("Argument must be a Buffer"))
 	}
-	if call.This == nil || sobek.IsUndefined(call.This) {
-		buf1 = toBuffer(rt, call.This)
+	if IsBuffer(rt, call.This) {
+		buf1 = call.This.Export().([]byte)
 		buf2 = b1.Export().([]byte)
 	} else {
 		buf1 = b1.Export().([]byte)
@@ -333,7 +332,7 @@ func (*Buffer) copy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 	data := make([]byte, sourceEnd-sourceStart)
 	this.readAt(data, int64(sourceStart))
-	target.writeAt(data, int64(sourceStart))
+	target.writeAt(data, int64(targetStart))
 
 	return rt.ToValue(len(data))
 }
@@ -341,18 +340,19 @@ func (*Buffer) copy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	src := call.Argument(0).String()
-	offset := this.offset(rt, call.Argument(1), 0)
+	offset := call.Argument(1).ToInteger()
 	length := int64(len(this)) - offset
+
+	buf := decode(rt, src, call.Argument(3))
 
 	if v := call.Argument(2); !sobek.IsUndefined(v) {
 		length = v.ToInteger()
-		if length > int64(len(this)) {
-			msg := fmt.Sprintf(`The value of "length" is out of range. It must be >= 0 && <= %d. Received %d`, len(this), length)
-			panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+		if length < 0 || length > int64(len(buf)) {
+			throwRangeError(rt, "length", 0, len(buf), length)
 		}
 	}
 
-	this.writeAt(decode(rt, src, call.Argument(3)), offset)
+	this.writeAt(buf[:length], offset)
 
 	return call.This
 }
@@ -360,52 +360,28 @@ func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*Buffer) fill(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0)
-	offset := call.Argument(1).ToInteger()
+	offset := int(call.Argument(1).ToInteger())
 	end := len(this)
 
 	if v := call.Argument(2); !sobek.IsUndefined(v) {
 		end = int(v.ToInteger())
 	}
 
+	var buf []byte
 	switch value.ExportType() {
 	case TypeArrayBuffer:
-		src := value.Export().(sobek.ArrayBuffer)
-		this.fill(offset, end, src.Bytes()...)
+		buf = value.Export().(sobek.ArrayBuffer).Bytes()
 	case typeString:
-		encoding := "utf8"
-		if v := call.Argument(3); !sobek.IsUndefined(v) {
-			encoding = v.String()
-		}
-		src := value.String()
-		switch encoding {
-		case "utf8", "utf-8":
-			this.fill(offset, end, []byte(src)...)
-		case "hex":
-			decoded, err := hex.DecodeString(src)
-			if err != nil {
-				panic(rt.NewTypeError("Invalid hex string"))
-			}
-			this.fill(offset, end, decoded...)
-		case "base64":
-			decoded, err := base64.StdEncoding.DecodeString(src)
-			if err != nil {
-				panic(rt.NewTypeError("Invalid base64 string"))
-			}
-			this.fill(offset, end, decoded...)
-		default:
-			panic(rt.NewTypeError(fmt.Sprintf("Unknown encoding: %s", encoding)))
-		}
+		buf = decode(rt, value.String(), call.Argument(3))
 	case typeInt, typeFloat:
-		this.fill(offset, end, byte(value.ToInteger()))
+		buf = []byte{byte(value.ToInteger())}
 	default:
-		if IsTypedArray(rt, value) {
-			bb, ok := value.ToObject(rt).Get("buffer").Export().(sobek.ArrayBuffer)
-			if !ok {
-				panic(rt.NewTypeError("TypedArray buffer is not an ArrayBuffer"))
-			}
-			this.fill(offset, end, bb.Bytes()...)
+		if IsBuffer(rt, value) || IsTypedArray(rt, value) {
+			buf = value.Export().([]byte)
 		}
 	}
+
+	this.fill(rt, offset, end, buf)
 
 	return call.This
 }
@@ -872,6 +848,7 @@ func newBuffer(rt *sobek.Runtime, this sobek.Value, data []byte) *sobek.Object {
 	if err != nil {
 		panic(err)
 	}
+	_ = object.SetSymbol(symBuffer, symBuffer)
 	return object
 }
 
@@ -889,6 +866,7 @@ func newBufferFrom(rt *sobek.Runtime, this sobek.Value, buf sobek.Value) *sobek.
 	if err != nil {
 		panic(err)
 	}
+	_ = object.SetSymbol(symBuffer, symBuffer)
 	return object
 }
 
@@ -909,8 +887,7 @@ func getByteLength(rt *sobek.Runtime, v sobek.Value) int64 {
 	}
 
 	if length < 1 || length > 6 {
-		msg := fmt.Sprintf(`The value of "byteLength" is out of range. It must be > 0 && <= 6. Received %d`, length)
-		panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+		throwRangeError(rt, "byteLength", 1, 6, length)
 	}
 	return length
 }
@@ -1013,12 +990,10 @@ func toInteger[N integer](rt *sobek.Runtime, value sobek.Value) (ret N) {
 	default:
 		panic("unreached")
 	}
-	if v <= maxInt && v >= minInt {
-		return N(v)
+	if v > maxInt || v < minInt {
+		throwRangeError(rt, "value", minInt, maxInt, v)
 	}
-
-	msg := fmt.Sprintf(`The value of "value" is out of range. It must be >= %d and <= %d. Received %d`, minInt, maxInt, v)
-	panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+	return N(v)
 }
 
 func checkInt(rt *sobek.Runtime, v, byteLength int64) {
@@ -1040,8 +1015,7 @@ func checkInt(rt *sobek.Runtime, v, byteLength int64) {
 	if v <= maxInt && v >= minInt {
 		return
 	}
-	msg := fmt.Sprintf(`The value of "value" is out of range. It must be >= %d and <= %d. Received %d`, minInt, maxInt, v)
-	panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+	throwRangeError(rt, "value", minInt, maxInt, v)
 }
 
 func checkUint(rt *sobek.Runtime, v uint64, byteLength int64) {
@@ -1063,8 +1037,7 @@ func checkUint(rt *sobek.Runtime, v uint64, byteLength int64) {
 	if v <= maxUint && v >= 0 {
 		return
 	}
-	msg := fmt.Sprintf(`The value of "value" is out of range. It must be >= 0 and <= %d. Received %d`, maxUint, v)
-	panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+	throwRangeError(rt, "value", 0, maxUint, v)
 }
 
 var symBuffer = sobek.NewSymbol("Symbol.__buffer__")
@@ -1081,8 +1054,7 @@ func (b buffer) offset(rt *sobek.Runtime, v sobek.Value, numBytes int64) int64 {
 	}
 
 	if offset < 0 || offset+numBytes > int64(len(b)) {
-		msg := fmt.Sprintf(`The value of "offset" is out of range. It must be >= 0 && <= %d. Received %d`, len(b), offset)
-		panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+		throwRangeError(rt, "offset", 0, int64(len(b)), offset)
 	}
 	return offset
 }
@@ -1106,15 +1078,20 @@ func (b buffer) writeAt(data []byte, offset int64) int64 {
 	return offset
 }
 
-func (b buffer) fill(offset int64, end int, values ...byte) {
-	if len(values) > len(b) {
-		values = values[:len(b)]
-	} else if len(values) < len(b) {
-		i := (len(b)-len(values))/len(values) - 1
-		for range i {
-			values = append(values, values...)
+func (b buffer) fill(rt *sobek.Runtime, offset, end int, buf []byte) {
+	if len(buf) > len(b) {
+		b.writeAt(buf[:len(b)], int64(offset))
+	} else {
+		if end < 0 || end > len(b) {
+			throwRangeError(rt, "end", 0, len(b), end)
 		}
-		values = append(values, values[:len(b)]...)
+		for i := offset; i < end; {
+			i += copy(b[i:], buf)
+		}
 	}
-	b.writeAt(values[:end], offset)
+}
+
+func throwRangeError(rt *sobek.Runtime, field string, min, max, received any) {
+	msg := fmt.Sprintf(`The value of "%s" is out of range. It must be >= %d && <= %d. Received %d`, field, min, max, received)
+	panic(js.New(rt, "RangeError", rt.ToValue(msg)))
 }

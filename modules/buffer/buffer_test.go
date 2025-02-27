@@ -1146,4 +1146,276 @@ func TestBuffer(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("instance methods", func(t *testing.T) {
+		t.Run("equals", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				buf1     string
+				buf2     string
+				expected bool
+			}{
+				{
+					name:     "identical buffers",
+					buf1:     `Buffer.from("hello")`,
+					buf2:     `Buffer.from("hello")`,
+					expected: true,
+				},
+				{
+					name:     "different content",
+					buf1:     `Buffer.from("hello")`,
+					buf2:     `Buffer.from("world")`,
+					expected: false,
+				},
+				{
+					name:     "different length",
+					buf1:     `Buffer.from("hello")`,
+					buf2:     `Buffer.from("hi")`,
+					expected: false,
+				},
+				{
+					name:     "empty buffers",
+					buf1:     `Buffer.alloc(0)`,
+					buf2:     `Buffer.alloc(0)`,
+					expected: true,
+				},
+				{
+					name:     "same content different encoding",
+					buf1:     `Buffer.from("hello")`,
+					buf2:     `Buffer.from("68656c6c6f", "hex")`,
+					expected: true,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					script := fmt.Sprintf(`%s.equals(%s);
+					`, tt.buf1, tt.buf2)
+					result, err := vm.RunString(ctx, script)
+					require.NoError(t, err)
+					assert.Equal(t, tt.expected, result.ToBoolean())
+				})
+			}
+		})
+
+		t.Run("compare", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				buf1     string
+				buf2     string
+				expected int64
+			}{
+				{
+					name:     "equal buffers",
+					buf1:     `Buffer.from("hello")`,
+					buf2:     `Buffer.from("hello")`,
+					expected: 0,
+				},
+				{
+					name:     "first buffer smaller",
+					buf1:     `Buffer.from("hello")`,
+					buf2:     `Buffer.from("world")`,
+					expected: -1,
+				},
+				{
+					name:     "first buffer larger",
+					buf1:     `Buffer.from("world")`,
+					buf2:     `Buffer.from("hello")`,
+					expected: 1,
+				},
+				{
+					name:     "different lengths",
+					buf1:     `Buffer.from("hi")`,
+					buf2:     `Buffer.from("hello")`,
+					expected: 1,
+				},
+				{
+					name:     "empty buffers",
+					buf1:     `Buffer.alloc(0)`,
+					buf2:     `Buffer.alloc(0)`,
+					expected: 0,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					script := fmt.Sprintf(`%s.compare(%s);
+					`, tt.buf1, tt.buf2)
+					result, err := vm.RunString(ctx, script)
+					require.NoError(t, err)
+					assert.Equal(t, tt.expected, result.ToInteger())
+				})
+			}
+		})
+
+		t.Run("copy", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				setup    string
+				expected string
+			}{
+				{
+					name: "basic copy",
+					setup: `
+						var dest = Buffer.alloc(5);
+						Buffer.from("hello").copy(dest);
+						dest.toString();
+					`,
+					expected: "hello",
+				},
+				{
+					name: "partial copy with offset",
+					setup: `
+						var dest = Buffer.alloc(5);
+						Buffer.from("hello").copy(dest, 2);
+						dest.toString();
+					`,
+					expected: "\x00\x00hel",
+				},
+				{
+					name: "copy with source offset",
+					setup: `
+						var dest = Buffer.alloc(3);
+						Buffer.from("hello").copy(dest, 0, 1, 4);
+						dest.toString();
+					`,
+					expected: "ell",
+				},
+				{
+					name: "copy to smaller buffer",
+					setup: `
+						var dest = Buffer.alloc(3);
+						Buffer.from("hello").copy(dest);
+						dest.toString();
+					`,
+					expected: "hel",
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					result, err := vm.RunString(ctx, tt.setup)
+					require.NoError(t, err)
+					assert.Equal(t, tt.expected, result.String())
+				})
+			}
+		})
+
+		t.Run("write", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				setup    string
+				expected []byte
+			}{
+				{
+					name: "write string",
+					setup: `
+						var buf = Buffer.alloc(5);
+						buf.write("hello");
+						buf
+					`,
+					expected: []byte("hello"),
+				},
+				{
+					name: "write with offset",
+					setup: `
+						var buf = Buffer.alloc(5);
+						buf.write("hi", 2);
+						buf
+					`,
+					expected: []byte{0, 0, 'h', 'i', 0},
+				},
+				{
+					name: "write with length",
+					setup: `
+						var buf = Buffer.alloc(5);
+						buf.write("hello", 0, 3);
+						buf
+					`,
+					expected: []byte{'h', 'e', 'l', 0, 0},
+				},
+				{
+					name: "write with encoding",
+					setup: `
+						var buf = Buffer.alloc(3);
+						buf.write("68656c", 0, 3, "hex");
+						buf
+					`,
+					expected: []byte("hel"),
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					result, err := vm.RunString(ctx, tt.setup)
+					require.NoError(t, err)
+					data := result.Export().([]byte)
+					assert.Equal(t, tt.expected, data)
+				})
+			}
+		})
+
+		t.Run("fill", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				setup    string
+				expected []byte
+			}{
+				{
+					name: "fill with number",
+					setup: `
+						var buf = Buffer.alloc(3);
+						buf.fill(65);
+						buf
+					`,
+					expected: []byte{'A', 'A', 'A'},
+				},
+				{
+					name: "fill with string",
+					setup: `
+						var buf = Buffer.alloc(6);
+						buf.fill("ab");
+						buf
+					`,
+					expected: []byte("ababab"),
+				},
+				{
+					name: "fill with offset",
+					setup: `
+						var buf = Buffer.alloc(5);
+						buf.fill("x", 2);
+						buf
+					`,
+					expected: []byte{0, 0, 'x', 'x', 'x'},
+				},
+				{
+					name: "fill with range",
+					setup: `
+						var buf = Buffer.alloc(5);
+						buf.fill("x", 1, 4);
+						buf
+					`,
+					expected: []byte{0, 'x', 'x', 'x', 0},
+				},
+				{
+					name: "fill with encoding",
+					setup: `
+						var buf = Buffer.alloc(3);
+						buf.fill("414243", 0, 3, "hex");
+						buf
+					`,
+					expected: []byte("ABC"),
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					result, err := vm.RunString(ctx, tt.setup)
+					require.NoError(t, err)
+					data := result.Export().([]byte)
+					assert.Equal(t, tt.expected, data)
+				})
+			}
+		})
+	})
 }
