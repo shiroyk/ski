@@ -30,10 +30,7 @@ func (f *File) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 	}
 
 	options := call.Argument(2)
-	blob, err := js.New(rt, "Blob", call.Argument(0), options)
-	if err != nil {
-		js.Throw(rt, err)
-	}
+	blob := js.New(rt, "Blob", call.Argument(0), options)
 
 	filename := call.Argument(1).String()
 

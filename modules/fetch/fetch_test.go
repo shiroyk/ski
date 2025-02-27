@@ -230,8 +230,14 @@ func TestFetch(t *testing.T) {
 
 	t.Run("response body methods", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"message":"hello"}`))
+			switch r.Header.Get("Accept") {
+			case "application/x-www-form-urlencoded":
+				w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+				w.Write([]byte(`foo=bar&name=11`))
+			default:
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"message":"hello"}`))
+			}
 		}))
 		defer server.Close()
 		tests := []struct {
@@ -242,8 +248,8 @@ func TestFetch(t *testing.T) {
 			{
 				name: "text",
 				input: `
-				export default async () => {
-					const response = await fetch("` + server.URL + `");
+				export default async (url) => {
+					const response = await fetch(url);
 					return await response.text();
 				}`,
 				expected: `{"message":"hello"}`,
@@ -251,8 +257,8 @@ func TestFetch(t *testing.T) {
 			{
 				name: "json",
 				input: `
-				export default async () => {
-					const response = await fetch("` + server.URL + `");
+				export default async (url) => {
+					const response = await fetch(url);
 					const data = await response.json();
 					return data.message;
 				}`,
@@ -261,32 +267,27 @@ func TestFetch(t *testing.T) {
 			{
 				name: "arrayBuffer",
 				input: `
-				export default async () => {
-					const response = await fetch("` + server.URL + `");
+				export default async (url) => {
+					const response = await fetch(url);
 					const buffer = await response.arrayBuffer();
 					return String.fromCharCode.apply(String, new Uint8Array(buffer));
 				}`,
 				expected: `{"message":"hello"}`,
 			},
 			{
-				name: "formData error",
+				name: "formData",
 				input: `
-				export default async () => {
-					const response = await fetch("` + server.URL + `");
-					try {
-						await response.formData();
-						return "should not reach here";
-					} catch (e) {
-						return e.toString();
-					}
+				export default async (url) => {
+					const response = await fetch(url, { headers: { accept: "application/x-www-form-urlencoded" } });
+					return [...(await response.formData()).keys()].sort();
 				}`,
-				expected: "invalid formData constructor argument",
+				expected: "foo,name",
 			},
 			{
 				name: "body used",
 				input: `
-				export default async () => {
-					const response = await fetch("` + server.URL + `");
+				export default async (url) => {
+					const response = await fetch(url);
 					await response.text();
 					try {
 						await response.text();
@@ -301,7 +302,7 @@ func TestFetch(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := vm.RunModule(ctx, tt.input)
+				result, err := vm.RunModule(ctx, tt.input, server.URL)
 				require.NoError(t, err)
 				value := modulestest.PromiseResult(result)
 				assert.Contains(t, value.String(), tt.expected)

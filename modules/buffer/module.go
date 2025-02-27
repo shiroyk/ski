@@ -18,6 +18,8 @@ func (Module) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	ret := rt.NewObject()
 	blob, _ := new(Blob).Instantiate(rt)
 	_ = ret.Set("Blob", blob)
+	buffer, _ := new(Buffer).Instantiate(rt)
+	_ = ret.Set("Buffer", buffer)
 	file, _ := new(File).Instantiate(rt)
 	blobProto := blob.(*sobek.Object).Prototype()
 	fileProto := file.(*sobek.Object).Prototype()

@@ -2,8 +2,6 @@ package promise
 
 import (
 	"errors"
-	"fmt"
-	"log/slog"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -69,15 +67,15 @@ func New[T any](rt *sobek.Runtime, async func() (T, error), then ...func(T, erro
 	go func() {
 		defer func() {
 			if x := recover(); x != nil {
-				err := reject(x)
-				if err != nil {
-					slog.Warn(fmt.Sprintf(`reject failed: %s`, err))
-				}
+				enqueue(func() error { return reject(x) })
 			}
 		}()
 
 		result, err := async()
 		enqueue(func() error {
+			if x := recover(); x != nil {
+				enqueue(func() error { return reject(x) })
+			}
 			value, err := thenFun(result, err)
 			if err != nil {
 				return reject(err)

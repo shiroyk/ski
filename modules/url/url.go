@@ -87,7 +87,7 @@ func (u *URL) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.
 		js.Throw(rt, err)
 	}
 
-	searchParams, err := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
+	searchParams := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
 	if err != nil {
 		js.Throw(rt, err)
 	}
@@ -319,7 +319,7 @@ func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		return sobek.Null()
 	}
 
-	searchParams, err := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
+	searchParams := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
 	if err != nil {
 		return sobek.Null()
 	}

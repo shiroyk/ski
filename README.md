@@ -16,10 +16,12 @@ Partial Node.js compatibility and web standard implementations.
 - [url](#url)
 ### buffer
 buffer module implements.
+- Buffer
 - Blob
 - File
 ```js
 export default async function () {
+  console.log(Buffer.from("Y2lhbGxv", "base64").toString());
   const blob = new Blob(["hello world"], { type: "text/plain" });
   console.log(await blob.text());
 }

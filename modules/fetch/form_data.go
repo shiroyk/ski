@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"mime/multipart"
+	"net/url"
 	"reflect"
 	"slices"
 
@@ -46,19 +47,36 @@ func (f *FormData) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 	obj := rt.ToValue(&ret).ToObject(rt)
 	_ = obj.SetPrototype(call.This.Prototype())
 
-	if !sobek.IsUndefined(params) {
-		callable, ok := sobek.AssertFunction(obj.Get("append"))
-		if !ok {
-			panic(rt.NewTypeError("invalid formData prototype"))
-		}
-		if params.ExportType().Kind() != reflect.Map {
-			panic(rt.NewTypeError("invalid formData constructor argument"))
-		}
+	if sobek.IsUndefined(params) {
+		return obj
+	}
+
+	callable, ok := sobek.AssertFunction(obj.Get("append"))
+	if !ok {
+		panic(rt.NewTypeError("invalid formData prototype"))
+	}
+	switch params.ExportType().Kind() {
+	case reflect.Map:
 		object := params.ToObject(rt)
 		for _, key := range object.Keys() {
 			_, err := callable(obj, rt.ToValue(key), object.Get(key))
 			if err != nil {
 				js.Throw(rt, err)
+			}
+		}
+	default:
+		values, err := url.ParseQuery(params.String())
+		if err != nil {
+			js.Throw(rt, err)
+		}
+		for name, vv := range values {
+			ele, ok := ret.data[name]
+			if !ok {
+				ret.keys = append(ret.keys, name)
+				ele = make([]sobek.Value, 0)
+			}
+			for _, v := range vv {
+				ele = append(ele, rt.ToValue(v))
 			}
 		}
 	}
@@ -93,10 +111,7 @@ func (*FormData) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 			filename = rt.ToValue("blob")
 		}
 
-		file, err := js.New(rt, "File", rt.NewArray(value), filename)
-		if err != nil {
-			js.Throw(rt, err)
-		}
+		file := js.New(rt, "File", rt.NewArray(value), filename)
 		ele = append(ele, file)
 	default:
 		if !sobek.IsUndefined(value) {
@@ -181,10 +196,7 @@ func (*FormData) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			filename = rt.ToValue("blob")
 		}
 
-		file, err := js.New(rt, "File", rt.NewArray(value), filename)
-		if err != nil {
-			js.Throw(rt, err)
-		}
+		file := js.New(rt, "File", rt.NewArray(value), filename)
 		this.data[name] = []sobek.Value{file}
 	default:
 		if !sobek.IsUndefined(value) {

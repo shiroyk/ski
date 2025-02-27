@@ -83,10 +83,14 @@ func Iterator(rt *sobek.Runtime, seq iter.Seq[any]) *sobek.Object {
 }
 
 // New create a new object from the constructor name
-func New(rt *sobek.Runtime, name string, args ...sobek.Value) (*sobek.Object, error) {
+func New(rt *sobek.Runtime, name string, args ...sobek.Value) *sobek.Object {
 	ctor := rt.Get(name)
 	if ctor == nil {
 		panic(rt.NewTypeError("%s is not defined", name))
 	}
-	return rt.New(ctor, args...)
+	o, err := rt.New(ctor, args...)
+	if err != nil {
+		Throw(rt, err)
+	}
+	return o
 }

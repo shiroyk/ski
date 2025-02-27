@@ -6,6 +6,7 @@ import (
 )
 
 // GetReader extracts the underlying Reader from a Blob or File.
+// panic if value is not a Blob or File.
 func GetReader(rt *sobek.Runtime, value sobek.Value) Reader {
 	switch value.ExportType() {
 	case TypeBlob:
@@ -35,7 +36,23 @@ func IsTypedArray(rt *sobek.Runtime, value sobek.Value) bool {
 	return false
 }
 
-// GetBuffer returns the underlying byte buffer from a ArrayBuffer, Blob, File, TypedArray, or DataView.
+// IsUint8Array returns true if the value is a Uint8Array.
+func IsUint8Array(rt *sobek.Runtime, value sobek.Value) bool {
+	if rt.InstanceOf(value, rt.Get("Uint8Array").(*sobek.Object)) {
+		return true
+	}
+	return false
+}
+
+// IsBuffer returns true if the value is a IsBuffer.
+func IsBuffer(rt *sobek.Runtime, value sobek.Value) bool {
+	if value.ToObject(rt).GetSymbol(symBuffer) == symBuffer {
+		return true
+	}
+	return false
+}
+
+// GetBuffer returns the underlying byte buffer from a ArrayBuffer, Blob, File, TypedArray, DataView, Buffer.
 func GetBuffer(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
 	switch value.ExportType() {
 	case TypeBlob, TypeFile:
@@ -48,6 +65,8 @@ func GetBuffer(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
 		return value.Export().(sobek.ArrayBuffer).Bytes(), true
 	default:
 		switch {
+		case IsBuffer(rt, value):
+			return value.Export().([]byte), true
 		case rt.InstanceOf(value, rt.Get("DataView").(*sobek.Object)):
 			fallthrough
 		case IsTypedArray(rt, value):

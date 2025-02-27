@@ -205,7 +205,7 @@ func (r *Request) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 		if err != nil {
 			return nil, err
 		}
-		return js.New(rt, "FormData", rt.ToValue(string(data)))
+		return js.New(rt, "FormData", rt.ToValue(string(data))), nil
 	}))
 }
 
@@ -215,7 +215,7 @@ func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		if err != nil {
 			return nil, err
 		}
-		return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data)))
+		return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data))), nil
 	}))
 }
 
@@ -295,7 +295,7 @@ func toRequest(rt *sobek.Runtime, value sobek.Value) *request {
 
 func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	if sobek.IsUndefined(opt) {
-		req.headers, _ = js.New(rt, "Headers", rt.ToValue(headers{}))
+		req.headers = js.New(rt, "Headers", rt.ToValue(headers{}))
 		return
 	}
 	init := opt.ToObject(rt)
@@ -327,13 +327,9 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 		req.signal = signal
 	}
 	if header := init.Get("headers"); header != nil {
-		h, err := js.New(rt, "Headers", header)
-		if err != nil {
-			js.Throw(rt, err)
-		}
-		req.headers = h
+		req.headers = js.New(rt, "Headers", header)
 	} else {
-		req.headers, _ = js.New(rt, "Headers", rt.ToValue(headers{}))
+		req.headers = js.New(rt, "Headers", rt.ToValue(headers{}))
 	}
 	if req.method == http.MethodGet || req.method == http.MethodHead {
 		return

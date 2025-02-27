@@ -30,8 +30,7 @@ func NewResponse(rt *sobek.Runtime, res *http.Response, async bool) sobek.Value 
 			for k := range res.Header {
 				h[normalizeHeaderName(k)] = res.Header[k]
 			}
-			header, _ := js.New(rt, "Headers", rt.ToValue(h))
-			return header
+			return js.New(rt, "Headers", rt.ToValue(h))
 		}),
 		body:  res.Body,
 		type_: "basic",
@@ -119,15 +118,7 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 			instance.status = fmt.Sprintf("%d %s", instance.statusCode, statusText.String())
 		}
 
-		v := init.Get("headers")
-		if v == nil {
-			v = sobek.Undefined()
-		}
-		h, err := js.New(rt, "Headers", v)
-		if err != nil {
-			js.Throw(rt, err)
-		}
-		instance.headers = func() sobek.Value { return h }
+		instance.headers = func() sobek.Value { return js.New(rt, "Headers", init.Get("headers")) }
 	}
 
 	obj := rt.ToValue(instance).(*sobek.Object)
@@ -206,14 +197,14 @@ func (*Response) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 			if err != nil {
 				return nil, err
 			}
-			return js.New(rt, "FormData", rt.ToValue(b))
+			return js.New(rt, "FormData", rt.ToValue(b)), nil
 		}))
 	}
 	data, err := this.text()
 	if err != nil {
 		js.Throw(rt, err)
 	}
-	f, err := js.New(rt, "FormData", rt.ToValue(data))
+	f := js.New(rt, "FormData", rt.ToValue(data))
 	if err != nil {
 		js.Throw(rt, err)
 	}
@@ -247,8 +238,7 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			statusCode: http.StatusOK,
 			body:       io.NopCloser(bytes.NewReader(b)),
 			headers: sync.OnceValue(func() sobek.Value {
-				ret, _ := js.New(rt, "Headers", rt.ToValue(headers{"content-type": {"application/json"}}))
-				return ret
+				return js.New(rt, "Headers", rt.ToValue(headers{"content-type": {"application/json"}}))
 			}),
 			type_:    "default",
 			bodyUsed: false,
@@ -296,14 +286,14 @@ func (*Response) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			if err != nil {
 				return nil, err
 			}
-			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data)))
+			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		}))
 	}
 	data, err := this.read()
 	if err != nil {
 		js.Throw(rt, err)
 	}
-	r, err := js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data)))
+	r := js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data)))
 	if err != nil {
 		js.Throw(rt, err)
 	}
@@ -317,14 +307,14 @@ func (*Response) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			if err != nil {
 				return nil, err
 			}
-			return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data)))
+			return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		}))
 	}
 	data, err := this.read()
 	if err != nil {
 		js.Throw(rt, err)
 	}
-	r, err := js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data)))
+	r := js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data)))
 	if err != nil {
 		js.Throw(rt, err)
 	}
