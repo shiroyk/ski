@@ -168,9 +168,8 @@ func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
 		}
 	})
 
-	globalThis := rt.GlobalObject()
 	// Create proxy to handle global property access
-	proxy := rt.NewProxy(globalThis, &sobek.ProxyTrapConfig{
+	proxy := rt.NewProxy(rt.GlobalObject(), &sobek.ProxyTrapConfig{
 		Get: func(target *sobek.Object, property string, receiver sobek.Value) sobek.Value {
 			if value := target.Get(property); value != nil {
 				return value
@@ -184,7 +183,7 @@ func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
 			module, ok := ml.goModules.Load(property)
 			if !ok {
 				mod, ok := Get(namespace)
-				if !ok || mod == nil {
+				if !ok {
 					return sobek.Undefined()
 				}
 
@@ -193,12 +192,12 @@ func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
 					return sobek.Undefined()
 				}
 
-				globalMod := globals[property]
-				if globalMod == nil {
+				mod = globals[property]
+				if mod == nil {
 					return sobek.Undefined()
 				}
 
-				module, _ = ml.goModules.LoadOrStore(property, &goModule{mod: globalMod})
+				module, _ = ml.goModules.LoadOrStore(property, &goModule{mod: mod})
 			}
 
 			// Instantiate the module
