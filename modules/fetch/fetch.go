@@ -37,15 +37,16 @@ func (fetch *Fetch) fetch(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		initRequest(rt, call.Argument(1), req)
 	}
 
-	return rt.ToValue(promise.New(rt, func() (*http.Response, error) {
+	return promise.New(rt, func(callback promise.Callback) {
 		defer req.cancel()
-		return fetch.Do(req.toRequest(rt))
-	}, func(res *http.Response, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		return NewResponse(rt, res, true), nil
-	}))
+		res, err := fetch.Do(req.toRequest(rt))
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return NewResponse(rt, res, true), nil
+		})
+	})
 }
 
 func (fetch *Fetch) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {

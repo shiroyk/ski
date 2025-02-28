@@ -87,12 +87,15 @@ func (*Blob) type_(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*Blob) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
-	return rt.ToValue(promise.New(rt, this.read, func(data []byte, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		return rt.NewArrayBuffer(data), nil
-	}))
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return rt.NewArrayBuffer(data), nil
+		})
+	})
 }
 
 func (*Blob) slice(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -145,12 +148,15 @@ func (*Blob) slice(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*Blob) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
-	return rt.ToValue(promise.New(rt, this.read, func(data []byte, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		return string(data), nil
-	}))
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return string(data), nil
+		})
+	})
 }
 
 type blob struct {

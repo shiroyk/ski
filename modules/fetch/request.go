@@ -167,56 +167,71 @@ func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (r *Request) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toRequest(rt, call.This)
-	return rt.ToValue(promise.New(rt, this.read, func(data []byte, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		return string(data), nil
-	}))
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return string(data), nil
+		})
+	})
 }
 
 func (r *Request) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toRequest(rt, call.This)
-	return rt.ToValue(promise.New(rt, this.read, func(data []byte, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		var ret any
-		if err = json.Unmarshal(data, &ret); err != nil {
-			return nil, err
-		}
-		return ret, nil
-	}))
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			var ret any
+			if err = json.Unmarshal(data, &ret); err != nil {
+				return nil, err
+			}
+			return ret, nil
+		})
+	})
 }
 
 func (r *Request) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toRequest(rt, call.This)
-	return rt.ToValue(promise.New(rt, this.read, func(data []byte, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		return rt.NewArrayBuffer(data), nil
-	}))
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return rt.NewArrayBuffer(data), nil
+		})
+	})
 }
 
 func (r *Request) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toRequest(rt, call.This)
-	return rt.ToValue(promise.New(rt, this.read, func(data []byte, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		return js.New(rt, "FormData", rt.ToValue(string(data))), nil
-	}))
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return js.New(rt, "FormData", rt.ToValue(string(data))), nil
+		})
+	})
 }
 
 func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toRequest(rt, call.This)
-	return rt.ToValue(promise.New(rt, this.read, func(data []byte, err error) (any, error) {
-		if err != nil {
-			return nil, err
-		}
-		return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data))), nil
-	}))
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data))), nil
+		})
+	})
 }
 
 func (r *Request) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {

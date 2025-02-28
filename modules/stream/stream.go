@@ -65,17 +65,11 @@ func (*ReadableStream) locked(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 
 func (*ReadableStream) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toReadableStream(rt, call.This)
-	return rt.ToValue(promise.New(rt, func() (any, error) {
-		if closer, ok := this.source.(io.Closer); ok {
-			if err := closer.Close(); err != nil {
-				return nil, err
-			}
-		}
-		this.cancel = true
-		this.source = nil
-		this.reader = nil
-		return sobek.Undefined(), nil
-	}))
+	err := this.close()
+	if err != nil {
+		return promise.Reject(rt, err)
+	}
+	return promise.Resolve(rt, sobek.Undefined())
 }
 
 func (*ReadableStream) getReader(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -134,6 +128,18 @@ type readableStream struct {
 
 func (r *readableStream) locked() bool { return r.reader != nil }
 
+func (r *readableStream) close() error {
+	if closer, ok := r.source.(io.Closer); ok {
+		if err := closer.Close(); err != nil {
+			return err
+		}
+	}
+	r.cancel = true
+	r.source = nil
+	r.reader = nil
+	return nil
+}
+
 type streamReader struct {
 	stream *readableStream
 }
@@ -148,18 +154,6 @@ func (r *streamReader) read(buf []byte) (int, error) {
 		return 0, err
 	}
 	return n, err
-}
-
-func (r *streamReader) cancel() error {
-	if closer, ok := r.stream.source.(io.Closer); ok {
-		if err := closer.Close(); err != nil {
-			return err
-		}
-	}
-	r.stream.cancel = true
-	r.stream.source = nil
-	r.stream.reader = nil
-	return nil
 }
 
 func toReadableStream(rt *sobek.Runtime, value sobek.Value) *readableStream {
@@ -205,8 +199,9 @@ func (r *ReadableStreamDefaultReader) Instantiate(rt *sobek.Runtime) (sobek.Valu
 func (*ReadableStreamDefaultReader) read(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
 	bytes := make([]byte, 1024) // default chunk size
-	return rt.ToValue(promise.New(rt, func() (int, error) { return this.read(bytes) },
-		func(n int, err error) (any, error) {
+	return promise.New(rt, func(callback promise.Callback) {
+		n, err := this.read(bytes)
+		callback(func() (any, error) {
 			if err != nil {
 				if err == io.EOF {
 					ret := rt.NewObject()
@@ -224,12 +219,17 @@ func (*ReadableStreamDefaultReader) read(call sobek.FunctionCall, rt *sobek.Runt
 			}
 			_ = ret.Set("value", value)
 			return ret, nil
-		}))
+		})
+	})
 }
 
 func (*ReadableStreamDefaultReader) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
-	return rt.ToValue(promise.New(rt, func() (any, error) { return nil, this.cancel() }))
+	err := this.stream.close()
+	if err != nil {
+		return promise.Reject(rt, err)
+	}
+	return promise.Resolve(rt, sobek.Undefined())
 }
 
 func (*ReadableStreamDefaultReader) releaseLock(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -285,8 +285,9 @@ func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime
 		return promise.Reject(rt, rt.NewTypeError("argument must be an ArrayBuffer or Uint8Array"))
 	}
 
-	return rt.ToValue(promise.New(rt, func() (int, error) { return this.read(bytes) },
-		func(n int, err error) (any, error) {
+	return promise.New(rt, func(callback promise.Callback) {
+		n, err := this.read(bytes)
+		callback(func() (any, error) {
 			if err != nil {
 				if err == io.EOF {
 					ret := rt.NewObject()
@@ -298,18 +299,20 @@ func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime
 			}
 			ret := rt.NewObject()
 			_ = ret.Set("done", false)
-			value, err := rt.New(rt.Get("Uint8Array"), rt.ToValue(rt.NewArrayBuffer(bytes[:n])))
-			if err != nil {
-				js.Throw(rt, err)
-			}
+			value := js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(bytes[:n])))
 			_ = ret.Set("value", value)
 			return ret, nil
-		}))
+		})
+	})
 }
 
 func (*ReadableStreamBYOBReader) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
-	return rt.ToValue(promise.New(rt, func() (any, error) { return nil, this.cancel() }))
+	err := this.stream.close()
+	if err != nil {
+		return promise.Reject(rt, err)
+	}
+	return promise.Resolve(rt, sobek.Undefined())
 }
 
 func (*ReadableStreamBYOBReader) releaseLock(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {

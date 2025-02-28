@@ -7,11 +7,24 @@ import (
 	"github.com/shiroyk/ski/js"
 )
 
-// New return a sobek.Promise object.
-// The second argument is a long-running asynchronous task that will be executed in a child goroutine.
-// The third optional argument is a callback that will be executed in the main goroutine.
-// Additional arguments will be ignored.
-// like this:
+// Callback is a function that receives a function to resolve/reject the promise.
+//
+// The function return:
+//   - result (any): The value to resolve the promise with
+//   - error: If non-nil, the promise will be rejected with this error
+type Callback func(func() (any, error))
+
+// New creates a sobek.Promise that wraps an asynchronous operation.
+// The async function runs in a separate goroutine and can safely interact with JavaScript values
+// through the provided callback. The callback ensures all JavaScript operations happen on the main goroutine.
+//
+// The callback return:
+//   - result (any): The value to resolve the promise with
+//   - error: If non-nil, the promise will be rejected with this error
+//
+// If a panic occurs in either the async function or callback, the promise will be rejected with the panic value.
+//
+// Example usage - implementing an async fetch function:
 //
 //	func main() {
 //		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -20,14 +33,13 @@ import (
 //		}))
 //		defer server.Close()
 //
-//		vm := js.NewVM()
 //		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 //		defer cancel()
 //
 //		fetch := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-//			return rt.ToValue(promise.New(rt,
-//				func() (*http.Response, error) { return http.Get(call.Argument(0).String()) },
-//				func(res *http.Response, err error) (any, error) {
+//			return promise.New(rt, func(callback promise.Callback) {
+//				res, err := http.Get(call.Argument(0).String())
+//				callback(func() (any, error) {
 //					if err != nil {
 //						return nil, err
 //					}
@@ -37,32 +49,27 @@ import (
 //						return nil, err
 //					}
 //					return string(data), nil
-//				}))
+//				})
+//			})
 //		}
-//		_ = vm.Runtime().Set("fetch", fetch)
 //
-//		start := time.Now()
-//
-//		result, err := vm.RunString(ctx, fmt.Sprintf(`fetch("%s")`, server.URL))
+//		var (
+//			value sobek.Value
+//			err   error
+//		)
+//		err = js.Run(ctx, func(rt *sobek.Runtime) error {
+//			_ = rt.Set("fetch", fetch)
+//			value, err = rt.RunString(fmt.Sprintf(`fetch("%s")`, server.URL))
+//			return err
+//		})
 //		if err != nil {
 //			panic(err)
 //		}
-//		value, err := js.Unwrap(result)
-//		if err != nil {
-//			panic(err)
-//		}
-//
-//		fmt.Println(value)
-//		fmt.Println(time.Since(start))
+//		fmt.Println(value.Export().(*sobek.Promise).Result().Export())
 //	}
-func New[T any](rt *sobek.Runtime, async func() (T, error), then ...func(T, error) (any, error)) *sobek.Promise {
+func New(rt *sobek.Runtime, async func(callback Callback)) sobek.Value {
 	enqueue := js.EnqueueJob(rt)
 	promise, resolve, reject := rt.NewPromise()
-
-	thenFun := func(r T, e error) (any, error) { return r, e }
-	if len(then) > 0 {
-		thenFun = then[0]
-	}
 
 	go func() {
 		defer func() {
@@ -71,21 +78,24 @@ func New[T any](rt *sobek.Runtime, async func() (T, error), then ...func(T, erro
 			}
 		}()
 
-		result, err := async()
-		enqueue(func() error {
-			if x := recover(); x != nil {
-				enqueue(func() error { return reject(x) })
-			}
-			value, err := thenFun(result, err)
-			if err != nil {
-				return reject(err)
-			} else {
-				return resolve(value)
-			}
+		async(func(callback func() (any, error)) {
+			enqueue(func() (err error) {
+				defer func() {
+					if x := recover(); x != nil {
+						err = reject(x)
+					}
+				}()
+				result, err := callback()
+				if err != nil {
+					return reject(err)
+				} else {
+					return resolve(result)
+				}
+			})
 		})
 	}()
 
-	return promise
+	return rt.ToValue(promise)
 }
 
 // Reject with reason
