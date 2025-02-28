@@ -2,17 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 
 	_ "github.com/shiroyk/ski/modules/buffer"
@@ -28,13 +25,11 @@ import (
 	_ "github.com/shiroyk/ski/modules/encoding/base64"
 )
 
-const defaultTimeout = time.Minute
-
 var (
-	timeoutFlag = flag.Duration("t", defaultTimeout, "run timeout")
+	timeoutFlag = flag.Duration("t", 0, "run timeout")
 	outputFlag  = flag.String("o", "", "write to file instead of stdout")
 	versionFlag = flag.Bool("v", false, "output version")
-	logger      = slog.New(loggerHandler())
+	logger      = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 )
 
 func run() (err error) {
@@ -42,21 +37,22 @@ func run() (err error) {
 	path := flag.Arg(0)
 	if path == "-" {
 		bytes, err = io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
 	} else {
 		bytes, err = os.ReadFile(path) //nolint:gosec
-	}
-	if err != nil {
-		return
-	}
-
-	timeout := defaultTimeout
-	if timeoutFlag != nil {
-		timeout = *timeoutFlag
+		if err != nil {
+			return fmt.Errorf("read script file: %w", err)
+		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	ctx = ski.NewContext(ctx, nil)
+	ctx := context.Background()
+	if timeoutFlag != nil && *timeoutFlag > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeoutFlag)
+		defer cancel()
+	}
 
 	module, err := js.CompileModule("js", string(bytes))
 	if err != nil {
@@ -72,34 +68,16 @@ func run() (err error) {
 		return nil
 	}
 
-	v, err := js.Unwrap(ret)
-	if err != nil {
-		return err
-	}
-
-	return outputJSON(v)
-}
-
-func loggerHandler() slog.Handler {
-	return slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
-}
-
-func outputJSON(data any) (err error) {
-	bytes, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return err
-	}
-
 	if *outputFlag == "" {
-		fmt.Println(string(bytes)) //nolint:forbidigo
+		fmt.Println(ret.String()) //nolint:forbidigo
 		return
 	}
 
 	ext := filepath.Ext(*outputFlag)
 	if ext == "" {
-		*outputFlag += ".json"
+		*outputFlag += ".txt"
 	}
-	return os.WriteFile(*outputFlag, bytes, 0o600)
+	return os.WriteFile(*outputFlag, []byte(ret.String()), 0o600)
 }
 
 func main() {
