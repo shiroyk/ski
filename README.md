@@ -145,43 +145,49 @@ import (
 	"github.com/shiroyk/ski/js/modulestest"
 )
 
+const app = `
+const app = createSSRApp({
+	data: () => ({ count: 1 }),
+	render() {
+		return h('h1', { onClick: () => this.count++ }, "Count: " + this.count) 
+	}
+});
+`
+
+const index = `<!DOCTYPE html>
+<html>
+  <head>
+	<title>Vue SSR Example</title>
+	<style>
+	#app {
+	  display: flex; align-items: center; justify-content: center; 
+	}
+	</style>
+	<script type="importmap">
+	  {"imports":{"vue":"https://esm.sh/vue@3"}}
+	</script>
+	<script type="module">
+		import { h, createSSRApp } from 'vue';
+		` + app + `
+		app.mount('#app');
+	</script>
+  </head>
+  <body>
+	<div id="app">${html}</div>
+  </body>
+</html>`
+
 func main() {
 	module, err := js.CompileModule(`module`, `
-		import { h, createSSRApp } from "https://unpkg.com/vue@3/dist/vue.runtime.esm-browser.js";
-		import { renderToString } from "https://unpkg.com/@vue/server-renderer@3/dist/server-renderer.esm-browser.js";
+	import { h, createSSRApp } from "https://esm.sh/vue@3";
+	import { renderToString } from "https://esm.sh/@vue/server-renderer@3";
 
         createServer("localhost:8000", async (req, res) => {
-			const app = createSSRApp({
-				data: () => ({ count: 1 }),
-				render() { return h('div', { onClick: () => this.count++ }, this.count) },
-			});
-			const html = await renderToString(app);
-			res.end(`+"`"+`
-				<!DOCTYPE html>
-				<html>
-				  <head>
-					<title>Vue SSR Example</title>
-					<script type="importmap">
-					  {
-						"imports": {
-						  "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
-						}
-					  }
-					</script>
-					<script type="module">
-						import { h, createSSRApp } from 'vue';
-						createSSRApp({
-							data: () => ({ count: 1 }),
-							render() { return h('div', { onClick: () => this.count++ }, this.count) },
-						}).mount('#app');
-					</script>
-				  </head>
-				  <body>
-					<div id="app">${html}</div>
-				  </body>
-				</html>`+"`"+`);
-		});
-    `)
+		`+app+`
+		const html = await renderToString(app);
+		res.end(`+"`"+index+"`"+`);
+	});
+    	`)
 	if err != nil {
 		panic(err)
 	}
