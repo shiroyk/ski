@@ -1,4 +1,4 @@
-package dom
+package ssr
 
 import (
 	"io"
@@ -67,6 +67,9 @@ func httpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 func TestVueSSR(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	t.Parallel()
 	vm := modulestest.New(t)
 

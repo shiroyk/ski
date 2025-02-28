@@ -379,7 +379,14 @@ func (ml *loader) loadNodeModules(base *url.URL, modName string) (mod sobek.Modu
 }
 
 func (ml *loader) loadModule(modPath *url.URL, modName string) (sobek.ModuleRecord, error) {
-	file := modPath.JoinPath(modName)
+	var file *url.URL
+	if strings.HasPrefix(modName, "/") {
+		u := *modPath
+		u.Path = modName
+		file = &u
+	} else {
+		file = modPath.JoinPath(modName)
+	}
 	specifier := file.String()
 
 	ml.Lock()
