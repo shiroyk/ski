@@ -21,9 +21,6 @@ func (a *AbortController) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("abort", a.abort)
 	_ = p.DefineAccessorProperty("signal", rt.ToValue(a.signal), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("AbortController") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == typeAbortController)
-	})
 	return p
 }
 
@@ -77,9 +74,6 @@ func (a *AbortSignal) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("abort", a.abort)
 	_ = p.Set("timeout", a.timeout)
 	_ = p.SetSymbol(sobek.SymToStringTag, rt.ToValue(func(sobek.ConstructorCall) sobek.Value { return rt.ToValue("AbortSignal") }))
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == typeAbortSignal)
-	})
 	return p
 }
 

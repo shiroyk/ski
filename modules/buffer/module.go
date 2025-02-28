@@ -9,29 +9,14 @@ import (
 )
 
 func init() {
-	modules.Register("node:buffer", new(Module))
+	modules.Register("node:buffer", modules.Global{
+		"Blob":   new(Blob),
+		"Buffer": new(Buffer),
+		"File":   new(File),
+		"atob":   modules.ModuleFunc(atob),
+		"btoa":   modules.ModuleFunc(btoa),
+	})
 }
-
-type Module struct{}
-
-func (Module) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	ret := rt.NewObject()
-	blob, _ := new(Blob).Instantiate(rt)
-	_ = ret.Set("Blob", blob)
-	buffer, _ := new(Buffer).Instantiate(rt)
-	_ = ret.Set("Buffer", buffer)
-	file, _ := new(File).Instantiate(rt)
-	blobProto := blob.(*sobek.Object).Prototype()
-	fileProto := file.(*sobek.Object).Prototype()
-	_ = fileProto.SetPrototype(blobProto)
-	_ = fileProto.Set("prototype", blobProto)
-	_ = ret.Set("File", file)
-	_ = ret.Set("atob", atob)
-	_ = ret.Set("btoa", btoa)
-	return ret, nil
-}
-
-func (Module) Global() {}
 
 func atob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	str := call.Argument(0).String()

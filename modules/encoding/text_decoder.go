@@ -20,21 +20,11 @@ import (
 )
 
 func init() {
-	modules.Register("node:encoding", new(Encoding))
+	modules.Register("node:encoding", modules.Global{
+		"TextDecoder": new(TextDecoder),
+		"TextEncoder": new(TextEncoder),
+	})
 }
-
-type Encoding struct{}
-
-func (Encoding) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	ret := rt.NewObject()
-	de, _ := new(TextDecoder).Instantiate(rt)
-	_ = ret.Set("TextDecoder", de)
-	en, _ := new(TextEncoder).Instantiate(rt)
-	_ = ret.Set("TextEncoder", en)
-	return ret, nil
-}
-
-func (Encoding) Global() {}
 
 // TextDecoder a decoder for a specific text encoding, such as
 // UTF-8, ISO-8859-2, KOI8-R, GBK, etc. A decoder takes a stream of bytes

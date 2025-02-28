@@ -1,12 +1,10 @@
 package fetch
 
 import (
-	"errors"
 	"net"
 	"net/http"
 	"time"
 
-	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/modules"
 )
 
@@ -16,7 +14,15 @@ func init() {
 	client.Jar = jar
 	modules.Register("http", &Http{client})
 	modules.Register("cookieJar", &CookieJarModule{jar})
-	modules.Register("fetch", &Module{client, jar})
+	modules.Register("fetch", modules.Global{
+		"fetch":           &Fetch{client},
+		"Request":         new(Request),
+		"Response":        new(Response),
+		"Headers":         new(Headers),
+		"FormData":        new(FormData),
+		"AbortController": new(AbortController),
+		"AbortSignal":     new(AbortSignal),
+	})
 }
 
 // Client http client interface
@@ -44,35 +50,3 @@ func NewClient() *http.Client {
 		},
 	}
 }
-
-type Module struct {
-	Client
-	CookieJar
-}
-
-func (m *Module) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	if m.Client == nil {
-		return nil, errors.New("http client can not be nil")
-	}
-	if m.CookieJar == nil {
-		return nil, errors.New("CookieJar can not nil")
-	}
-	ret := rt.NewObject()
-	fetch, _ := (&Fetch{m.Client}).Instantiate(rt)
-	_ = ret.Set("fetch", fetch)
-	request, _ := new(Request).Instantiate(rt)
-	_ = ret.Set("Request", request)
-	response, _ := new(Response).Instantiate(rt)
-	_ = ret.Set("Response", response)
-	headers, _ := new(Headers).Instantiate(rt)
-	_ = ret.Set("Headers", headers)
-	formData, _ := new(FormData).Instantiate(rt)
-	_ = ret.Set("FormData", formData)
-	abortController, _ := new(AbortController).Instantiate(rt)
-	_ = ret.Set("AbortController", abortController)
-	abortSignal, _ := new(AbortSignal).Instantiate(rt)
-	_ = ret.Set("AbortSignal", abortSignal)
-	return ret, nil
-}
-
-func (*Module) Global() {}

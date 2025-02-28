@@ -12,20 +12,17 @@ import (
 type Timers struct{}
 
 func init() {
-	modules.Register("timers", new(Timers))
+	modules.Register("timers", new(Timers).Global())
 }
 
-func (t *Timers) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	_ = rt.GlobalObject().SetSymbol(symTimers, &timers{timer: make(map[int64]*timer)})
-	ret := rt.NewObject()
-	_ = ret.Set("setTimeout", t.setTimeout)
-	_ = ret.Set("clearTimeout", t.clearTimeout)
-	_ = ret.Set("setInterval", t.setInterval)
-	_ = ret.Set("clearInterval", t.clearInterval)
-	return ret, nil
+func (t *Timers) Global() modules.Global {
+	return modules.Global{
+		"setTimeout":    modules.ModuleFunc(t.setTimeout),
+		"clearTimeout":  modules.ModuleFunc(t.clearTimeout),
+		"setInterval":   modules.ModuleFunc(t.setInterval),
+		"clearInterval": modules.ModuleFunc(t.clearInterval),
+	}
 }
-
-func (t *Timers) Global() {}
 
 func (*Timers) setTimeout(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	callback, ok := sobek.AssertFunction(call.Argument(0))
@@ -174,11 +171,14 @@ func (t *timers) stop(id int64) {
 var symTimers = sobek.NewSymbol(`Symbol.__timers__`)
 
 func rtTimers(rt *sobek.Runtime) *timers {
-	t, ok := rt.GlobalObject().GetSymbol(symTimers).Export().(*timers)
-	if ok {
+	global := rt.GlobalObject()
+	v := global.GetSymbol(symTimers)
+	if v == nil {
+		t := &timers{timer: make(map[int64]*timer)}
+		_ = global.SetSymbol(symTimers, t)
 		return t
 	}
-	panic(rt.NewTypeError(`symbol value of "timers" must be Timers`))
+	return v.Export().(*timers)
 }
 
 func nothing() error { return nil }

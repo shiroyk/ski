@@ -94,7 +94,7 @@ func TestFile(t *testing.T) {
 				}
 				require.NoError(t, err)
 				obj := result.ToObject(vm.Runtime())
-				blob := obj.Export().(*file).blob.Export().(*blob)
+				blob := toBlob(vm.Runtime(), obj)
 				assert.Equal(t, tt.expected.name, obj.Get("name").String())
 				assert.Equal(t, tt.expected.size, blob.size)
 				assert.Equal(t, tt.expected.type_, blob.type_)

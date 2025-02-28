@@ -15,6 +15,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	modules.Register("testGlobal", modules.Global{
+		"globalMod": modules.ModuleFunc(func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+			return rt.ToValue("some value")
+		}),
+	})
+	modules.Register("node:url", modules.Global{
+		"URL": new(nodeURL),
+	})
+}
+
 type gomod1 struct{}
 
 func (gomod1) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
@@ -29,18 +40,9 @@ func (gomod2) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	}{Key: "gomod2"}), nil
 }
 
-type gomod3 struct{}
-
-func (gomod3) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	return rt.ToValue(map[string]string{"globalgomod3": "gomod3"}), nil
-}
-
-func (gomod3) Global() {}
-
 type nodeURL struct{}
 
 func (nodeURL) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	ret := rt.NewObject()
 	ctor := rt.ToValue(func(call sobek.ConstructorCall) *sobek.Object {
 		u, err := url.Parse(call.Argument(0).String())
 		if err != nil {
@@ -51,11 +53,8 @@ func (nodeURL) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 		return instance
 	}).ToObject(rt)
 	_ = ctor.SetPrototype(rt.NewObject())
-	_ = ret.Set("URL", ctor)
-	return ret, nil
+	return ctor, nil
 }
-
-func (nodeURL) Global() {}
 
 func TestModuleLoader(t *testing.T) {
 	mfs := fstest.MapFS{
@@ -157,15 +156,12 @@ func TestModuleLoader(t *testing.T) {
 
 	modules.Register("gomod1", new(gomod1))
 	modules.Register("gomod2", new(gomod2))
-	modules.Register("gomod3", new(gomod3))
-	modules.Register("node:url", new(nodeURL))
 	vm := NewTestVM(t)
 
 	t.Run("script", func(t *testing.T) {
 		scriptCases := []struct{ name, s string }{
 			{"gomod1", `assert.equal(require("ski/gomod1").key, "gomod1")`},
 			{"gomod2", `assert.equal(require("ski/gomod2").key, "gomod2")`},
-			{"gomod3", `assert.equal(globalgomod3, "gomod3")`},
 			{"remote cjs", `assert.equal(require("https://foo.com/foo.min.js?type=cjs").foo, "bargomod1")`},
 			{"remote esm", `(async () => assert.equal(await require("https://foo.com/foo.min.js?type=esm")(), "gomod114"))()`},
 			{"module1", `assert.equal(require("module1")(), "module1")`},
@@ -180,11 +176,6 @@ func TestModuleLoader(t *testing.T) {
 			{"cjs_script1", `assert.equal(require("./cjs_script1")(), "/module4/cjs_script1")`},
 			{"cjs_script2", `assert.equal(require("./cjs_script2").value(), 555)`},
 			{"json1", `assert.equal(require("./json1.json").key, "json1")`},
-			{"node url", `
-			const NODE_URL = require("node:url").URL;
-			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
-			assert.true(require("node:url").URL.prototype === URL.prototype, 'prototype not equal');
-			`},
 			{"node file", `
 			assert.equal(require("node:file").default(), "node file module");
 			`},
@@ -204,7 +195,6 @@ func TestModuleLoader(t *testing.T) {
 			assert.equal(gomod1.key, "gomod1")`},
 			{"gomod2", `import gomod2 from "ski/gomod2";
 			assert.equal(gomod2.key, "gomod2")`},
-			{"gomod3", `assert.equal(globalgomod3, "gomod3")`},
 			{"remote cjs", `import foo from "https://foo.com/foo.min.js?type=cjs";
 			assert.equal(foo.foo, "bargomod1")`},
 			{"remote esm", `import foo from "https://foo.com/foo.min.js?type=esm";
@@ -233,9 +223,6 @@ func TestModuleLoader(t *testing.T) {
 			assert.equal(value(), 555);`},
 			{"json1", `import j from "./json1.json";
 			assert.equal(j.key, "json1");`},
-			{"node url", `import {URL as NODE_URL} from "node:url";
-			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
-			assert.true(NODE_URL.prototype === URL.prototype, 'prototype not equal');`},
 			{"node file", `import node_file from "node:file";
 			assert.equal(node_file(), "node file module");
 			`},
@@ -263,6 +250,39 @@ func TestModuleLoader(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("lazy global", func(t *testing.T) {
+		t.Run("variable", func(t *testing.T) {
+			mod, err := ml.CompileModule("", `
+			assert.true(globalMod(), 'some value');`)
+			require.NoError(t, err)
+
+			_, err = vm.RunModule(t.Context(), mod)
+			require.NoError(t, err)
+
+			_, err = vm.RunString(t.Context(), `
+			assert.true(globalMod(), 'some value');
+			`)
+			require.NoError(t, err)
+		})
+
+		t.Run("prototype", func(t *testing.T) {
+			mod, err := ml.CompileModule("", `import {URL as NODE_URL} from "node:url";
+			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
+			assert.true(NODE_URL.prototype === URL.prototype, 'prototype not equal');`)
+			require.NoError(t, err)
+			_, err = vm.RunModule(t.Context(), mod)
+			require.NoError(t, err)
+
+			_, err = vm.RunString(t.Context(), `
+			const NODE_URL = require("node:url").URL;
+			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
+			assert.true(require("node:url").URL.prototype === URL.prototype, 'prototype not equal');
+			`)
+			require.NoError(t, err)
+		})
+
 	})
 
 	t.Run("error", func(t *testing.T) {

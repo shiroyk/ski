@@ -14,13 +14,17 @@ type File struct{}
 
 func (f *File) prototype(rt *sobek.Runtime) *sobek.Object {
 	p := rt.NewObject()
+	b := rt.Get("Blob")
+	if b == nil {
+		panic(rt.NewTypeError("Blob is undefined"))
+	}
+	proto := b.ToObject(rt).Prototype()
+	_ = p.SetPrototype(proto)
+	_ = p.Set("prototype", proto)
 	_ = p.DefineAccessorProperty("name", rt.ToValue(f.name), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("lastModified", rt.ToValue(f.lastModified), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("webkitRelativePath", rt.ToValue(f.webkitRelativePath), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("File") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == TypeFile)
-	})
 	return p
 }
 
@@ -30,7 +34,7 @@ func (f *File) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 	}
 
 	options := call.Argument(2)
-	blob := js.New(rt, "Blob", call.Argument(0), options)
+	b := js.New(rt, "Blob", call.Argument(0), options)
 
 	filename := call.Argument(1).String()
 
@@ -42,7 +46,7 @@ func (f *File) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 	}
 
 	obj := rt.ToValue(&file{
-		blob:         blob,
+		blob:         b.Export().(*blob),
 		name:         filename,
 		lastModified: lastModified,
 	}).(*sobek.Object)
@@ -66,7 +70,7 @@ func (*File) webkitRelativePath(call sobek.FunctionCall, rt *sobek.Runtime) sobe
 }
 
 type file struct {
-	blob               sobek.Value
+	*blob
 	name               string
 	webkitRelativePath string
 	lastModified       int64

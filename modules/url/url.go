@@ -11,21 +11,11 @@ import (
 )
 
 func init() {
-	modules.Register("node:url", new(Module))
+	modules.Register("node:url", modules.Global{
+		"URL":             new(URL),
+		"URLSearchParams": new(URLSearchParams),
+	})
 }
-
-type Module struct{}
-
-func (Module) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	ret := rt.NewObject()
-	url, _ := new(URL).Instantiate(rt)
-	_ = ret.Set("URL", url)
-	urlSearchParams, _ := new(URLSearchParams).Instantiate(rt)
-	_ = ret.Set("URLSearchParams", urlSearchParams)
-	return ret, nil
-}
-
-func (Module) Global() {}
 
 // URL is a component of the URL standard, which defines what constitutes
 // a valid Uniform Resource Locator and the API that accesses and manipulates URLs.
@@ -59,7 +49,6 @@ func (u *URL) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("toJSON", u.toJSON)
 
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("URL") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value { return rt.ToValue(call.Argument(0).ExportType() == typeURL) })
 	return p
 }
 

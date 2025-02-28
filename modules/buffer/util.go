@@ -12,7 +12,7 @@ func GetReader(rt *sobek.Runtime, value sobek.Value) Reader {
 	case TypeBlob:
 		return value.Export().(*blob).data
 	case TypeFile:
-		return toBlob(rt, value.Export().(*file).blob).data
+		return value.Export().(*file).data
 	default:
 		panic(rt.NewTypeError(`Value is not a Blob`))
 	}

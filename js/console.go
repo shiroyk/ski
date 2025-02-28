@@ -10,7 +10,7 @@ import (
 
 func EnableConsole(rt *sobek.Runtime, attr ...slog.Attr) {
 	v, _ := console(attr).Instantiate(rt)
-	_ = rt.Set("console", v.(*sobek.Object).Get("console"))
+	_ = rt.Set("console", v)
 }
 
 // console implements the js console
@@ -22,12 +22,8 @@ func (c console) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	_ = obj.Set("info", c.info)
 	_ = obj.Set("warn", c.warn)
 	_ = obj.Set("error", c.error)
-	ret := rt.NewObject()
-	_ = ret.Set("console", obj)
-	return ret, nil
+	return obj, nil
 }
-
-func (c console) Global() {}
 
 func (c console) output(level slog.Level, call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	ctx := Context(rt)

@@ -31,9 +31,6 @@ func (u *URLSearchParams) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("entries", u.entries)
 	_ = p.SetSymbol(sobek.SymIterator, u.entries)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("URLSearchParams") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == TypeURLSearchParams)
-	})
 	return p
 }
 

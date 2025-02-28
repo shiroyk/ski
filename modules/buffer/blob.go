@@ -30,9 +30,6 @@ func (b *Blob) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("slice", b.slice)
 	_ = p.Set("text", b.text)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Blob") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == TypeBlob)
-	})
 	return p
 }
 
@@ -198,7 +195,7 @@ func toBlob(rt *sobek.Runtime, value sobek.Value) *blob {
 	case TypeBlob:
 		return value.Export().(*blob)
 	case TypeFile:
-		return toBlob(rt, value.Export().(*file).blob)
+		return value.Export().(*file).blob
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type Blob`))
 }

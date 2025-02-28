@@ -74,9 +74,6 @@ func (r *Response) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("json", r.json)
 	_ = p.Set("arrayBuffer", r.arrayBuffer)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Response") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == typeResponse)
-	})
 	return p
 }
 

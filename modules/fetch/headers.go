@@ -28,9 +28,6 @@ func (h *Headers) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("values", h.values)
 	_ = p.SetSymbol(sobek.SymIterator, h.entries)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Headers") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == typeHeaders)
-	})
 	return p
 }
 

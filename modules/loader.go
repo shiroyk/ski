@@ -121,6 +121,9 @@ type (
 		goModules    sync.Map
 		cacheModules sync.Map
 
+		globalOnce sync.Once
+		globals    map[string]string
+
 		fileLoader FileLoader
 
 		base         *url.URL
@@ -147,28 +150,82 @@ func (ml *loader) EnableRequire(rt *sobek.Runtime) Loader {
 	return ml
 }
 
-// InitGlobal instantiate Global module and add their exports to the global scope of the JavaScript runtime.
+// InitGlobal instantiates global objects for the runtime. It creates a proxy around the global object
+// to lazily load global modules when they are first accessed.
+//
+// This allows for automatic loading of global modules like fetch, TextEncoder, etc.
+// when they are referenced in code.
 func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
-	for name, module := range All() {
-		if _, ok := module.(Global); !ok {
-			continue
+	ml.globalOnce.Do(func() {
+		// Collect all global module names and their namespaces
+		ml.globals = make(map[string]string)
+		for namespace, m := range All() {
+			if globals, ok := m.(Global); ok {
+				for name := range globals {
+					ml.globals[name] = namespace
+				}
+			}
 		}
-		mod, ok := ml.goModules.Load(name)
-		if !ok {
-			mod, _ = ml.goModules.LoadOrStore(name, &goModule{mod: module})
-		}
-		record := mod.(sobek.CyclicModuleRecord)
-		promise := rt.CyclicModuleRecordEvaluate(record, ml.ResolveModule)
-		if promise.State() == sobek.PromiseStateRejected {
-			slog.Warn(fmt.Sprintf("instantiate global js module %s failed: %s", name, promise.Result().String()))
-			continue
-		}
-		instance := rt.GetModuleInstance(record)
-		exports := instance.(*goModuleInstance)
-		for _, key := range exports.GetOwnPropertyNames() {
-			_ = rt.Set(key, exports.Get(key))
-		}
-	}
+	})
+
+	globalThis := rt.GlobalObject()
+	// Create proxy to handle global property access
+	proxy := rt.NewProxy(globalThis, &sobek.ProxyTrapConfig{
+		Get: func(target *sobek.Object, property string, receiver sobek.Value) sobek.Value {
+			if value := target.Get(property); value != nil {
+				return value
+			}
+
+			namespace, ok := ml.globals[property]
+			if !ok {
+				return sobek.Undefined()
+			}
+
+			module, ok := ml.goModules.Load(property)
+			if !ok {
+				mod, ok := Get(namespace)
+				if !ok || mod == nil {
+					return sobek.Undefined()
+				}
+
+				globals, ok := mod.(Global)
+				if !ok {
+					return sobek.Undefined()
+				}
+
+				globalMod := globals[property]
+				if globalMod == nil {
+					return sobek.Undefined()
+				}
+
+				module, _ = ml.goModules.LoadOrStore(property, &goModule{mod: globalMod})
+			}
+
+			// Instantiate the module
+			record := module.(sobek.CyclicModuleRecord)
+			promise := rt.CyclicModuleRecordEvaluate(record, ml.ResolveModule)
+
+			switch promise.State() {
+			case sobek.PromiseStateRejected:
+				slog.Warn("failed to instantiate global module",
+					"namespace", namespace,
+					"module", property,
+					"error", promise.Result().String())
+				return sobek.Undefined()
+			case sobek.PromiseStatePending:
+				return sobek.Undefined()
+			default:
+				// Set the instantiated module on the global object
+				value := rt.GetModuleInstance(record).(*goModuleInstance).Object
+				if err := target.Set(property, value); err != nil {
+					throwError(rt, err)
+				}
+				return value
+			}
+		},
+	})
+
+	rt.SetGlobalObject(rt.ToValue(proxy).(*sobek.Object))
 	return ml
 }
 

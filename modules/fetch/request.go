@@ -44,9 +44,6 @@ func (r *Request) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("formData", r.formData)
 	_ = p.Set("blob", r.blob)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Request") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == typeRequest)
-	})
 	return p
 }
 

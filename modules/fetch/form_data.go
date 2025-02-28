@@ -32,9 +32,6 @@ func (f *FormData) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("entries", f.entries)
 	_ = p.SetSymbol(sobek.SymIterator, f.entries)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("FormData") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == typeFormData)
-	})
 	return p
 }
 

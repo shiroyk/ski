@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,9 +12,7 @@ import (
 
 func TestTimers(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
-		_, _ = new(Timers).Instantiate(rt)
-	}))
+	vm := modulestest.New(t)
 	ctx := context.Background()
 
 	t.Run("setTimeout", func(t *testing.T) {

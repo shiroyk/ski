@@ -17,23 +17,12 @@ var (
 )
 
 func init() {
-	modules.Register("node:stream/web", new(Module))
+	modules.Register("node:stream/web", modules.Global{
+		"ReadableStream":              new(ReadableStream),
+		"ReadableStreamBYOBReader":    new(ReadableStreamBYOBReader),
+		"ReadableStreamDefaultReader": new(ReadableStreamDefaultReader),
+	})
 }
-
-type Module struct{}
-
-func (Module) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
-	ret := rt.NewObject()
-	rs, _ := new(ReadableStream).Instantiate(rt)
-	_ = ret.Set("ReadableStream", rs)
-	rsbr, _ := new(ReadableStreamBYOBReader).Instantiate(rt)
-	_ = ret.Set("ReadableStreamBYOBReader", rsbr)
-	rsdr, _ := new(ReadableStreamDefaultReader).Instantiate(rt)
-	_ = ret.Set("ReadableStreamDefaultReader", rsdr)
-	return ret, nil
-}
-
-func (Module) Global() {}
 
 // ReadableStream interface represents a readable stream of byte data.
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
@@ -48,9 +37,6 @@ func (r *ReadableStream) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("pipeTo", r.pipeTo)
 	_ = p.Set("pipeThrough", r.pipeThrough)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("ReadableStream") })
-	_ = p.SetSymbol(sobek.SymHasInstance, func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(call.Argument(0).ExportType() == TypeReadableStream)
-	})
 	return p
 }
 

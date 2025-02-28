@@ -76,7 +76,8 @@ func New(t testing.TB, opts ...js.Option) VM {
 	return VM{vm}
 }
 
-// PromiseResult get the promise result
+// PromiseResult get the promise resolve result
+// panic when promise reject.
 func PromiseResult(value sobek.Value) sobek.Value {
 	promise, ok := value.Export().(*sobek.Promise)
 	if !ok {
@@ -84,7 +85,7 @@ func PromiseResult(value sobek.Value) sobek.Value {
 	}
 	switch promise.State() {
 	case sobek.PromiseStateRejected:
-		return promise.Result()
+		panic(promise.Result().String())
 	case sobek.PromiseStateFulfilled:
 		return promise.Result()
 	default:
