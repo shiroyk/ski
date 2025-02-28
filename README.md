@@ -4,7 +4,7 @@
 ![GitHub](https://img.shields.io/github/license/shiroyk/ski)<br/>
 
 ## Description
-**ski** is a collection of Goja modules, provides a set of built-in modules for common tasks like caching, cryptography, encoding, fetch.
+**ski** is a JavaScript runtime environment for Go powered by [Goja](https://github.com/dop251/goja). </br>It provides a collection of built-in modules that implement partial Node.js compatibility and Web APIs, allowing you to write JavaScript code that can seamlessly interact with Go. The modules include essential functionality like Buffer manipulation, encoding/decoding, HTTP client (fetch), streams, timers, and URL handling.
 
 ## Modules
 Partial Node.js compatibility and web standard implementations.
