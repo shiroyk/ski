@@ -14,6 +14,11 @@ func TestVueSSR(t *testing.T) {
 	}
 	t.Parallel()
 	vm := modulestest.New(t)
+	_ = vm.Runtime().Set("process", map[string]any{
+		"env": map[string]any{
+			"NODE_ENV": "development",
+		},
+	})
 
 	source := `
 import { h, createSSRApp } from "https://unpkg.com/vue@3/dist/vue.runtime.esm-browser.js";

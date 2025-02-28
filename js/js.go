@@ -36,6 +36,22 @@ func RunString(ctx context.Context, str string) (sobek.Value, error) {
 	return NewVM().RunString(ctx, str)
 }
 
+// Run executes the given function
+//
+// example:
+//
+//	err := js.Run(context.Background(), func(rt *sobek.Runtime) error {
+//		_, err := rt.RunString(`console.log('hello world')`)
+//		return err
+//	})
+//	if err != nil {
+//		panic(err)
+//	}
+func Run(ctx context.Context, fn func(*sobek.Runtime) error) error {
+	vm := NewVM()
+	return vm.Run(ctx, func() error { return fn(vm.Runtime()) })
+}
+
 // CompileModule compile module from source string (cjs/esm).
 func CompileModule(name, source string) (sobek.CyclicModuleRecord, error) {
 	return Loader().CompileModule(name, source)

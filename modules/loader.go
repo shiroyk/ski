@@ -42,6 +42,8 @@ type (
 		EnableImportModuleDynamically(*sobek.Runtime) Loader
 		// InitGlobal instantiate Global module and add their exports to the global scope of the JavaScript runtime.
 		InitGlobal(*sobek.Runtime) Loader
+		// SetFileLoader set the FileLoader.
+		SetFileLoader(fl FileLoader)
 	}
 
 	// Option the new Loader options.
@@ -69,11 +71,7 @@ func WithSourceMapLoader(fn func(path string) ([]byte, error)) Option {
 // NewLoader returns a new module resolver
 // if the fileLoader option not provided, uses the default DefaultFileLoader.
 func NewLoader(opts ...Option) Loader {
-	ml := &loader{
-		modules:   make(map[string]moduleCache),
-		goModules: make(map[string]sobek.CyclicModuleRecord),
-		reverse:   make(map[sobek.ModuleRecord]*url.URL),
-	}
+	ml := new(loader)
 
 	for _, option := range opts {
 		option(ml)
@@ -119,10 +117,9 @@ type (
 	// loader the Loader implement.
 	// Allows loading and interop between ES module and CommonJS module.
 	loader struct {
-		sync.Mutex
-		modules   map[string]moduleCache
-		goModules map[string]sobek.CyclicModuleRecord
-		reverse   map[sobek.ModuleRecord]*url.URL
+		reverse      sync.Map
+		goModules    sync.Map
+		cacheModules sync.Map
 
 		fileLoader FileLoader
 
@@ -136,6 +133,14 @@ type (
 	}
 )
 
+// SetFileLoader set the FileLoader.
+func (ml *loader) SetFileLoader(fl FileLoader) {
+	if fl == nil {
+		return
+	}
+	ml.fileLoader = fl
+}
+
 // EnableRequire enable the global function require to the sobek.Runtime.
 func (ml *loader) EnableRequire(rt *sobek.Runtime) Loader {
 	_ = rt.Set("require", ml.require)
@@ -148,19 +153,17 @@ func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
 		if _, ok := module.(Global); !ok {
 			continue
 		}
-		ml.Lock()
-		mod, ok := ml.goModules[name]
+		mod, ok := ml.goModules.Load(name)
 		if !ok {
-			mod = &goModule{mod: module}
-			ml.goModules[name] = mod
+			mod, _ = ml.goModules.LoadOrStore(name, &goModule{mod: module})
 		}
-		ml.Unlock()
-		promise := rt.CyclicModuleRecordEvaluate(mod, ml.ResolveModule)
+		record := mod.(sobek.CyclicModuleRecord)
+		promise := rt.CyclicModuleRecordEvaluate(record, ml.ResolveModule)
 		if promise.State() == sobek.PromiseStateRejected {
 			slog.Warn(fmt.Sprintf("instantiate global js module %s failed: %s", name, promise.Result().String()))
 			continue
 		}
-		instance := rt.GetModuleInstance(mod)
+		instance := rt.GetModuleInstance(record)
 		exports := instance.(*goModuleInstance)
 		for _, key := range exports.GetOwnPropertyNames() {
 			_ = rt.Set(key, exports.Get(key))
@@ -259,73 +262,66 @@ func (ml *loader) resolve(base *url.URL, specifier string) (sobek.ModuleRecord, 
 }
 
 func (ml *loader) resolveGo(specifier string) (sobek.ModuleRecord, bool) {
-	ml.Lock()
-	defer ml.Unlock()
-	if mod, ok := ml.goModules[specifier]; ok {
-		return mod, ok
+	if mod, ok := ml.goModules.Load(specifier); ok {
+		return mod.(sobek.ModuleRecord), ok
 	}
 	if module, ok := Get(specifier); ok {
 		mod := &goModule{mod: module}
-		ml.goModules[specifier] = mod
+		ml.goModules.Store(specifier, mod)
 		return mod, ok
 	}
 	return nil, false
 }
 
 func (ml *loader) reversePath(referencingScriptOrModule any) *url.URL {
-	if referencingScriptOrModule == nil {
-		return ml.base
-	}
 	mod, ok := referencingScriptOrModule.(sobek.ModuleRecord)
 	if !ok {
 		return ml.base
 	}
 
-	ml.Lock()
-	p, ok := ml.reverse[mod]
-	ml.Unlock()
-
+	p, ok := ml.reverse.Load(mod)
 	if !ok {
 		return ml.base
 	}
 
-	if p.String() == "file://-" {
+	u := p.(*url.URL)
+	if u.Scheme == "file" && u.Path == "-" {
 		return ml.base
 	}
-	return p
+	return u
 }
 
-func (ml *loader) loadAsFileOrDirectory(modPath *url.URL, modName string) (sobek.ModuleRecord, error) {
-	mod, err := ml.loadAsFile(modPath, modName)
+func (ml *loader) loadAsFileOrDirectory(base *url.URL, specifier string) (sobek.ModuleRecord, error) {
+	mod, err := ml.loadAsFile(base, specifier)
 	if err != nil {
 		if isSyntaxError(err) {
 			return nil, err
 		}
-		return ml.loadAsDirectory(modPath.JoinPath(modName))
+		return ml.loadAsDirectory(base.JoinPath(specifier))
 	}
 	return mod, nil
 }
 
-func (ml *loader) loadAsFile(modPath *url.URL, modName string) (module sobek.ModuleRecord, err error) {
-	if module, err = ml.loadModule(modPath, modName); err == nil {
+func (ml *loader) loadAsFile(base *url.URL, specifier string) (module sobek.ModuleRecord, err error) {
+	if module, err = ml.loadModule(base, specifier); err == nil {
 		return
 	}
 	if isSyntaxError(err) {
 		return nil, err
 	}
-	if module, err = ml.loadModule(modPath, modName+".js"); err == nil {
+	if module, err = ml.loadModule(base, specifier+".js"); err == nil {
 		return
 	}
 	if isSyntaxError(err) {
 		return nil, err
 	}
-	return ml.loadModule(modPath, modName+".json")
+	return ml.loadModule(base, specifier+".json")
 }
 
-func (ml *loader) loadAsDirectory(modPath *url.URL) (mod sobek.ModuleRecord, err error) {
-	buf, err := ml.fileLoader(modPath.JoinPath("package.json"), "package.json")
+func (ml *loader) loadAsDirectory(base *url.URL) (mod sobek.ModuleRecord, err error) {
+	buf, err := ml.fileLoader(base.JoinPath("package.json"), "package.json")
 	if err != nil {
-		return ml.loadModule(modPath, "index.js")
+		return ml.loadModule(base, "index.js")
 	}
 
 	var pkg struct {
@@ -333,12 +329,12 @@ func (ml *loader) loadAsDirectory(modPath *url.URL) (mod sobek.ModuleRecord, err
 		Module string `json:"module"`
 	}
 	if err = json.Unmarshal(buf, &pkg); err != nil {
-		return ml.loadModule(modPath, "index.js")
+		return ml.loadModule(base, "index.js")
 	}
 
 	for _, entry := range []string{pkg.Module, pkg.Main} {
 		if len(entry) > 0 {
-			if mod, err = ml.loadAsFile(modPath, entry); err != nil {
+			if mod, err = ml.loadAsFile(base, entry); err != nil {
 				if isSyntaxError(err) {
 					return nil, err
 				}
@@ -349,18 +345,22 @@ func (ml *loader) loadAsDirectory(modPath *url.URL) (mod sobek.ModuleRecord, err
 		}
 	}
 
-	return ml.loadModule(modPath, "index.js")
+	return ml.loadModule(base, "index.js")
 }
 
-func (ml *loader) loadNodeModules(base *url.URL, modName string) (mod sobek.ModuleRecord, err error) {
+func (ml *loader) loadNodeModules(base *url.URL, specifier string) (mod sobek.ModuleRecord, err error) {
 	start := base.Path
-	clone := *base
-	modPath := &clone
-	modPath.Path = ""
+	u := *base
+	nodeModules := &u
+	nodeModules.Path = ""
 	for {
-		modPath.Path = filepath.Join(start, "node_modules")
+		if path.Base(start) != "node_modules" {
+			nodeModules.Path = filepath.Join(start, "node_modules")
+		} else {
+			nodeModules.Path = start
+		}
 
-		mod, err = ml.loadAsFileOrDirectory(modPath, modName)
+		mod, err = ml.loadAsFileOrDirectory(nodeModules, specifier)
 		if mod != nil || isSyntaxError(err) {
 			return mod, err
 		}
@@ -375,40 +375,36 @@ func (ml *loader) loadNodeModules(base *url.URL, modName string) (mod sobek.Modu
 		start = parent
 	}
 
-	return nil, fmt.Errorf("%w '%s'", ErrNotFoundModule, modName)
+	return nil, fmt.Errorf("%w '%s'", ErrNotFoundModule, specifier)
 }
 
-func (ml *loader) loadModule(modPath *url.URL, modName string) (sobek.ModuleRecord, error) {
-	var file *url.URL
-	if strings.HasPrefix(modName, "/") {
-		u := *modPath
-		u.Path = modName
-		file = &u
+func (ml *loader) loadModule(base *url.URL, specifier string) (sobek.ModuleRecord, error) {
+	var absolute *url.URL
+	if strings.HasPrefix(specifier, "/") {
+		u := *base
+		u.Path = specifier
+		absolute = &u
 	} else {
-		file = modPath.JoinPath(modName)
+		absolute = base.JoinPath(specifier)
 	}
-	specifier := file.String()
+	filename := absolute.String()
 
-	ml.Lock()
-	cache, exists := ml.modules[specifier]
-	ml.Unlock()
+	cache, exists := ml.cacheModules.Load(filename)
 	if exists {
-		return cache.mod, cache.err
+		m := cache.(moduleCache)
+		return m.mod, m.err
 	}
 
-	buf, err := ml.fileLoader(file, modName)
+	buf, err := ml.fileLoader(absolute, specifier)
 	if err != nil {
 		return nil, err
 	}
-	mod, err := ml.CompileModule(specifier, string(buf))
 
-	ml.Lock()
+	mod, err := ml.CompileModule(filename, string(buf))
 	if err == nil {
-		file.Path = filepath.Dir(file.Path)
-		ml.reverse[mod] = file
+		ml.reverse.Store(mod, absolute.JoinPath(".."))
 	}
-	ml.modules[specifier] = moduleCache{mod: mod, err: err}
-	ml.Unlock()
+	ml.cacheModules.Store(filename, moduleCache{mod: mod, err: err})
 	return mod, err
 }
 

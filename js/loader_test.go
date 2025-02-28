@@ -3,6 +3,7 @@ package js
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"testing"
 	"testing/fstest"
@@ -132,7 +133,12 @@ func TestModuleLoader(t *testing.T) {
 			Data: []byte(`a {}`),
 		},
 	}
-	ml := modules.NewLoader(modules.WithFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
+
+	ml := Loader()
+	t.Cleanup(func() {
+		ml.SetFileLoader(modules.DefaultFileLoader(http.DefaultClient.Do))
+	})
+	ml.SetFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
 		switch specifier.Scheme {
 		case "http", "https":
 			if specifier.Query().Get("type") == "esm" {
@@ -147,8 +153,8 @@ func TestModuleLoader(t *testing.T) {
 		default:
 			return nil, fmt.Errorf("unexpected scheme %s", specifier.Scheme)
 		}
-	}))
-	setLoader(t, ml)
+	})
+
 	modules.Register("gomod1", new(gomod1))
 	modules.Register("gomod2", new(gomod2))
 	modules.Register("gomod3", new(gomod3))
@@ -315,10 +321,4 @@ func NewTestVM(t *testing.T, opts ...Option) VM {
 	})
 	_ = vm.Runtime().Set("assert", p)
 	return vm
-}
-
-func setLoader(t *testing.T, loader modules.Loader) {
-	current := Loader()
-	SetLoader(loader)
-	t.Cleanup(func() { SetLoader(current) })
 }
