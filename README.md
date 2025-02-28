@@ -2,9 +2,12 @@
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/shiroyk/ski)
 [![Go Report Card](https://goreportcard.com/badge/github.com/shiroyk/ski)](https://goreportcard.com/report/github.com/shiroyk/ski)
 ![GitHub](https://img.shields.io/github/license/shiroyk/ski)<br/>
+**ski** is a JavaScript runtime environment for Go powered by [Goja](https://github.com/dop251/goja). </br>
 
 ## Description
-**ski** is a JavaScript runtime environment for Go powered by [Goja](https://github.com/dop251/goja). </br>It provides a collection of built-in modules that implement partial Node.js compatibility and Web APIs, allowing you to write JavaScript code that can seamlessly interact with Go. The modules include essential functionality like Buffer manipulation, encoding/decoding, HTTP client (fetch), streams, timers, and URL handling.
+ski provides a collection of built-in modules that implement partial Node.js compatibility and Web APIs, allowing you to write JavaScript code that can seamlessly interact with Go.
+
+The modules include essential functionality like Buffer manipulation, encoding/decoding, HTTP client (fetch), streams, timers, and URL handling.
 
 ## Modules
 Partial Node.js compatibility and web standard implementations.
