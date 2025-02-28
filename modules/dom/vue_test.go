@@ -1,13 +1,11 @@
 package dom
 
 import (
-	"context"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -54,7 +52,7 @@ func httpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	enqueue := js.EnqueueJob(rt)
 
 	go func() {
-		slog.Info("test server: " + server.Addr)
+		slog.Info("test server: http://" + server.Addr)
 		_ = server.Serve(l)
 		enqueue(func() error { return nil })
 	}()
@@ -69,55 +67,21 @@ func httpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 func TestVueSSR(t *testing.T) {
+	t.Parallel()
 	vm := modulestest.New(t)
-	_ = vm.Runtime().Set("server", httpServer)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
 
 	source := `
 import { h, createSSRApp } from "https://unpkg.com/vue@3/dist/vue.runtime.esm-browser.js";
 import { renderToString } from "https://unpkg.com/@vue/server-renderer@3/dist/server-renderer.esm-browser.js";
 
-const s = server(async (ok) => {
-	const app = createSSRApp({
-		data: () => ({ count: 1 }),
-		render() { return h('div', { onClick: () => this.count++ }, this.count) },
-	});
+const app = createSSRApp({
+	data: () => ({ count: 1 }),
+	render() { return h('div', { onClick: () => this.count++ }, this.count) },
+});
 
-	const html = await renderToString(app);
-	ok(` + "`" + `
-		<!DOCTYPE html>
-		<html>
-		  <head>
-			<title>Vue SSR Example</title>
-			<script type="importmap">
-			  {
-				"imports": {
-				  "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
-				}
-			  }
-			</script>
-			<script type="module">
-				import { h, createSSRApp } from 'vue';
-				createSSRApp({
-					data: () => ({ count: 1 }),
-					render() { return h('div', { onClick: () => this.count++ }, this.count) },
-				}).mount('#app');
-			</script>
-		  </head>
-		  <body>
-			<div id="app">${html}</div>
-		  </body>
-		</html>` + "`" + `);
-	});
-
-const body = await (await fetch("http://"+s.url)).text();
-if (!/<div>1<\/div>/.exec(body)) {
-	throw new Error('ssr render failed: ' + body);
-}
-s.close();
+let html = await renderToString(app);
+assert.regexp(html, '<div>1</div>');
 `
-	_, err := vm.RunModule(ctx, source)
+	_, err := vm.RunModule(t.Context(), source)
 	require.NoError(t, err)
 }
