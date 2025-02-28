@@ -336,7 +336,7 @@ func (ml *loader) loadAsDirectory(modPath *url.URL) (mod sobek.ModuleRecord, err
 		return ml.loadModule(modPath, "index.js")
 	}
 
-	for _, entry := range []string{pkg.Main, pkg.Module} {
+	for _, entry := range []string{pkg.Module, pkg.Main} {
 		if len(entry) > 0 {
 			if mod, err = ml.loadAsFile(modPath, entry); err != nil {
 				if isSyntaxError(err) {
