@@ -4,6 +4,7 @@ package modulestest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -39,7 +40,7 @@ func New(t testing.TB, opts ...js.Option) VM {
 			msg = call.Argument(2).String()
 		}
 		if !assert.Equal(t, b, a, msg) {
-			js.Throw(vm, errors.New("not equal"))
+			js.Throw(vm, fmt.Errorf("not equal: %#v != %#v", b, a))
 		}
 		return
 	})
@@ -57,7 +58,7 @@ func New(t testing.TB, opts ...js.Option) VM {
 			msg = call.Argument(2).String()
 		}
 		if !assert.Regexp(t, b, a, msg) {
-			js.Throw(vm, errors.New("not match"))
+			js.Throw(vm, fmt.Errorf("not match: %#v != %#v", b, a))
 		}
 		return
 	})

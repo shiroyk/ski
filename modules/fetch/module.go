@@ -15,13 +15,11 @@ func init() {
 	modules.Register("http", &Http{client})
 	modules.Register("cookieJar", &CookieJarModule{jar})
 	modules.Register("fetch", modules.Global{
-		"fetch":           &Fetch{client},
-		"Request":         new(Request),
-		"Response":        new(Response),
-		"Headers":         new(Headers),
-		"FormData":        new(FormData),
-		"AbortController": new(AbortController),
-		"AbortSignal":     new(AbortSignal),
+		"fetch":    &Fetch{client},
+		"Request":  new(Request),
+		"Response": new(Response),
+		"Headers":  new(Headers),
+		"FormData": new(FormData),
 	})
 }
 

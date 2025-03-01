@@ -1,4 +1,4 @@
-package fetch
+package signal
 
 import (
 	"context"
@@ -9,7 +9,15 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/modules"
 )
+
+func init() {
+	modules.Register("signal", modules.Global{
+		"AbortController": new(AbortController),
+		"AbortSignal":     new(AbortSignal),
+	})
+}
 
 // AbortController interface represents a controller object
 // that allows you to abort one or more Web requests as and when desired.
@@ -27,13 +35,12 @@ func (a *AbortController) prototype(rt *sobek.Runtime) *sobek.Object {
 func (a *AbortController) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	signal := new(abortSignal)
 	signal.ctx, signal.cancel = context.WithCancelCause(js.Context(rt))
-	abortSignalCtor := rt.Get("AbortSignal")
-	if abortSignalCtor == nil {
+	abortSignal := rt.Get("AbortSignal")
+	if abortSignal == nil {
 		panic(rt.NewTypeError("AbortSignal is not defined"))
 	}
-	proto := abortSignalCtor.ToObject(rt).Prototype()
-	value := rt.ToValue(signal).ToObject(rt)
-	_ = value.SetPrototype(proto)
+	value := rt.ToValue(signal).(*sobek.Object)
+	_ = value.SetPrototype(abortSignal.ToObject(rt).Prototype())
 
 	obj := rt.ToValue(&abortController{signal: value}).ToObject(rt)
 	_ = obj.SetPrototype(call.This.Prototype())
@@ -45,6 +52,7 @@ func (a *AbortController) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	ctor := rt.ToValue(a.constructor).(*sobek.Object)
 	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
 	_ = ctor.Set("prototype", proto)
+	_ = ctor.SetPrototype(proto)
 	return ctor, nil
 }
 
@@ -53,7 +61,7 @@ func (*AbortController) signal(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 }
 
 func (*AbortController) abort(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	reason := errAbort
+	reason := ErrAbort
 	if r := call.Argument(0); !sobek.IsUndefined(r) {
 		reason = errors.New(r.String())
 	}
@@ -106,7 +114,7 @@ func (a *AbortSignal) reason(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 func (a *AbortSignal) abort(_ sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	signal := new(abortSignal)
 	signal.ctx, signal.cancel = context.WithCancelCause(context.Background())
-	signal.abort(errImmediateAbort)
+	signal.abort(ErrImmediateAbort)
 	object := rt.ToValue(signal).ToObject(rt)
 	_ = object.SetPrototype(a.prototype(rt))
 	return object
@@ -153,22 +161,37 @@ type abortController struct {
 }
 
 var (
-	errAbort            = errors.New("aborted")
-	errImmediateAbort   = errors.New("immediate abort")
-	typeAbortController = reflect.TypeOf((*abortController)(nil))
-	typeAbortSignal     = reflect.TypeOf((*abortSignal)(nil))
+	ErrAbort            = errors.New("aborted")
+	ErrImmediateAbort   = errors.New("immediate abort")
+	TypeAbortController = reflect.TypeOf((*abortController)(nil))
+	TypeAbortSignal     = reflect.TypeOf((*abortSignal)(nil))
 )
 
 func toAbortController(rt *sobek.Runtime, value sobek.Value) *abortController {
-	if value.ExportType() == typeAbortController {
+	if value.ExportType() == TypeAbortController {
 		return value.Export().(*abortController)
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type AbortController`))
 }
 
 func toAbortSignal(rt *sobek.Runtime, value sobek.Value) *abortSignal {
-	if value.ExportType() == typeAbortSignal {
+	if value.ExportType() == TypeAbortSignal {
 		return value.Export().(*abortSignal)
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type AbortSignal`))
+}
+
+// Abort a signal
+func Abort(value sobek.Value, err error) {
+	if value.ExportType() == TypeAbortSignal {
+		value.Export().(*abortSignal).abort(err)
+	}
+}
+
+// Context return signal context
+func Context(rt *sobek.Runtime, value sobek.Value) context.Context {
+	if value.ExportType() == TypeAbortSignal {
+		return value.Export().(*abortSignal).ctx
+	}
+	panic(rt.NewTypeError(`Value must be of type AbortSignal`))
 }

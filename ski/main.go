@@ -15,6 +15,7 @@ import (
 	_ "github.com/shiroyk/ski/modules/buffer"
 	_ "github.com/shiroyk/ski/modules/encoding"
 	_ "github.com/shiroyk/ski/modules/fetch"
+	_ "github.com/shiroyk/ski/modules/signal"
 	_ "github.com/shiroyk/ski/modules/stream"
 	_ "github.com/shiroyk/ski/modules/timers"
 	_ "github.com/shiroyk/ski/modules/url"

@@ -14,6 +14,7 @@ import (
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/promise"
 	"github.com/shiroyk/ski/modules/buffer"
+	"github.com/shiroyk/ski/modules/signal"
 	"github.com/shiroyk/ski/modules/stream"
 	"github.com/shiroyk/ski/modules/url"
 )
@@ -272,7 +273,7 @@ func (r *request) read() ([]byte, error) {
 func (r *request) cancel() {
 	if r.signal != nil {
 		r.body.Close()
-		r.signal.Export().(*abortSignal).abort(errAbort)
+		signal.Abort(r.signal, signal.ErrAbort)
 	}
 }
 
@@ -281,7 +282,7 @@ func (r *request) toRequest(rt *sobek.Runtime) *http.Request {
 	if r.signal == nil {
 		ctx = js.Context(rt)
 	} else {
-		ctx = r.signal.Export().(*abortSignal).ctx
+		ctx = signal.Context(rt, r.signal)
 	}
 	req, err := http.NewRequestWithContext(ctx, r.method, r.url, r.body)
 	if err != nil {
@@ -332,11 +333,11 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	if integrity := init.Get("integrity"); integrity != nil {
 		req.integrity = integrity.String()
 	}
-	if signal := init.Get("signal"); signal != nil {
-		if signal.ExportType() != typeAbortSignal {
+	if v := init.Get("signal"); v != nil {
+		if v.ExportType() != signal.TypeAbortSignal {
 			js.Throw(rt, errors.New("options signal is not AbortSignal"))
 		}
-		req.signal = signal
+		req.signal = v
 	}
 	if header := init.Get("headers"); header != nil {
 		req.headers = js.New(rt, "Headers", header)

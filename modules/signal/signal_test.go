@@ -1,4 +1,4 @@
-package fetch
+package signal
 
 import (
 	"context"
