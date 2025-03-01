@@ -6,6 +6,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js/modulestest"
+	_ "github.com/shiroyk/ski/modules/timers"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -153,7 +154,7 @@ func TestEventTarget(t *testing.T) {
 			setTimeout(() => {
 				target.dispatchEvent(event);
 				assert.equal(count, 1);
-			}, 0);
+			});
 		`)
 		assert.NoError(t, err)
 	})

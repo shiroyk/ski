@@ -114,7 +114,7 @@ func (*event) type_(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*event) target(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	evt := toEvent(rt, call.This)
 	if target := evt.Target(); target != nil {
-		return rt.ToValue(target.toValue(nil, rt))
+		return rt.ToValue(target.toValue(call.This, rt))
 	}
 	return sobek.Null()
 }
@@ -122,7 +122,7 @@ func (*event) target(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*event) currentTarget(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	evt := toEvent(rt, call.This)
 	if target := evt.CurrentTarget(); target != nil {
-		return rt.ToValue(target.toValue(nil, rt))
+		return rt.ToValue(target.toValue(call.This, rt))
 	}
 	return sobek.Null()
 }
