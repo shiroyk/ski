@@ -44,6 +44,27 @@ func RunString(ctx context.Context, str string) (sobek.Value, error) {
 	return vm.RunString(ctx, str)
 }
 
+// RunProgram executes the given sobek.Program
+//
+// example:
+//
+//	program, err := sobek.Compile("", `1 + 1`, false)
+//	if err != nil {
+//		panic(err)
+//	}
+//	value, err := ski.RunProgram(context.Background(), program)
+//	if err != nil {
+//		panic(err)
+//	}
+//	fmt.Println(value.Export()) // 2
+func RunProgram(ctx context.Context, program *sobek.Program) (sobek.Value, error) {
+	vm, err := GetScheduler().get()
+	if err != nil {
+		return nil, err
+	}
+	return vm.RunProgram(ctx, program)
+}
+
 // Run executes the given function
 //
 // example:

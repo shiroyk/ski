@@ -20,6 +20,8 @@ type VM interface {
 	RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (sobek.Value, error)
 	// RunString executes the given string
 	RunString(ctx context.Context, str string) (sobek.Value, error)
+	// RunProgram executes the given sobek.Program
+	RunProgram(ctx context.Context, program *sobek.Program) (sobek.Value, error)
 	// Run execute the given function in the EventLoop.
 	// when context done interrupt VM execution and release the VM.
 	// This is usually used when needs to be called repeatedly many times.
@@ -154,6 +156,15 @@ func (vm *vmImpl) RunModule(ctx context.Context, module sobek.CyclicModuleRecord
 func (vm *vmImpl) RunString(ctx context.Context, str string) (ret sobek.Value, err error) {
 	err = vm.Run(ctx, func() error {
 		ret, err = vm.runtime.RunString(str)
+		return err
+	})
+	return
+}
+
+// RunProgram executes the given sobek.Program
+func (vm *vmImpl) RunProgram(ctx context.Context, p *sobek.Program) (ret sobek.Value, err error) {
+	err = vm.Run(ctx, func() error {
+		ret, err = vm.runtime.RunProgram(p)
 		return err
 	})
 	return
