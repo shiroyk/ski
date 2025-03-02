@@ -15,7 +15,7 @@ func init() {
 	modules.Register("http", &Http{client})
 	modules.Register("cookieJar", &CookieJarModule{jar})
 	modules.Register("fetch", modules.Global{
-		"fetch":    &Fetch{client},
+		"fetch":    Fetch(client),
 		"Request":  new(Request),
 		"Response": new(Response),
 		"Headers":  new(Headers),

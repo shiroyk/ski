@@ -32,8 +32,8 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`");
+		export default (url) => {
+			const response = http.get(url);
 			return {
 				ok: response.ok,
 				status: response.status,
@@ -41,7 +41,7 @@ func TestHttp(t *testing.T) {
 				text: response.text(),
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := result.ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
@@ -58,8 +58,8 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.request(new Request("`+server.URL+`", {
+		export default (url) => {
+			const response = http.request(new Request(url, {
 				method: "GET",
 			}));
 			return {
@@ -69,7 +69,7 @@ func TestHttp(t *testing.T) {
 				text: response.text(),
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := result.ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
@@ -92,29 +92,29 @@ func TestHttp(t *testing.T) {
 			{name: "OPTIONS", method: "OPTIONS"},
 		}
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					assert.Equal(t, tt.method, r.Method)
-					if tt.body != "" {
-						body, err := io.ReadAll(r.Body)
-						if assert.NoError(t, err) {
-							assert.Equal(t, tt.body, string(body))
-						}
-					}
-					w.WriteHeader(http.StatusOK)
-				}))
-				defer server.Close()
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			i, err := strconv.Atoi(r.URL.Query().Get("i"))
+			require.NoError(t, err)
+			tt := tests[i]
+			assert.Equal(t, tt.method, r.Method)
+			if tt.body != "" {
+				body, err := io.ReadAll(r.Body)
+				if assert.NoError(t, err) {
+					assert.Equal(t, tt.body, string(body))
+				}
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
 
+		for i, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
 				result, err := vm.RunModule(ctx, `
-				export default () => {
-					const response = http.request("`+server.URL+`", {
-						method: "`+tt.method+`",
-						body: "`+tt.body+`"
-					});
+				export default (url, method, body) => {
+					const response = http.request(url, { method,body });
 					return response.status;
 				}
-				`)
+				`, fmt.Sprintf("%s?i=%d", server.URL, i), tt.method, tt.body)
 				require.NoError(t, err)
 				assert.Equal(t, int64(200), result.ToInteger())
 			})
@@ -130,8 +130,8 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`", {
+		export default (url) => {
+			const response = http.get(url, {
 				headers: {
 					"Content-Type": "application/json",
 					"X-Custom": "custom value"
@@ -139,7 +139,7 @@ func TestHttp(t *testing.T) {
 			});
 			return response.status;
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		assert.Equal(t, int64(200), result.ToInteger())
 	})
@@ -322,14 +322,14 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`");
+		export default (url) => {
+			const response = http.get(url);
 			return {
 				contentType: response.headers.get("content-type"),
 				custom: response.headers.get("x-custom"),
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := result.ToObject(vm.Runtime())
 		assert.Equal(t, "text/plain", obj.Get("contentType").String())
@@ -343,14 +343,14 @@ func TestHttp(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			const response = http.get("`+server.URL+`");
+		export default (url) => {
+			const response = http.get(url);
 			return {
 				ok: response.ok,
 				status: response.status,
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := result.ToObject(vm.Runtime())
 		assert.False(t, obj.Get("ok").ToBoolean())

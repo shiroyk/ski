@@ -69,13 +69,10 @@ func (h *Http) head(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 func (h *Http) do(call sobek.FunctionCall, rt *sobek.Runtime, method string) sobek.Value {
-	if len(call.Arguments) < 1 {
-		panic(rt.NewTypeError("fetch requires at least 1 argument"))
+	if len(call.Arguments) == 0 {
+		panic(rt.NewTypeError("http requires at least 1 argument"))
 	}
 	resource := call.Argument(0)
-	if sobek.IsUndefined(resource) {
-		panic(rt.NewTypeError("fetch requires at least 1 argument"))
-	}
 
 	var req *request
 	if resource.ExportType() == typeRequest {

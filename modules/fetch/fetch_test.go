@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js/modulestest"
+	"github.com/shiroyk/ski/js/promise"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,8 +28,8 @@ func TestFetch(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default async () => {
-			const response = await fetch("`+server.URL+`");
+		export default async (url) => {
+			const response = await fetch(url);
 			return {
 				ok: response.ok,
 				status: response.status,
@@ -37,7 +37,7 @@ func TestFetch(t *testing.T) {
 				text: await response.text(),
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
@@ -54,8 +54,8 @@ func TestFetch(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default async () => {
-			const response = await fetch(new Request("`+server.URL+`", {
+		export default async (url) => {
+			const response = await fetch(new Request(url, {
 				method: "GET",
 			}));
 			return {
@@ -65,7 +65,7 @@ func TestFetch(t *testing.T) {
 				text: await response.text(),
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
@@ -87,30 +87,29 @@ func TestFetch(t *testing.T) {
 			{name: "HEAD", method: "HEAD"},
 			{name: "OPTIONS", method: "OPTIONS"},
 		}
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			i, err := strconv.Atoi(r.URL.Query().Get("i"))
+			require.NoError(t, err)
+			tt := tests[i]
+			assert.Equal(t, tt.method, r.Method)
+			if tt.body != "" {
+				body, err := io.ReadAll(r.Body)
+				if assert.NoError(t, err) {
+					assert.Equal(t, tt.body, string(body))
+				}
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
 
-		for _, tt := range tests {
+		for i, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					assert.Equal(t, tt.method, r.Method)
-					if tt.body != "" {
-						body, err := io.ReadAll(r.Body)
-						if assert.NoError(t, err) {
-							assert.Equal(t, tt.body, string(body))
-						}
-					}
-					w.WriteHeader(http.StatusOK)
-				}))
-				defer server.Close()
-
 				result, err := vm.RunModule(ctx, `
-				export default async () => {
-					const response = await fetch("`+server.URL+`", {
-						method: "`+tt.method+`",
-						body: "`+tt.body+`"
-					});
+				export default async (url, method, body) => {
+					const response = await fetch(url, { method, body });
 					return response.status;
 				}
-				`)
+				`, fmt.Sprintf("%s?i=%d", server.URL, i), tt.method, tt.body)
 				require.NoError(t, err)
 				assert.Equal(t, int64(200), modulestest.PromiseResult(result).ToInteger())
 			})
@@ -126,8 +125,8 @@ func TestFetch(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default async () => {
-			const response = await fetch("`+server.URL+`", {
+		export default async (url) => {
+			const response = await fetch(url, {
 				headers: {
 					"Content-Type": "application/json",
 					"X-Custom": "custom value"
@@ -135,7 +134,7 @@ func TestFetch(t *testing.T) {
 			});
 			return response.status;
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		assert.Equal(t, int64(200), modulestest.PromiseResult(result).ToInteger())
 	})
@@ -319,14 +318,14 @@ func TestFetch(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default async () => {
-			const response = await fetch("`+server.URL+`");
+		export default async (url) => {
+			const response = await fetch(url);
 			return {
 				contentType: response.headers.get("content-type"),
 				custom: response.headers.get("x-custom"),
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
 		assert.Equal(t, "text/plain", obj.Get("contentType").String())
@@ -340,14 +339,14 @@ func TestFetch(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default async () => {
-			const response = await fetch("`+server.URL+`");
+		export default async (url) => {
+			const response = await fetch(url);
 			return {
 				ok: response.ok,
 				status: response.status,
 			};
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
 		assert.False(t, obj.Get("ok").ToBoolean())
@@ -361,9 +360,9 @@ func TestFetch(t *testing.T) {
 		defer server.Close()
 
 		result, err := vm.RunModule(ctx, `
-		export default async () => {
+		export default async (url) => {
 			const controller = new AbortController();
-			const promise = fetch("`+server.URL+`", { signal: controller.signal });
+			const promise = fetch(url, { signal: controller.signal });
 			controller.abort();
 			try {
 				await promise;
@@ -372,27 +371,17 @@ func TestFetch(t *testing.T) {
 				return e.toString();
 			}
 		}
-		`)
+		`, server.URL)
 		require.NoError(t, err)
 		assert.Contains(t, modulestest.PromiseResult(result).String(), "aborted")
 	})
 
 	t.Run("type error", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
-		export default () => {
-			return fetch()
-		}
+		export default () => fetch()
 		`)
 		require.NoError(t, err)
-		promise, ok := result.Export().(*sobek.Promise)
-		if !ok {
-			t.Fatalf("result is not a promise")
-		}
-		switch promise.State() {
-		case sobek.PromiseStateRejected:
-			assert.Equal(t, `TypeError: fetch requires at least 1 argument`, promise.Result().String())
-		default:
-			panic("unexpected promise state")
-		}
+		_, err = promise.Result(result)
+		assert.ErrorContains(t, err, `TypeError: fetch requires at least 1 argument`)
 	})
 }
