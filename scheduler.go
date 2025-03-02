@@ -52,14 +52,15 @@ func GetScheduler() Scheduler { return scheduler.Load().(Scheduler) }
 
 // Scheduler the js.VM scheduler
 type Scheduler interface {
-	// Get the VM1
-	Get() (js.VM, error)
 	// Shrink the idle VM to initial VM size
 	Shrink()
 	// Metrics Scheduler metrics
 	Metrics() Metrics
 	// Close the scheduler
 	Close() error
+
+	// get a VM
+	get() (js.VM, error)
 }
 
 // NewScheduler create a new Scheduler
@@ -106,7 +107,7 @@ type schedulerImpl struct {
 	opt        []js.Option
 }
 
-func (s *schedulerImpl) Get() (js.VM, error) {
+func (s *schedulerImpl) get() (js.VM, error) {
 	if s.closed.Load() {
 		return nil, ErrSchedulerClosed
 	}

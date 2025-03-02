@@ -24,7 +24,7 @@ func TestScheduler(t *testing.T) {
 		assert.Equal(t, 2, metrics.Idle)
 		assert.Equal(t, 3, metrics.Remaining)
 
-		vm1, err := s.Get()
+		vm1, err := s.get()
 		require.NoError(t, err)
 		require.NotNil(t, vm1)
 
@@ -49,17 +49,17 @@ func TestScheduler(t *testing.T) {
 		})
 		defer s.Close()
 
-		vm1, err := s.Get()
+		vm1, err := s.get()
 		require.NoError(t, err)
-		vm2, err := s.Get()
+		vm2, err := s.get()
 		require.NoError(t, err)
 
-		_, err = s.Get()
+		_, err = s.get()
 		assert.Error(t, err)
 
 		vm1.Run(context.Background(), func() error { return nil })
 
-		vm3, err := s.Get()
+		vm3, err := s.get()
 		assert.NoError(t, err)
 		assert.NotNil(t, vm3)
 
@@ -96,7 +96,7 @@ func TestScheduler(t *testing.T) {
 			wg1.Add(1)
 			go func() {
 				defer wg1.Done()
-				vm, err := s.Get()
+				vm, err := s.get()
 				if err == nil {
 					vms <- vm
 				}
@@ -118,9 +118,9 @@ func TestScheduler(t *testing.T) {
 		})
 		defer s.Close()
 
-		vm1, _ := s.Get()
-		vm2, _ := s.Get()
-		vm3, _ := s.Get()
+		vm1, _ := s.get()
+		vm2, _ := s.get()
+		vm3, _ := s.get()
 
 		vm1.Run(context.Background(), func() error { return nil })
 		vm2.Run(context.Background(), func() error { return nil })
@@ -136,7 +136,7 @@ func TestScheduler(t *testing.T) {
 		assert.Equal(t, 2, metrics.Idle)
 		assert.Equal(t, 2, metrics.Remaining)
 
-		vm, err := s.Get()
+		vm, err := s.get()
 		assert.NoError(t, err)
 		assert.NotNil(t, vm)
 		vm.Run(context.Background(), func() error { return nil })
@@ -148,13 +148,13 @@ func TestScheduler(t *testing.T) {
 			MaxVMs:     5,
 		})
 
-		vm, err := s.Get()
+		vm, err := s.get()
 		require.NoError(t, err)
 
 		err = s.Close()
 		assert.NoError(t, err)
 
-		_, err = s.Get()
+		_, err = s.get()
 		assert.ErrorIs(t, err, ErrSchedulerClosed)
 
 		assert.NotPanics(t, func() {
@@ -179,7 +179,7 @@ func TestScheduler(t *testing.T) {
 
 		vms := make([]js.VM, 3)
 		for i := range 3 {
-			vm, err := s.Get()
+			vm, err := s.get()
 			require.NoError(t, err)
 			vms[i] = vm
 		}

@@ -20,7 +20,7 @@ import (
 //	}
 //	fmt.Println(value.Export()) // 3
 func RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any) (sobek.Value, error) {
-	vm, err := GetScheduler().Get()
+	vm, err := GetScheduler().get()
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func RunModule(ctx context.Context, module sobek.CyclicModuleRecord, args ...any
 //	}
 //	fmt.Println(value.Export()) // 2
 func RunString(ctx context.Context, str string) (sobek.Value, error) {
-	vm, err := GetScheduler().Get()
+	vm, err := GetScheduler().get()
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func RunString(ctx context.Context, str string) (sobek.Value, error) {
 //		panic(err)
 //	}
 func Run(ctx context.Context, fn func(*sobek.Runtime) error) error {
-	vm, err := GetScheduler().Get()
+	vm, err := GetScheduler().get()
 	if err != nil {
 		return err
 	}
