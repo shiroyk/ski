@@ -1,30 +1,15 @@
-package js
+package modules
 
 import (
-	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"testing"
 	"testing/fstest"
-	_ "unsafe"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski/modules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func init() {
-	modules.Register("testGlobal", modules.Global{
-		"globalMod": modules.ModuleFunc(func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-			return rt.ToValue("some value")
-		}),
-	})
-	modules.Register("node:url", modules.Global{
-		"URL": new(nodeURL),
-	})
-}
 
 type gomod1 struct{}
 
@@ -36,13 +21,14 @@ type gomod2 struct{}
 
 func (gomod2) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return rt.ToValue(struct {
-		Key string `js:"key"`
+		Key string
 	}{Key: "gomod2"}), nil
 }
 
-type nodeURL struct{}
+type nodeURL struct{ init int }
 
-func (nodeURL) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+func (n *nodeURL) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
+	n.init++
 	ctor := rt.ToValue(func(call sobek.ConstructorCall) *sobek.Object {
 		u, err := url.Parse(call.Argument(0).String())
 		if err != nil {
@@ -133,11 +119,7 @@ func TestModuleLoader(t *testing.T) {
 		},
 	}
 
-	ml := Loader()
-	t.Cleanup(func() {
-		ml.SetFileLoader(modules.DefaultFileLoader(http.DefaultClient.Do))
-	})
-	ml.SetFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
+	ml := NewLoader(WithFileLoader(func(specifier *url.URL, name string) ([]byte, error) {
 		switch specifier.Scheme {
 		case "http", "https":
 			if specifier.Query().Get("type") == "esm" {
@@ -152,11 +134,11 @@ func TestModuleLoader(t *testing.T) {
 		default:
 			return nil, fmt.Errorf("unexpected scheme %s", specifier.Scheme)
 		}
-	})
+	}))
 
-	modules.Register("gomod1", new(gomod1))
-	modules.Register("gomod2", new(gomod2))
-	vm := NewTestVM(t)
+	Register("gomod1", new(gomod1))
+	Register("gomod2", new(gomod2))
+	vm := NewTestVM(t, ml)
 
 	t.Run("script", func(t *testing.T) {
 		scriptCases := []struct{ name, s string }{
@@ -183,7 +165,7 @@ func TestModuleLoader(t *testing.T) {
 
 		for _, script := range scriptCases {
 			t.Run(fmt.Sprintf("script %s", script.name), func(t *testing.T) {
-				_, err := vm.RunString(context.Background(), script.s)
+				_, err := vm.RunString(script.s)
 				assert.NoError(t, err)
 			})
 		}
@@ -212,7 +194,7 @@ func TestModuleLoader(t *testing.T) {
 			{"module6", `import module6 from "module6";
 			assert.equal(module6(), "/module6/module5");`},
 			{"module7", `import module7 from "module7";
-			export default async () => assert.equal(await module7(), "dynamic import /module6");`},
+			assert.equal(await module7(), "dynamic import /module6");`},
 			{"es_script1", `import es from "./es_script1";
 			assert.equal(es(), "module1/module2/module3/es_script1");`},
 			{"es_script2", `import { value } from "./es_script2";
@@ -232,55 +214,60 @@ func TestModuleLoader(t *testing.T) {
 			t.Run(fmt.Sprintf("module %v", script.name), func(t *testing.T) {
 				mod, err := ml.CompileModule("", script.s)
 				require.NoError(t, err)
-				result, err := vm.RunModule(context.Background(), mod)
-				require.NoError(t, err)
-				if result == nil {
-					return
-				}
-				promise, ok := result.Export().(*sobek.Promise)
-				if !ok {
-					return
-				}
-				switch promise.State() {
-				case sobek.PromiseStateRejected:
-					require.FailNow(t, fmt.Sprintf("promise rejected: %s", promise.Result().String()))
-				case sobek.PromiseStateFulfilled:
-				default:
-					require.FailNow(t, "unexpected promise state")
-				}
+				require.NoError(t, mod.Link())
+				Result(vm.CyclicModuleRecordEvaluate(mod, ml.ResolveModule))
 			})
 		}
 	})
 
 	t.Run("lazy global", func(t *testing.T) {
-		t.Run("variable", func(t *testing.T) {
+		t.Run("function", func(t *testing.T) {
+			Register("testGlobal", Global{
+				"globalMod": ModuleFunc(func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+					return rt.ToValue("some value")
+				}),
+			})
+			ml.(*loader).collectGlobals()
+
 			mod, err := ml.CompileModule("", `
-			assert.true(globalMod(), 'some value');`)
-			require.NoError(t, err)
-
-			_, err = vm.RunModule(t.Context(), mod)
-			require.NoError(t, err)
-
-			_, err = vm.RunString(t.Context(), `
+			assert.true(Reflect.has(globalThis, "globalMod"), "before init");
 			assert.true(globalMod(), 'some value');
-			`)
+			assert.true(Reflect.has(globalThis, "globalMod"), "after init");`)
+			require.NoError(t, err)
+			require.NoError(t, mod.Link())
+			Result(vm.CyclicModuleRecordEvaluate(mod, ml.ResolveModule))
+
+			_, err = vm.RunString(`assert.true(globalMod(), 'some value');`)
 			require.NoError(t, err)
 		})
 
-		t.Run("prototype", func(t *testing.T) {
-			mod, err := ml.CompileModule("", `import {URL as NODE_URL} from "node:url";
-			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
-			assert.true(NODE_URL.prototype === URL.prototype, 'prototype not equal');`)
-			require.NoError(t, err)
-			_, err = vm.RunModule(t.Context(), mod)
-			require.NoError(t, err)
+		t.Run("constructor", func(t *testing.T) {
+			n := new(nodeURL)
+			Register("node:url", Global{
+				"URL": n,
+			})
+			ml.(*loader).collectGlobals()
 
-			_, err = vm.RunString(t.Context(), `
+			mod, err := ml.CompileModule("", `
+			import {URL as NODE_URL} from "node:url";
+			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
+			assert.true(NODE_URL.prototype === URL.prototype, 'prototype not equal');
+			let desc = Reflect.getOwnPropertyDescriptor(globalThis, "URL");
+			assert.true(desc.value.prototype === URL.prototype, 'desc prototype not equal')`)
+			require.NoError(t, err)
+			require.NoError(t, mod.Link())
+			Result(vm.CyclicModuleRecordEvaluate(mod, ml.ResolveModule))
+
+			_, err = vm.RunString(`
+			assert.true(Reflect.has(globalThis, "URL"), "before init");
 			const NODE_URL = require("node:url").URL;
+			assert.true(Reflect.has(globalThis, "URL"), "after init");
 			assert.equal(new NODE_URL("https://example.com").toString(), "https://example.com");
 			assert.true(require("node:url").URL.prototype === URL.prototype, 'prototype not equal');
 			`)
 			require.NoError(t, err)
+
+			assert.Equal(t, n.init, 1)
 		})
 
 	})
@@ -289,16 +276,18 @@ func TestModuleLoader(t *testing.T) {
 		testCases := []struct {
 			name, script string
 			expected     string
+			require      bool
 		}{
 			{
 				name:     "import syntax",
 				script:   `import test from "./syntaxError"`,
-				expected: "SyntaxError",
+				expected: "SyntaxError: file://syntaxError.js",
 			},
 			{
 				name:     "require syntax",
 				script:   `require("./syntaxError")`,
-				expected: `Error: SyntaxError: file://syntaxError.js:`,
+				expected: `SyntaxError: file://syntaxError.js:`,
+				require:  true,
 			},
 			{
 				name:     "not found error",
@@ -313,24 +302,37 @@ func TestModuleLoader(t *testing.T) {
 			{
 				name:     "require not found",
 				script:   `require("some")`,
-				expected: "Error: cannot found module 'some'",
+				expected: "cannot found module",
+				require:  true,
+			},
+			{
+				name:     "require natives not found",
+				script:   `require("ski/some_module")`,
+				expected: "cannot found module",
+				require:  true,
 			},
 		}
 
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				mod, err := ml.CompileModule("", tt.script)
-				require.NoError(t, err)
-				_, err = vm.RunModule(context.Background(), mod)
-				assert.ErrorContains(t, err, tt.expected)
+				if tt.require {
+					_, err := vm.RunString(tt.script)
+					assert.ErrorContains(t, err, tt.expected)
+				} else {
+					mod, err := ml.CompileModule("", tt.script)
+					require.NoError(t, err)
+					assert.ErrorContains(t, mod.Link(), tt.expected)
+				}
 			})
 		}
 	})
 }
 
-func NewTestVM(t *testing.T, opts ...Option) VM {
-	vm := NewVM(opts...)
-	p := vm.Runtime().NewObject()
+func NewTestVM(t *testing.T, ml Loader) *sobek.Runtime {
+	rt := sobek.New()
+	rt.SetFieldNameMapper(sobek.UncapFieldNameMapper())
+	ml.EnableRequire(rt).EnableImportModuleDynamically(rt).InitGlobal(rt)
+	p := rt.NewObject()
 	_ = p.Set("equal", func(call sobek.FunctionCall) sobek.Value {
 		assert.Equal(t, call.Argument(0).Export(), call.Argument(1).Export(), call.Argument(2).String())
 		return sobek.Undefined()
@@ -339,6 +341,19 @@ func NewTestVM(t *testing.T, opts ...Option) VM {
 		assert.True(t, call.Argument(0).ToBoolean(), call.Argument(1).String())
 		return sobek.Undefined()
 	})
-	_ = vm.Runtime().Set("assert", p)
-	return vm
+	_ = rt.Set("assert", p)
+	return rt
+}
+
+// Result get the promise resolve result
+// panic when promise reject.
+func Result(promise *sobek.Promise) sobek.Value {
+	switch promise.State() {
+	case sobek.PromiseStateRejected:
+		panic(promise.Result().String())
+	case sobek.PromiseStateFulfilled:
+		return promise.Result()
+	default:
+		panic("unexpected promise state")
+	}
 }
