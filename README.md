@@ -142,10 +142,10 @@ package main
 import (
 	"context"
 
-	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/modulestest"
+	"github.com/shiroyk/ski/modules"
 )
 
 const app = `
@@ -181,9 +181,11 @@ const index = `<!DOCTYPE html>
 </html>`
 
 func main() {
+	modules.Register("server", modules.ModuleFunc(modulestest.HttpServer))
 	module, err := js.CompileModule(`module`, `
 	import { h, createSSRApp } from "https://esm.sh/vue@3";
 	import { renderToString } from "https://esm.sh/@vue/server-renderer@3";
+	import createServer from "ski/server";
 
         createServer("localhost:8000", async (req, res) => {
 		`+app+`
@@ -195,11 +197,7 @@ func main() {
 		panic(err)
 	}
 
-	err = ski.Run(context.Background(), func(rt *sobek.Runtime) error {
-		_ = rt.Set("createServer", modulestest.HttpServer)
-		_, err = js.ModuleInstance(rt, module)
-		return err
-	})
+	_, err = ski.RunModule(context.Background(), module)
 	if err != nil {
 		panic(err)
 	}
