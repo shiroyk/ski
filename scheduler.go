@@ -108,19 +108,21 @@ type schedulerImpl struct {
 }
 
 func (s *schedulerImpl) get() (js.VM, error) {
-	if s.closed.Load() {
-		return nil, ErrSchedulerClosed
-	}
-
 	for range s.maxRetries {
 		select {
-		case vm := <-s.vms:
+		case vm, ok := <-s.vms:
+			if !ok {
+				return nil, ErrSchedulerClosed
+			}
 			return vm, nil
 		default:
 			if s.active.Add(1) > s.maxVMs {
 				s.active.Add(-1) // rollback count
 				select {
-				case vm := <-s.vms:
+				case vm, ok := <-s.vms:
+					if !ok {
+						return nil, ErrSchedulerClosed
+					}
 					return vm, nil
 				case <-time.After(s.timeout):
 					continue
@@ -171,6 +173,9 @@ func (s *schedulerImpl) Close() error {
 		return ErrSchedulerClosed
 	}
 	close(s.vms)
+	// clear buffered
+	for range s.vms {
+	}
 	return nil
 }
 

@@ -165,6 +165,26 @@ func TestScheduler(t *testing.T) {
 		assert.ErrorIs(t, err, ErrSchedulerClosed)
 	})
 
+	t.Run("close get", func(t *testing.T) {
+		s := NewScheduler(SchedulerOptions{
+			InitialVMs: 0,
+			MaxVMs:     1,
+			GetTimeout: time.Millisecond * 200,
+		})
+
+		vm, err := s.get()
+		require.NoError(t, err)
+
+		time.AfterFunc(time.Millisecond*100, func() { require.NoError(t, s.Close()) })
+
+		_, err = s.get()
+		assert.ErrorIs(t, err, ErrSchedulerClosed)
+
+		assert.NotPanics(t, func() {
+			vm.Run(context.Background(), func() error { return nil })
+		})
+	})
+
 	t.Run("metrics accuracy", func(t *testing.T) {
 		s := NewScheduler(SchedulerOptions{
 			InitialVMs: 3,
