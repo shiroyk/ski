@@ -135,7 +135,7 @@ export default function () {
 ```
 
 ## Example
-Vue.js Server side rendering.
+Vue.js Server side rendering. </br>See more examples in [examples](https://github.com/shiroyk/ski/tree/master/examples).
 ```go
 package main
 
