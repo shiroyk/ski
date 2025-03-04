@@ -1,6 +1,7 @@
 package modulestest
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -46,10 +48,12 @@ func HttpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			done := make(chan struct{})
+			ctx, cancel := context.WithTimeout(r.Context(), time.Second*30)
+			defer cancel()
 			js.EnqueueJob(rt)(func() error {
 				req := &request{
 					req:      r,
+					URL:      r.RequestURI,
 					Method:   r.Method,
 					Host:     r.Host,
 					Path:     r.URL.Path,
@@ -58,7 +62,7 @@ func HttpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				}
 				res := &response{
 					res:  w,
-					done: done,
+					done: cancel,
 				}
 				v, err := handler(sobek.Undefined(), rt.ToValue(req), rt.ToValue(res))
 				if err == nil {
@@ -70,10 +74,9 @@ func HttpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				slog.Error("test server: error", "method", r.Method, "path", r.URL.Path, "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				io.WriteString(w, err.Error())
-				close(done)
 				return nil
 			})
-			<-done
+			<-ctx.Done()
 		}),
 	}
 
@@ -98,6 +101,7 @@ func HttpServer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 type request struct {
 	req      *http.Request
+	URL      string `js:"url"`
 	Path     string
 	Method   string
 	Host     string
@@ -150,7 +154,7 @@ func (r *request) GetHeader(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 
 type response struct {
 	res        http.ResponseWriter
-	done       chan struct{}
+	done       func()
 	StatusCode int
 }
 
@@ -173,7 +177,7 @@ func (r *response) Write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	if err != nil {
 		r.res.WriteHeader(http.StatusInternalServerError)
 		r.res.Write([]byte(err.Error()))
-		close(r.done)
+		r.done()
 		js.Throw(rt, err)
 	}
 
@@ -183,19 +187,17 @@ func (r *response) Write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 }
 
 func (r *response) End(call sobek.FunctionCall) sobek.Value {
+	defer r.done()
 	data, err := js.Unwrap(call.Argument(0))
 	if err != nil {
 		r.res.WriteHeader(http.StatusInternalServerError)
 		r.res.Write([]byte(err.Error()))
-		goto END
+		return sobek.Undefined()
 	}
 
 	if r.StatusCode != 0 {
 		r.res.WriteHeader(r.StatusCode)
 	}
 	r.res.Write([]byte(fmt.Sprintf("%v", data)))
-
-END:
-	close(r.done)
 	return sobek.Undefined()
 }

@@ -309,9 +309,6 @@ func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 
 	searchParams := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
-	if err != nil {
-		return sobek.Null()
-	}
 
 	obj := rt.ToValue(&url{
 		url:          parsedURL,

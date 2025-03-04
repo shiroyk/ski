@@ -53,6 +53,7 @@ func TestHttpServer(t *testing.T) {
 
 	source := `
 const server = createServer((req, res) => {
+	assert.equal(req.url, '/test?foo=bar');
 	assert.equal(req.method, 'GET');
 	assert.equal(req.path, '/test');
 	assert.equal(req.protocol, 'HTTP/1.1');
@@ -63,7 +64,7 @@ const server = createServer((req, res) => {
 	res.end('{"hello": "world"}');
 });
 
-const res = await post(server.url+"/test", '{"foo": "bar"}');
+const res = await post(server.url+"/test?foo=bar", '{"foo": "bar"}');
 assert.equal(res.status, 400);
 assert.equal(res.body, '{"hello": "world"}');
 assert.equal(res.headers.get('content-type'), 'application/json');
