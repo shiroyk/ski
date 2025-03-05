@@ -261,7 +261,7 @@ func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
 				if err != nil {
 					return nil, "", err
 				}
-				data := buffer.GetReader(rt, value)
+				data, _ := buffer.GetReader(value)
 				if data == nil {
 					fw.Write(nil)
 					continue

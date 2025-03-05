@@ -7,8 +7,8 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/promise"
+	"github.com/shiroyk/ski/js/types"
 	"github.com/shiroyk/ski/modules"
-	"github.com/shiroyk/ski/modules/buffer"
 )
 
 var (
@@ -263,9 +263,9 @@ func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime
 	data := call.Argument(0)
 	var bytes []byte
 	switch data.ExportType() {
-	case buffer.TypeArrayBuffer:
+	case types.TypeArrayBuffer:
 		bytes = data.Export().(sobek.ArrayBuffer).Bytes()
-	case buffer.TypeBytes:
+	case types.TypeBytes:
 		bytes = data.Export().([]byte)
 	default:
 		return promise.Reject(rt, rt.NewTypeError("argument must be an ArrayBuffer or Uint8Array"))

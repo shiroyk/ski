@@ -124,6 +124,9 @@ func Result(value sobek.Value) (any, error) {
 	}
 	switch promise.State() {
 	case sobek.PromiseStateRejected:
+		if ex, ok := promise.Result().Export().(error); ok {
+			return nil, ex
+		}
 		return nil, errors.New(promise.Result().String())
 	case sobek.PromiseStateFulfilled:
 		return promise.Result().Export(), nil

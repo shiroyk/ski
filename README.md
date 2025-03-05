@@ -38,7 +38,7 @@ encoding module provides base64 decode/encode and TextDecoder/TextEncoder.
 export default function () {
   const encoder = new TextEncoder();
   const data = encoder.encode("hello");
-  return encoding.base64.encode(data);
+  console.log(Array.from(new Uint8Array(data)));
 }
 ```
 ### fetch
@@ -53,7 +53,6 @@ fetch module provides HTTP client functionality. Web API implementations:
 
 Other:
 - cookieJar
-- http
 ```js
 export default async () => {
   const res = await fetch("http://example.com", {
@@ -144,8 +143,7 @@ import (
 
 	"github.com/shiroyk/ski"
 	"github.com/shiroyk/ski/js"
-	"github.com/shiroyk/ski/js/modulestest"
-	"github.com/shiroyk/ski/modules"
+	_ "github.com/shiroyk/ski/modules/http"
 )
 
 const app = `
@@ -181,16 +179,15 @@ const index = `<!DOCTYPE html>
 </html>`
 
 func main() {
-	modules.Register("server", modules.ModuleFunc(modulestest.HttpServer))
 	module, err := js.CompileModule(`module`, `
 	import { h, createSSRApp } from "https://esm.sh/vue@3";
 	import { renderToString } from "https://esm.sh/@vue/server-renderer@3";
-	import createServer from "ski/server";
+	import serv from "ski/http/server";
 
-        createServer("localhost:8000", async (req, res) => {
+        serv(8000, async (req) => {
 		`+app+`
 		const html = await renderToString(app);
-		res.end(`+"`"+index+"`"+`);
+		return new Response(`+"`"+index+"`"+`);
 	});
     	`)
 	if err != nil {
@@ -202,6 +199,7 @@ func main() {
 		panic(err)
 	}
 }
+
 ```
 ## License
 ski is distributed under the [**MIT license**](https://github.com/shiroyk/ski/blob/master/LICENSE.md).

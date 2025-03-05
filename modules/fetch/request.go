@@ -7,7 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"reflect"
+	urlpkg "net/url"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -61,19 +61,16 @@ func (r *Request) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 	}
 
 	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
-		if arg.ExportType() == typeRequest {
-			req := arg.Export().(*request)
-			instance.url = req.url
-			if !req.bodyUsed {
-				instance.body = req.body
-			}
+		if req, ok := toRequest(arg); ok {
+			instance = req
 		} else {
 			instance.url = arg.String()
 		}
 	}
 
 	initRequest(rt, call.Argument(1), instance)
-	obj := rt.ToValue(instance).(*sobek.Object)
+	obj := rt.NewObject()
+	_ = obj.SetSymbol(symRequest, instance)
 	_ = obj.SetPrototype(call.This.Prototype())
 	return obj
 }
@@ -87,55 +84,57 @@ func (r *Request) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 }
 
 func (*Request) method(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).method)
+	return rt.ToValue(toThisRequest(rt, call.This).method)
 }
 
 func (*Request) url(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).url)
+	return rt.ToValue(toThisRequest(rt, call.This).url)
 }
 
 func (*Request) headers(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return toRequest(rt, call.This).headers
+	return toThisRequest(rt, call.This).headers
 }
 
 func (*Request) bodyUsed(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).bodyUsed)
+	return rt.ToValue(toThisRequest(rt, call.This).bodyUsed)
 }
 
 func (*Request) mode(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).mode)
+	return rt.ToValue(toThisRequest(rt, call.This).mode)
 }
 
 func (*Request) credentials(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).credentials)
+	return rt.ToValue(toThisRequest(rt, call.This).credentials)
 }
 
 func (*Request) cache(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).cache)
+	return rt.ToValue(toThisRequest(rt, call.This).cache)
 }
 
 func (*Request) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).redirect)
+	return rt.ToValue(toThisRequest(rt, call.This).redirect)
 }
 
 func (*Request) referrer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).referrer)
+	return rt.ToValue(toThisRequest(rt, call.This).referrer)
 }
 
 func (*Request) integrity(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toRequest(rt, call.This).integrity)
+	return rt.ToValue(toThisRequest(rt, call.This).integrity)
 }
 
 func (*Request) signal(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return toRequest(rt, call.This).signal
+	return toThisRequest(rt, call.This).signal
 }
 
 func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toRequest(rt, call.This)
+	this := toThisRequest(rt, call.This)
 	body := this.body
 	if !this.bodyUsed {
 		b1, b2 := new(bytes.Buffer), new(bytes.Buffer)
-		defer body.Close()
+		if c, ok := body.(io.Closer); ok {
+			defer c.Close()
+		}
 		_, err := io.Copy(io.MultiWriter(b1, b2), body)
 		if err != nil {
 			js.Throw(rt, err)
@@ -158,13 +157,14 @@ func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		integrity:   this.integrity,
 	}
 
-	obj := rt.ToValue(instance).(*sobek.Object)
+	obj := rt.NewObject()
+	_ = obj.SetSymbol(symRequest, instance)
 	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
 	return obj
 }
 
 func (r *Request) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toRequest(rt, call.This)
+	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
 		data, err := this.read()
 		callback(func() (any, error) {
@@ -177,7 +177,7 @@ func (r *Request) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 func (r *Request) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toRequest(rt, call.This)
+	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
 		data, err := this.read()
 		callback(func() (any, error) {
@@ -194,7 +194,7 @@ func (r *Request) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 func (r *Request) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toRequest(rt, call.This)
+	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
 		data, err := this.read()
 		callback(func() (any, error) {
@@ -207,7 +207,7 @@ func (r *Request) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 }
 
 func (r *Request) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toRequest(rt, call.This)
+	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
 		data, err := this.read()
 		callback(func() (any, error) {
@@ -220,7 +220,7 @@ func (r *Request) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 }
 
 func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toRequest(rt, call.This)
+	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
 		data, err := this.read()
 		callback(func() (any, error) {
@@ -233,7 +233,7 @@ func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 func (r *Request) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toRequest(rt, call.This)
+	this := toThisRequest(rt, call.This)
 	if this.body == nil {
 		return sobek.Null()
 	}
@@ -244,7 +244,7 @@ type request struct {
 	method          string
 	url             string
 	headers, signal sobek.Value
-	body            io.ReadCloser
+	body            io.Reader
 	bodyUsed        bool
 	mode            string
 	credentials     string
@@ -262,7 +262,9 @@ func (r *request) read() ([]byte, error) {
 		return nil, errBodyAlreadyRead
 	}
 	r.bodyUsed = true
-	defer r.body.Close()
+	if c, ok := r.body.(io.Closer); ok {
+		defer c.Close()
+	}
 	data, err := io.ReadAll(r.body)
 	if err != nil {
 		return nil, err
@@ -272,7 +274,9 @@ func (r *request) read() ([]byte, error) {
 
 func (r *request) cancel() {
 	if r.signal != nil {
-		r.body.Close()
+		if c, ok := r.body.(io.Closer); ok {
+			defer c.Close()
+		}
 		signal.Abort(r.signal, signal.ErrAbort)
 	}
 }
@@ -297,18 +301,29 @@ func (r *request) toRequest(rt *sobek.Runtime) *http.Request {
 	return req
 }
 
-var typeRequest = reflect.TypeOf((*request)(nil))
+var symRequest = sobek.NewSymbol("Symbol.Request")
 
-func toRequest(rt *sobek.Runtime, value sobek.Value) *request {
-	if value.ExportType() == typeRequest {
-		return value.Export().(*request)
+func toThisRequest(rt *sobek.Runtime, value sobek.Value) *request {
+	if o, ok := value.(*sobek.Object); ok {
+		if v := o.GetSymbol(symRequest); v != nil {
+			return v.Export().(*request)
+		}
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type Request`))
 }
 
+func toRequest(value sobek.Value) (*request, bool) {
+	if o, ok := value.(*sobek.Object); ok {
+		if v := o.GetSymbol(symRequest); v != nil {
+			return v.Export().(*request), true
+		}
+	}
+	return nil, false
+}
+
 func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	if sobek.IsUndefined(opt) {
-		req.headers = js.New(rt, "Headers", rt.ToValue(headers{}))
+		req.headers = js.New(rt, "Headers")
 		return
 	}
 	init := opt.ToObject(rt)
@@ -342,7 +357,7 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	if header := init.Get("headers"); header != nil {
 		req.headers = js.New(rt, "Headers", header)
 	} else {
-		req.headers = js.New(rt, "Headers", rt.ToValue(headers{}))
+		req.headers = js.New(rt, "Headers")
 	}
 	if req.method == http.MethodGet || req.method == http.MethodHead {
 		return
@@ -366,16 +381,58 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 		case stream.TypeReadableStream:
 			body = stream.GetStreamSource(rt, b)
 		default:
-			if data, ok := buffer.GetBuffer(rt, b); ok {
-				body = bytes.NewReader(data)
+			if v, ok := buffer.GetReader(b); ok {
+				body = v
+			} else if v, ok := buffer.GetBuffer(rt, b); ok {
+				body = bytes.NewReader(v)
 			} else {
 				body = strings.NewReader(b.String())
 				h := req.headers.Export().(headers)
 				if _, ok := h["content-type"]; !ok {
-					h["content-type"] = []string{"text/plain;charset=UTF-8"}
+					h["content-type"] = []string{"text/plain; charset=UTF-8"}
 				}
 			}
 		}
-		req.body = io.NopCloser(body)
+		req.body = body
 	}
+}
+
+// NewRequest returns a new js Request
+func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
+	instance := &request{
+		method:      req.Method,
+		url:         req.URL.String(),
+		body:        http.NoBody,
+		headers:     js.New(rt, "Headers", rt.ToValue(map[string][]string(req.Header))),
+		referrer:    req.Referer(),
+		signal:      signal.New(rt, req.Context()),
+		mode:        "cors",
+		credentials: "same-origin",
+		cache:       "default",
+		redirect:    "follow",
+	}
+	if req.Body != nil {
+		instance.body = req.Body
+	}
+	obj := js.New(rt, "Request")
+	_ = obj.SetSymbol(symRequest, instance)
+	return obj
+}
+
+// ToRequest converts a js Request object to an http.Request
+func ToRequest(value sobek.Value) (*http.Request, bool) {
+	if o, ok := value.(*sobek.Object); ok {
+		if v := o.GetSymbol(symRequest); v != nil {
+			req := v.Export().(*request)
+			u, _ := urlpkg.Parse(req.url)
+			return &http.Request{
+				Method:     req.method,
+				URL:        u,
+				RequestURI: req.url,
+				Header:     http.Header(req.headers.Export().(headers)),
+				Body:       io.NopCloser(req.body),
+			}, true
+		}
+	}
+	return nil, false
 }

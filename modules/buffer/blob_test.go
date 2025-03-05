@@ -221,23 +221,3 @@ func TestBlob(t *testing.T) {
 		}
 	})
 }
-
-func TestIsTypedArray(t *testing.T) {
-	vm := modulestest.New(t)
-
-	t.Run("typed array", func(t *testing.T) {
-		for _, typ := range typedArrayTypes {
-			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
-			require.NoError(t, err)
-			assert.True(t, IsTypedArray(vm.Runtime(), v))
-		}
-	})
-
-	t.Run("not typed array", func(t *testing.T) {
-		for _, typ := range []string{"Array", "ArrayBuffer"} {
-			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
-			require.NoError(t, err)
-			assert.False(t, IsTypedArray(vm.Runtime(), v))
-		}
-	})
-}

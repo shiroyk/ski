@@ -195,3 +195,15 @@ func Context(rt *sobek.Runtime, value sobek.Value) context.Context {
 	}
 	panic(rt.NewTypeError(`Value must be of type AbortSignal`))
 }
+
+func New(rt *sobek.Runtime, ctx context.Context) sobek.Value {
+	signal := new(abortSignal)
+	signal.ctx, signal.cancel = context.WithCancelCause(ctx)
+	abortSignal := rt.Get("AbortSignal")
+	if abortSignal == nil {
+		panic(rt.NewTypeError("AbortSignal is not defined"))
+	}
+	value := rt.ToValue(signal).(*sobek.Object)
+	_ = value.SetPrototype(abortSignal.ToObject(rt).Prototype())
+	return value
+}

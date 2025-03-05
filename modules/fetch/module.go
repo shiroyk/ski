@@ -12,7 +12,6 @@ func init() {
 	jar := NewCookieJar()
 	client := NewClient()
 	client.Jar = jar
-	modules.Register("http", &Http{client})
 	modules.Register("cookieJar", &CookieJarModule{jar})
 	modules.Register("fetch", modules.Global{
 		"fetch":    Fetch(client),

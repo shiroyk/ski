@@ -20,10 +20,8 @@ func Fetch(client Client) modules.ModuleFunc {
 		}
 		resource := call.Argument(0)
 
-		var req *request
-		if resource.ExportType() == typeRequest {
-			req = resource.Export().(*request)
-		} else {
+		req, ok := toRequest(resource)
+		if !ok {
 			req = &request{
 				method: "GET",
 				cache:  "default",
@@ -40,7 +38,7 @@ func Fetch(client Client) modules.ModuleFunc {
 				if err != nil {
 					return nil, err
 				}
-				return NewResponse(rt, res, true), nil
+				return NewResponse(rt, res), nil
 			})
 		})
 	}

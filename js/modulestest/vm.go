@@ -44,6 +44,24 @@ func New(t testing.TB, opts ...js.Option) VM {
 		}
 		return
 	})
+	_ = obj.Set("contains", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
+		a, err := js.Unwrap(call.Argument(0))
+		if err != nil {
+			js.Throw(vm, err)
+		}
+		b, err := js.Unwrap(call.Argument(1))
+		if err != nil {
+			js.Throw(vm, err)
+		}
+		var msg string
+		if !sobek.IsUndefined(call.Argument(2)) {
+			msg = call.Argument(2).String()
+		}
+		if !assert.Contains(t, b, a, msg) {
+			js.Throw(vm, fmt.Errorf("not contains: %#v != %#v", b, a))
+		}
+		return
+	})
 	_ = obj.Set("regexp", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
 		a, err := js.Unwrap(call.Argument(0))
 		if err != nil {

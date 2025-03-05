@@ -214,7 +214,8 @@ func (vm *vmImpl) Run(ctx context.Context, task func() error) (err error) {
 			} else {
 				err = fmt.Errorf(`%s`, x)
 			}
-			Logger(ctx).Error(err.Error(), slog.String("stack", string(debug.Stack())))
+			stack := string(debug.Stack())
+			Logger(ctx).Error(err.Error()+"\n"+stack, slog.String("stack", stack))
 		}
 		vm.ctx = context.Background()
 		vm.release()

@@ -7,50 +7,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/promise"
+	"github.com/shiroyk/ski/js/types"
 	"github.com/shiroyk/ski/modules/buffer"
 	"github.com/shiroyk/ski/modules/stream"
 )
 
 var errBodyAlreadyRead = errors.New("body stream already read")
-
-// NewResponse returns a new js Response
-func NewResponse(rt *sobek.Runtime, res *http.Response, async bool) sobek.Value {
-	instance := &response{
-		status:     res.Status,
-		statusCode: res.StatusCode,
-		headers: sync.OnceValue(func() sobek.Value {
-			h := make(headers, len(res.Header))
-			for k := range res.Header {
-				h[normalizeHeaderName(k)] = res.Header[k]
-			}
-			return js.New(rt, "Headers", rt.ToValue(h))
-		}),
-		body:  res.Body,
-		type_: "basic",
-		async: async,
-	}
-	if res.Request != nil {
-		instance.url = res.Request.URL.String()
-		if location := res.Header.Get("Location"); location != "" {
-			instance.redirected = location != instance.url
-		}
-	}
-	js.Cleanup(rt, instance.close)
-	obj := rt.ToValue(instance).(*sobek.Object)
-	ctor := rt.Get("Response")
-	if ctor == nil {
-		panic(rt.NewTypeError("Response is not defined"))
-	}
-	_ = obj.SetPrototype(ctor.ToObject(rt).Prototype())
-	return obj
-}
 
 // Response represents the response to a request.
 // https://developer.mozilla.org/en-US/docs/Web/API/Response
@@ -89,8 +57,10 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 			}
 			body = reader
 		default:
-			if data, ok := buffer.GetBuffer(rt, arg); ok {
-				body = bytes.NewReader(data)
+			if v, ok := buffer.GetReader(arg); ok {
+				body = v
+			} else if v, ok := buffer.GetBuffer(rt, arg); ok {
+				body = bytes.NewReader(v)
 			} else {
 				body = strings.NewReader(arg.String())
 			}
@@ -106,19 +76,25 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 
 	if opt := call.Argument(1); !sobek.IsUndefined(opt) {
 		init := opt.ToObject(rt)
-		if status := init.Get("status"); status != nil {
-			code := int(status.ToInteger())
+		if v := init.Get("status"); v != nil {
+			code := int(v.ToInteger())
 			instance.statusCode = code
 			instance.status = fmt.Sprintf("%d %s", code, http.StatusText(code))
 		}
-		if statusText := init.Get("statusText"); statusText != nil {
-			instance.status = fmt.Sprintf("%d %s", instance.statusCode, statusText.String())
+		if v := init.Get("statusText"); v != nil {
+			instance.status = fmt.Sprintf("%d %s", instance.statusCode, v.String())
 		}
-
-		instance.headers = func() sobek.Value { return js.New(rt, "Headers", init.Get("headers")) }
+		if v := init.Get("headers"); v != nil {
+			instance.headers = func() sobek.Value { return js.New(rt, "Headers", v) }
+		}
 	}
 
-	obj := rt.ToValue(instance).(*sobek.Object)
+	if instance.headers == nil {
+		instance.headers = func() sobek.Value { return js.New(rt, "Headers") }
+	}
+
+	obj := rt.NewObject()
+	_ = obj.SetSymbol(symResponse, instance)
 	_ = obj.SetPrototype(call.This.Prototype())
 	return obj
 }
@@ -166,7 +142,9 @@ func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	body := this.body
 	if !this.bodyUsed {
 		b1, b2 := new(bytes.Buffer), new(bytes.Buffer)
-		defer body.Close()
+		if c, ok := body.(io.Closer); ok {
+			defer c.Close()
+		}
 		_, err := io.Copy(io.MultiWriter(b1, b2), body)
 		if err != nil {
 			js.Throw(rt, err)
@@ -174,60 +152,42 @@ func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		this.body = io.NopCloser(b1)
 		body = io.NopCloser(b2)
 	}
-	obj := rt.ToValue(&response{
+	obj := rt.NewObject()
+	_ = obj.SetSymbol(symResponse, &response{
 		status:     this.status,
 		statusCode: this.statusCode,
 		headers:    this.headers,
 		body:       body,
 		bodyUsed:   this.bodyUsed,
 		url:        this.url,
-		async:      this.async,
-	}).(*sobek.Object)
+	})
 	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
 	return obj
 }
 
 func (*Response) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
-	if this.async {
-		return promise.New(rt, func(callback promise.Callback) {
-			b, err := this.text()
-			callback(func() (any, error) {
-				if err != nil {
-					return nil, err
-				}
-				return js.New(rt, "FormData", rt.ToValue(b)), nil
-			})
+	return promise.New(rt, func(callback promise.Callback) {
+		b, err := this.text()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return js.New(rt, "FormData", rt.ToValue(b)), nil
 		})
-	}
-	data, err := this.text()
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	f := js.New(rt, "FormData", rt.ToValue(data))
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	return f
+	})
 }
 
 func (*Response) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
-	if this.async {
-		return promise.New(rt, func(callback promise.Callback) {
-			v, err := this.text()
-			callback(func() (any, error) { return v, err })
-		})
-	}
-	data, err := this.text()
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	return rt.ToValue(data)
+	return promise.New(rt, func(callback promise.Callback) {
+		v, err := this.text()
+		callback(func() (any, error) { return v, err })
+	})
 }
 
 func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	if call.This == rt.Get("Response") {
+	if call.This.ExportType() == types.TypeFunc {
 		data := call.Argument(0)
 		if sobek.IsUndefined(data) {
 			panic(rt.NewTypeError("Response.json requires at least 1 arguments"))
@@ -236,7 +196,8 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		if err != nil {
 			js.Throw(rt, err)
 		}
-		res := rt.ToValue(&response{
+		res := rt.NewObject()
+		_ = res.SetSymbol(symResponse, &response{
 			status:     "200 OK",
 			statusCode: http.StatusOK,
 			body:       io.NopCloser(bytes.NewReader(b)),
@@ -245,42 +206,28 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			}),
 			type_:    "default",
 			bodyUsed: false,
-		}).(*sobek.Object)
+		})
 		_ = res.SetPrototype(call.This.ToObject(rt).Prototype())
 		return res
 	}
 	this := toResponse(rt, call.This)
-	if this.async {
-		return promise.New(rt, func(callback promise.Callback) {
-			v, err := this.json()
-			callback(func() (any, error) { return v, err })
-		})
-	}
-	data, err := this.json()
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	return rt.ToValue(data)
+	return promise.New(rt, func(callback promise.Callback) {
+		v, err := this.json()
+		callback(func() (any, error) { return v, err })
+	})
 }
 
 func (*Response) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
-	if this.async {
-		return promise.New(rt, func(callback promise.Callback) {
-			data, err := this.read()
-			callback(func() (any, error) {
-				if err != nil {
-					return nil, err
-				}
-				return rt.NewArrayBuffer(data), nil
-			})
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return rt.NewArrayBuffer(data), nil
 		})
-	}
-	data, err := this.read()
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	return rt.ToValue(rt.NewArrayBuffer(data))
+	})
 }
 
 func (*Response) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -290,65 +237,44 @@ func (*Response) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*Response) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
-	if this.async {
-		return promise.New(rt, func(callback promise.Callback) {
-			data, err := this.read()
-			callback(func() (any, error) {
-				if err != nil {
-					return nil, err
-				}
-				return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
-			})
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
-	}
-	data, err := this.read()
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	r := js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data)))
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	return r
+	})
 }
 
 func (*Response) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
-	if this.async {
-		return promise.New(rt, func(callback promise.Callback) {
-			data, err := this.read()
-			callback(func() (any, error) {
-				if err != nil {
-					return nil, err
-				}
-				return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data))), nil
-			})
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
-	}
-	data, err := this.read()
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	r := js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data)))
-	if err != nil {
-		js.Throw(rt, err)
-	}
-	return r
+	})
 }
 
 type response struct {
 	status               string
 	statusCode           int
 	headers              func() sobek.Value
-	body                 io.ReadCloser
+	body                 io.Reader
 	bodyUsed, redirected bool
 	url, type_           string
-	async                bool
 }
 
 func (r *response) close() {
 	if !r.bodyUsed {
-		r.body.Close()
+		if c, ok := r.body.(io.Closer); ok {
+			c.Close()
+		}
 	}
 }
 
@@ -357,7 +283,9 @@ func (r *response) read() ([]byte, error) {
 		return nil, errBodyAlreadyRead
 	}
 	r.bodyUsed = true
-	defer r.body.Close()
+	if c, ok := r.body.(io.Closer); ok {
+		defer c.Close()
+	}
 	data, err := io.ReadAll(r.body)
 	if err != nil {
 		return nil, err
@@ -389,11 +317,60 @@ func (r *response) String() string {
 	return fmt.Sprintf("[Response %d %s]", r.statusCode, r.status)
 }
 
-var typeResponse = reflect.TypeOf((*response)(nil))
+var symResponse = sobek.NewSymbol("Symbol.Response")
 
 func toResponse(rt *sobek.Runtime, value sobek.Value) *response {
-	if value.ExportType() == typeResponse {
-		return value.Export().(*response)
+	if o, ok := value.(*sobek.Object); ok {
+		if v := o.GetSymbol(symResponse); v != nil {
+			return v.Export().(*response)
+		}
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type Response`))
+}
+
+// NewResponse returns a new js Response
+func NewResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
+	instance := &response{
+		status:     res.Status,
+		statusCode: res.StatusCode,
+		headers: sync.OnceValue(func() sobek.Value {
+			h := make(headers, len(res.Header))
+			for k := range res.Header {
+				h[normalizeHeaderName(k)] = res.Header[k]
+			}
+			return js.New(rt, "Headers", rt.ToValue(h))
+		}),
+		body:  res.Body,
+		type_: "basic",
+	}
+	if res.Request != nil {
+		instance.url = res.Request.URL.String()
+		if location := res.Header.Get("Location"); location != "" {
+			instance.redirected = location != instance.url
+		}
+	}
+	ctor := rt.Get("Response")
+	if ctor == nil {
+		panic(rt.NewTypeError("Response is not defined"))
+	}
+	obj := rt.NewObject()
+	_ = obj.SetSymbol(symResponse, instance)
+	_ = obj.SetPrototype(ctor.ToObject(rt).Prototype())
+	return obj
+}
+
+// ToResponse converts a js Response object to an http.Response
+func ToResponse(value sobek.Value) (*http.Response, bool) {
+	if o, ok := value.(*sobek.Object); ok {
+		if v := o.GetSymbol(symResponse); v != nil {
+			res := v.Export().(*response)
+			return &http.Response{
+				Status:     res.status,
+				StatusCode: res.statusCode,
+				Header:     http.Header(res.headers().Export().(headers)),
+				Body:       io.NopCloser(res.body),
+			}, true
+		}
+	}
+	return nil, false
 }

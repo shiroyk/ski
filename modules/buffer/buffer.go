@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"reflect"
 	"strconv"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/types"
 )
 
 // Buffer used to represent a fixed-length sequence of bytes.
@@ -142,14 +142,13 @@ func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 
 func (b *Buffer) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	arg := call.Argument(0)
-	switch arg.ExportType() {
-	case typeInt, typeFloat:
+	if types.IsNumber(arg) {
 		size := int(arg.ToInteger())
 		if size < 0 {
 			panic(rt.NewTypeError("Buffer size must be a non-negative integer"))
 		}
 		return newBuffer(rt, call.This, make([]byte, size))
-	default:
+	} else {
 		return b.from(sobek.FunctionCall{This: call.This, Arguments: call.Arguments}, rt).(*sobek.Object)
 	}
 }
@@ -158,11 +157,11 @@ func (*Buffer) from(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	arg := call.Argument(0)
 
 	switch arg.ExportType() {
-	case TypeBytes:
+	case types.TypeBytes:
 		return newBuffer(rt, call.This, arg.Export().([]byte))
-	case TypeArrayBuffer:
+	case types.TypeArrayBuffer:
 		return newBufferFrom(rt, call.This, arg)
-	case typeString:
+	case types.TypeString:
 		buf := newBuffer(rt, call.This, decode(rt, arg.String(), call.Argument(1)))
 		return buf
 	default:
@@ -241,7 +240,7 @@ func (*Buffer) concat(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				data.Grow(len(buf))
 				data.Write(buf)
 				continue
-			} else if IsUint8Array(rt, item) {
+			} else if types.IsUint8Array(rt, item) {
 				buf := item.Export().([]byte)
 				data.Write(buf)
 				continue
@@ -369,14 +368,14 @@ func (*Buffer) fill(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 	var buf []byte
 	switch value.ExportType() {
-	case TypeArrayBuffer:
+	case types.TypeArrayBuffer:
 		buf = value.Export().(sobek.ArrayBuffer).Bytes()
-	case typeString:
+	case types.TypeString:
 		buf = decode(rt, value.String(), call.Argument(3))
-	case typeInt, typeFloat:
+	case types.TypeInt, types.TypeFloat:
 		buf = []byte{byte(value.ToInteger())}
 	default:
-		if IsBuffer(rt, value) || IsTypedArray(rt, value) {
+		if IsBuffer(rt, value) || types.IsTypedArray(rt, value) {
 			buf = value.Export().([]byte)
 		}
 	}
@@ -828,12 +827,6 @@ func (*Buffer) writeUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	return rt.ToValue(offset + byteLength)
 }
 
-var (
-	typeInt    = reflect.TypeOf(int64(0))
-	typeFloat  = reflect.TypeOf(0.0)
-	typeString = reflect.TypeOf("")
-)
-
 func newBuffer(rt *sobek.Runtime, this sobek.Value, data []byte) *sobek.Object {
 	u8 := rt.Get("Uint8Array")
 	if u8 == nil {
@@ -879,10 +872,9 @@ func toBuffer(rt *sobek.Runtime, value sobek.Value) buffer {
 
 func getByteLength(rt *sobek.Runtime, v sobek.Value) int64 {
 	var length int64
-	switch v.ExportType() {
-	case typeInt, typeFloat:
+	if types.IsNumber(v) {
 		length = v.ToInteger()
-	default:
+	} else {
 		panic(rt.NewTypeError(`The value of "byteLength" must be of type number`))
 	}
 
@@ -1046,10 +1038,9 @@ type buffer []byte
 
 func (b buffer) offset(rt *sobek.Runtime, v sobek.Value, numBytes int64) int64 {
 	var offset int64
-	switch v.ExportType() {
-	case typeInt, typeFloat:
+	if types.IsNumber(v) {
 		offset = v.ToInteger()
-	default:
+	} else {
 		panic(rt.NewTypeError(`The value of "offset" must be of type number`))
 	}
 

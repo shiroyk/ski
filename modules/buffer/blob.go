@@ -11,9 +11,7 @@ import (
 )
 
 var (
-	TypeBlob        = reflect.TypeOf((*blob)(nil))
-	TypeBytes       = reflect.TypeOf(([]byte)(nil))
-	TypeArrayBuffer = reflect.TypeOf(sobek.ArrayBuffer{})
+	TypeBlob = reflect.TypeOf((*blob)(nil))
 )
 
 // Blob interface represents a blob, which is a file-like object of immutable,
@@ -46,8 +44,10 @@ func (b *Blob) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 
 	var err error
 	rt.ForOf(blobParts, func(part sobek.Value) bool {
-		if buffer, ok := GetBuffer(rt, part); ok {
-			_, err = buf.Write(buffer)
+		if r, ok := GetReader(part); ok {
+			_, err = io.Copy(buf, r)
+		} else if v, ok := GetBuffer(rt, part); ok {
+			_, err = buf.Write(v)
 		} else {
 			_, err = buf.WriteString(part.String())
 		}
