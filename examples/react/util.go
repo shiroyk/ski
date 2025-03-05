@@ -38,19 +38,18 @@ export default (code) => transform(code, {presets: ["react"]}).code;
 )
 
 func source(path, data string) {
-	sourceFS[path] = &fstest.MapFile{Data: []byte(data)}
-}
-
-func loadFile(path string) ([]byte, error) {
-	data, err := sourceFS.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	// compile jsx file
 	if filepath.Ext(path) == ".jsx" {
-		return compiler()(string(data))
+		// compile jsx file
+		bytes, err := compiler()(data)
+		if err != nil {
+			panic("compile jsx failed: " + err.Error())
+		}
+		sourceFS[path] = &fstest.MapFile{Data: bytes}
+		fmt.Println("compile jsx:", path)
+	} else {
+		sourceFS[path] = &fstest.MapFile{Data: []byte(data)}
+		fmt.Println("source file:", path)
 	}
-	return data, nil
 }
 
 func fileLoader(specifier *urlpkg.URL, _ string) ([]byte, error) {
@@ -63,14 +62,14 @@ func fileLoader(specifier *urlpkg.URL, _ string) ([]byte, error) {
 		defer res.Body.Close()
 		return io.ReadAll(res.Body)
 	case "file":
-		return loadFile(specifier.Path)
+		return sourceFS.ReadFile(specifier.Path)
 	}
 	return nil, fmt.Errorf("scheme not supported %s", specifier.Scheme)
 }
 
 func openFile(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	name := call.Argument(0).String()
-	data, err := loadFile(name)
+	data, err := sourceFS.ReadFile(name)
 	if err != nil {
 		js.Throw(rt, err)
 	}

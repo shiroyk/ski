@@ -7,7 +7,6 @@ import (
 	"net/http"
 	urlpkg "net/url"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing/fstest"
 	"time"
@@ -55,22 +54,25 @@ export default (ssr, name, code) => {
 )
 
 func source(path, data string) {
-	sourceFS[path] = &fstest.MapFile{Data: []byte(data)}
-}
-
-func loadFile(path string) ([]byte, error) {
-	var query string
-	// cut the query from path "App.vue?ssr"
-	path, query, _ = strings.Cut(path, "?")
-	data, err := sourceFS.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	// compile vue sfc file
 	if filepath.Ext(path) == ".vue" {
-		return compiler()(query == "ssr", filepath.Base(path), string(data))
+		// compile vue sfc file
+		client, err := compiler()(false, filepath.Base(path), data)
+		if err != nil {
+			panic("compile vue sfc failed: " + err.Error())
+		}
+		sourceFS[path] = &fstest.MapFile{Data: client}
+
+		ssr, err := compiler()(true, filepath.Base(path), data)
+		if err != nil {
+			panic("compile vue sfc failed: " + err.Error())
+		}
+		sourceFS[path+"?ssr"] = &fstest.MapFile{Data: ssr}
+
+		fmt.Println("compile vue:", path)
+	} else {
+		sourceFS[path] = &fstest.MapFile{Data: []byte(data)}
+		fmt.Println("source file:", path)
 	}
-	return data, nil
 }
 
 func fileLoader(specifier *urlpkg.URL, _ string) ([]byte, error) {
@@ -83,14 +85,14 @@ func fileLoader(specifier *urlpkg.URL, _ string) ([]byte, error) {
 		defer res.Body.Close()
 		return io.ReadAll(res.Body)
 	case "file":
-		return loadFile(specifier.Path)
+		return sourceFS.ReadFile(specifier.Path)
 	}
 	return nil, fmt.Errorf("scheme not supported %s", specifier.Scheme)
 }
 
 func openFile(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	name := call.Argument(0).String()
-	data, err := loadFile(name)
+	data, err := sourceFS.ReadFile(name)
 	if err != nil {
 		js.Throw(rt, err)
 	}
