@@ -7,14 +7,14 @@ import (
 	"syscall"
 
 	"github.com/shiroyk/ski/js"
-	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/shiroyk/ski/modules"
 	_ "github.com/shiroyk/ski/modules/buffer"
+	_ "github.com/shiroyk/ski/modules/http"
 )
 
 func init() {
-	modules.Register("server", modules.ModuleFunc(modulestest.HttpServer))
 	modules.Register("open", modules.ModuleFunc(openFile))
+	modules.Register("now", modules.ModuleFunc(now))
 	js.Loader().SetFileLoader(fileLoader)
 
 	// alias module from cdn
@@ -85,31 +85,35 @@ app.mount('#app');
 `)
 
 	source("server.js", `
-import App from "./App.vue?ssr";
+import serve from "ski/http/server";
+import open from "ski/open";
+import now from "ski/now";
 import { createSSRApp } from "vue";
 import { renderToString } from "vue/server-renderer";
-import createServer from "ski/server";
-import open from "ski/open";
+import App from "./App.vue?ssr";
 
-export default () => createServer("localhost:3000", async (req, res) => {
-  switch (req.path) {
+export default () => serve(3000, async (req) => {
+  switch (req.url) {
     case "/":
       const html = open("index.html");
-      const start = Date.now();
+      const start = now();
       const app = await renderToString(createSSRApp(App));
-      res.end(html.replace("__APP__", app).replace("__TIME__", Date.now() - start));
-      break;
+      const take = ((now() - start) / 1000).toFixed(2);
+      return new Response(html.replace("__APP__", app).replace("__TIME__", take));
     case "/client.js":
-      res.setHeader("Content-Type", "text/javascript");
-      res.end(open("client.js"));
-      break;
+      return new Response(open("client.js"), {
+        headers: {
+          "content-type": "text/javascript",
+        }
+      });
     case "/app.js":
-      res.setHeader("Content-Type", "text/javascript");
-      res.end(open("App.vue"));
-      break;
+      return new Response(open("App.vue"), {
+        headers: {
+          "content-type": "text/javascript",
+        }
+      });
     default:
-      res.statusCode = 404;
-      res.end("Not Found: " + req.path);
+      return new Response("Not Found: " + req.url, { status: 404, });
   }
 });
 `)

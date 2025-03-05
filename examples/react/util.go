@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing/fstest"
+	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -74,4 +75,8 @@ func openFile(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		js.Throw(rt, err)
 	}
 	return rt.ToValue(string(data))
+}
+
+func now(_ sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(time.Now().UnixNano() / 1000)
 }

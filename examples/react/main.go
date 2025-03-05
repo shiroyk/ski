@@ -7,15 +7,15 @@ import (
 	"syscall"
 
 	"github.com/shiroyk/ski/js"
-	"github.com/shiroyk/ski/js/modulestest"
 	"github.com/shiroyk/ski/modules"
 	_ "github.com/shiroyk/ski/modules/buffer"
 	_ "github.com/shiroyk/ski/modules/encoding"
+	_ "github.com/shiroyk/ski/modules/http"
 )
 
 func init() {
-	modules.Register("server", modules.ModuleFunc(modulestest.HttpServer))
 	modules.Register("open", modules.ModuleFunc(openFile))
+	modules.Register("now", modules.ModuleFunc(now))
 	js.Loader().SetFileLoader(fileLoader)
 
 	// alias module from cdn
@@ -86,31 +86,35 @@ import ReactDOM from "react-dom";
 ReactDOM.hydrate(React.createElement(App, { compile: window.__COMPILE__ ?? "-" }), document.getElementById("root"));
 `)
 	source("server.js", `
-import App from "./App.jsx";
 import React from "react";
-import {renderToString} from "react-dom/server";
-import createServer from "ski/server";
+import { renderToString } from "react-dom/server";
+import serve from "ski/http/server";
+import now from "ski/now";
 import open from "ski/open";
+import App from "./App.jsx";
 
-export default () => createServer("localhost:3000", (req, res) => {
-  switch (req.path) {
+export default () => serve(3000, (req) => {
+  switch (req.url) {
     case "/":
       const html = open("index.html");
-      const start = Date.now();
+      const start = now();
       const app = renderToString(React.createElement(App));
-      res.end(html.replace("__ROOT__", app).replace("__TIME__", Date.now() - start));
-      break;
+      const take = ((now() - start) / 1000).toFixed(2);
+      return new Response(html.replace("__ROOT__", app).replace("__TIME__", take));
     case "/client.js":
-      res.setHeader("Content-Type", "text/javascript");
-      res.end(open("client.jsx"));
-      break;
+      return new Response(open("client.jsx"), {
+        headers: {
+          "content-type": "text/javascript",
+        }
+      });
     case "/app.js":
-      res.setHeader("Content-Type", "text/javascript");
-      res.end(open("App.jsx"));
-      break;
+      return new Response(open("App.jsx"), {
+        headers: {
+          "content-type": "text/javascript",
+        }
+      });
     default:
-      res.statusCode = 404;
-      res.end("Not Found: "+req.path);
+      return new Response("Not Found: " + req.url, { status: 404, });
   }
 });
 `)
