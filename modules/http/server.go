@@ -356,12 +356,18 @@ func (s *httpServer) writeError(w http.ResponseWriter, r *http.Request, done fun
 		err    error
 	)
 
-	jsErr, err = s.rt.New(s.rt.Get("Error"), s.rt.ToValue(rawErr.Error()))
-	if err != nil {
-		goto EX
+	ex, ok := rawErr.(*sobek.Exception)
+	if ok {
+		jsErr, ok = ex.Value().(*sobek.Object)
 	}
-
+	if !ok {
+		jsErr, err = s.rt.New(s.rt.Get("Error"), s.rt.ToValue(rawErr.Error()))
+		if err != nil {
+			goto EX
+		}
+	}
 	_ = jsErr.Set("method", r.Method)
+	_ = jsErr.Set("headers", r.Header)
 	_ = jsErr.Set("url", r.URL.String())
 
 	result, err = s.onError(sobek.Undefined(), jsErr)
