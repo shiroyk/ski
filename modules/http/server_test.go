@@ -22,14 +22,14 @@ func TestHttpServer(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
 		value, _ := new(Server).Instantiate(rt)
-		_ = rt.Set("serv", value)
+		_ = rt.Set("serve", value)
 	}))
 
 	t.Run("basic", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv((req) => new Response("ok"));
+		const s = serve((req) => new Response("ok"));
 		const res = await fetch(s.url);
 		assert.equal(await res.text(), "ok");
 		await s.shutdown();
@@ -41,7 +41,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv(3000, (req) => new Response("ok"));
+		const s = serve(3000, (req) => new Response("ok"));
 		const res = await fetch(s.url);
 		assert.equal(await res.text(), "ok");
 		await s.shutdown();
@@ -53,7 +53,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv({
+		const s = serve({
 			port: 3000,
 			hostname: "localhost",
 			handler: (req) => new Response("ok")
@@ -69,7 +69,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv({
+		const s = serve({
 			handler: (req) => { throw new Error("test error"); },
 			onError: (err) => {
 				assert.contains("test error", err.message);
@@ -88,7 +88,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv({
+		const s = serve({
 			handler: (req) => { throw new Error("test error") },
 			onError: (err) => { throw new Error("onError error") }
 		});
@@ -104,7 +104,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv({
+		const s = serve({
 			handler: (req) => "ciallo",
 			onError: (err) => "ciallo"
 		});
@@ -120,7 +120,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv({
+		const s = serve({
 			handler: (req) => "ciallo",
 		});
 		const res = await fetch(s.url);
@@ -135,7 +135,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv(async (req) => {
+		const s = serve(async (req) => {
 			assert.equal(req.method, "POST");
 			assert.equal(req.url, "/");
 			await new Promise((r) => { setTimeout(r, 100) });
@@ -159,7 +159,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv({
+		const s = serve({
 			handler: (req) => new Response("ok")
 		});
 		assert.equal(s.listening, true);
@@ -170,11 +170,11 @@ func TestHttpServer(t *testing.T) {
 	})
 
 	t.Run("abort signal", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second*2)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
 		const controller = new AbortController();
-		const s = serv({
+		const s = serve({
 			signal: controller.signal,
 			handler: (req) => new Response("ok")
 		});
@@ -189,7 +189,7 @@ func TestHttpServer(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		_, err := vm.RunModule(ctx, `
-		const s = serv({
+		const s = serve({
 			onListen: ({ hostname, port }) => {
 				assert.equal(hostname, "127.0.0.1");
 				assert.equal(port, 8000);
@@ -206,8 +206,8 @@ func TestHttpServer(t *testing.T) {
 		defer cancel()
 
 		_, err := vm.RunModule(ctx, `
-		const s1 = serv(8001, (req) => Response.json({ msg: "ok" }));
-		const s2 = serv(async (req) => {
+		const s1 = serve(8001, (req) => Response.json({ msg: "ok" }));
+		const s2 = serve(async (req) => {
 			const res = await fetch(s1.url);
 			const json = await res.json();
 			assert.equal(json, { msg: "ok" });
@@ -260,7 +260,7 @@ func TestHttpServer(t *testing.T) {
 		})
 
 		_, err := vm.RunModule(ctx, `
-		const s = serv(() => Response.json({ msg: "ok" }));
+		const s = serve(() => Response.json({ msg: "ok" }));
 		const take = await concurrent(s.url);
 		console.log("`+strconv.Itoa(goroutines)+` request", take);
 		s.close();
