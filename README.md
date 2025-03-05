@@ -99,6 +99,30 @@ export default async () => {
   console.log(new URL('http://example.com'));
 }
 ```
+### http
+http/server module provides an HTTP server implementation that follows the Fetch API standard. 
+
+It allows you to create HTTP servers that can handle requests and send responses using the familiar Request and Response objects.
+```js
+import serve from "ski/http/server";
+
+serve(async (req) => {
+  console.log("Method:", req.method);
+
+  const url = new URL(req.url);
+  console.log("Path:", url.pathname);
+  console.log("Query parameters:", url.searchParams);
+
+  console.log("Headers:", req.headers);
+
+  if (req.method === "POST") {
+    const body = await req.text();
+    console.log("Body:", body);
+  }
+
+  return new Response("Hello, World!");
+});
+```
 ### cache
 cache module provides for store string or bytes.
 ```js
@@ -182,9 +206,9 @@ func main() {
 	module, err := js.CompileModule(`module`, `
 	import { h, createSSRApp } from "https://esm.sh/vue@3";
 	import { renderToString } from "https://esm.sh/@vue/server-renderer@3";
-	import serv from "ski/http/server";
+	import serve from "ski/http/server";
 
-        serv(8000, async (req) => {
+        serve(8000, async (req) => {
 		`+app+`
 		const html = await renderToString(app);
 		return new Response(`+"`"+index+"`"+`);
