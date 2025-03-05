@@ -227,10 +227,10 @@ func TestHttpServer(t *testing.T) {
 
 		goroutines := 100
 
-		do := func(i int, wg *sync.WaitGroup, url string) {
+		do := func(i int, done func(), url string) {
 			ctx2, cancel2 := context.WithTimeout(ctx, time.Second*10)
 			defer cancel2()
-			defer wg.Done()
+			defer done()
 
 			req, err := http.NewRequestWithContext(ctx2, http.MethodGet, url, nil)
 			assert.NoError(t, err, "goroutine %d", i)
@@ -250,7 +250,7 @@ func TestHttpServer(t *testing.T) {
 				start := time.Now()
 				for i := range goroutines {
 					wg.Add(1)
-					go do(i, &wg, url)
+					go do(i, wg.Done, url)
 				}
 				wg.Wait()
 				callback(func() (any, error) {

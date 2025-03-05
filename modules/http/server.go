@@ -317,9 +317,7 @@ func (s *httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// Handle promise result
 		if types.IsPromise(result) {
-			if err = s.handlePromise(w, r, wg.Done, result); err != nil {
-				s.writeError(w, r, wg.Done, err)
-			}
+			s.handlePromise(w, r, wg.Done, result)
 			return nil
 		}
 
@@ -406,27 +404,27 @@ EX:
 }
 
 // handlePromise handles promise result
-func (s *httpServer) handlePromise(w http.ResponseWriter, r *http.Request, done func(), result sobek.Value) error {
-	p, ok := result.Export().(*sobek.Promise)
-	if ok {
-		switch p.State() {
-		case sobek.PromiseStateRejected:
-			if ex, ok := p.Result().Export().(error); ok {
-				return ex
-			}
-			return errors.New(p.Result().String())
-		case sobek.PromiseStateFulfilled:
-			if res, ok := fetch.ToResponse(p.Result()); ok {
-				s.writeResponse(w, r, done, res)
-				return nil
-			}
-			s.writeError(w, r, done, errNotResponse)
-			return nil
-		default:
+func (s *httpServer) handlePromise(w http.ResponseWriter, r *http.Request, done func(), result sobek.Value) {
+	var err error
+	switch p := result.Export().(*sobek.Promise); p.State() {
+	case sobek.PromiseStateRejected:
+		if ex, ok := p.Result().Export().(error); ok {
+			err = ex
+		} else {
+			err = errors.New(p.Result().String())
 		}
+	case sobek.PromiseStateFulfilled:
+		if res, ok := fetch.ToResponse(p.Result()); ok {
+			s.writeResponse(w, r, done, res)
+		} else {
+			err = errNotResponse
+		}
+	default:
+		err = s.handlePendingPromise(w, r, done, result)
 	}
-
-	return s.handlePendingPromise(w, r, done, result)
+	if err != nil {
+		s.writeError(w, r, done, err)
+	}
 }
 
 // handlePendingPromise handles a pending promise with resolve and reject callbacks
