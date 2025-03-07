@@ -57,7 +57,7 @@ func (r *Request) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 		redirect:    "follow",
 		referrer:    "",
 		integrity:   "",
-		body:        io.NopCloser(http.NoBody),
+		body:        http.NoBody,
 	}
 
 	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
@@ -402,7 +402,7 @@ func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
 	instance := &request{
 		method:      req.Method,
 		url:         req.URL.String(),
-		body:        http.NoBody,
+		body:        req.Body,
 		headers:     js.New(rt, "Headers", rt.ToValue(map[string][]string(req.Header))),
 		referrer:    req.Referer(),
 		signal:      signal.New(rt, req.Context()),
@@ -410,9 +410,6 @@ func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
 		credentials: "same-origin",
 		cache:       "default",
 		redirect:    "follow",
-	}
-	if req.Body != nil {
-		instance.body = req.Body
 	}
 	obj := js.New(rt, "Request")
 	_ = obj.SetSymbol(symRequest, instance)

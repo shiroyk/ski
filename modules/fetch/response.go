@@ -70,7 +70,7 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 	instance := &response{
 		status:     "200 OK",
 		statusCode: http.StatusOK,
-		body:       io.NopCloser(body),
+		body:       body,
 		type_:      "default",
 	}
 
@@ -270,14 +270,6 @@ type response struct {
 	url, type_           string
 }
 
-func (r *response) close() {
-	if !r.bodyUsed {
-		if c, ok := r.body.(io.Closer); ok {
-			c.Close()
-		}
-	}
-}
-
 func (r *response) read() ([]byte, error) {
 	if r.bodyUsed {
 		return nil, errBodyAlreadyRead
@@ -349,13 +341,8 @@ func NewResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
 			instance.redirected = location != instance.url
 		}
 	}
-	ctor := rt.Get("Response")
-	if ctor == nil {
-		panic(rt.NewTypeError("Response is not defined"))
-	}
-	obj := rt.NewObject()
+	obj := js.New(rt, "Response")
 	_ = obj.SetSymbol(symResponse, instance)
-	_ = obj.SetPrototype(ctor.ToObject(rt).Prototype())
 	return obj
 }
 
@@ -364,11 +351,15 @@ func ToResponse(value sobek.Value) (*http.Response, bool) {
 	if o, ok := value.(*sobek.Object); ok {
 		if v := o.GetSymbol(symResponse); v != nil {
 			res := v.Export().(*response)
+			var body io.ReadCloser
+			if body, ok = res.body.(io.ReadCloser); !ok {
+				body = io.NopCloser(res.body)
+			}
 			return &http.Response{
 				Status:     res.status,
 				StatusCode: res.statusCode,
 				Header:     http.Header(res.headers().Export().(headers)),
-				Body:       io.NopCloser(res.body),
+				Body:       body,
 			}, true
 		}
 	}
