@@ -163,11 +163,7 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 			}), nil
 		}
 	}
-	if serv.server.Addr == "" {
-		serv.port = 8000
-		serv.hostname = "127.0.0.1"
-		serv.server.Addr = "127.0.0.1:8000"
-	}
+
 	serv.server.Handler = serv
 	serv.ref = js.EnqueueJob(rt)
 	ln := serv.listen()
@@ -460,10 +456,8 @@ func (s *httpServer) handlePendingPromise(w http.ResponseWriter, r *http.Request
 		return sobek.Undefined()
 	})
 
-	if _, err := then(object, resolve, reject); err != nil {
-		return err
-	}
-	return nil
+	_, err := then(object, resolve, reject)
+	return err
 }
 
 var (

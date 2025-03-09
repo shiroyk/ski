@@ -282,7 +282,7 @@ func toCtx(rt *sobek.Runtime, v sobek.Value) context.Context {
 // self get VM self
 func self(rt *sobek.Runtime) *vmImpl {
 	value := rt.GlobalObject().GetSymbol(symbolVM)
-	if value.ExportType() == reflectTypeVmself {
+	if value != nil && value.ExportType() == reflectTypeVmself {
 		return value.Export().(*vmself).vm
 	}
 	panic(rt.NewTypeError(`symbol value of "VM" must be of type vmself, ` +
