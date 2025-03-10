@@ -66,20 +66,17 @@ func (u *URL) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.
 	if base := call.Argument(1); !sobek.IsUndefined(base) {
 		baseURL, err := pkgurl.Parse(base.String())
 		if err != nil {
-			js.Throw(rt, err)
+			panic(rt.NewTypeError(err.Error()))
 		}
 		parsedURL, err = baseURL.Parse(rawURL)
 	} else {
 		parsedURL, err = pkgurl.Parse(rawURL)
 	}
 	if err != nil {
-		js.Throw(rt, err)
+		panic(rt.NewTypeError(err.Error()))
 	}
 
 	searchParams := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
-	if err != nil {
-		js.Throw(rt, err)
-	}
 
 	obj := rt.ToValue(&url{
 		url:          parsedURL,

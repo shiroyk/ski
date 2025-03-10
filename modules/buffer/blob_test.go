@@ -28,9 +28,8 @@ func TestBlob(t *testing.T) {
 			}
 		}{
 			{
-				name:    "missing arguments",
-				input:   "new Blob()",
-				wantErr: true,
+				name:  "default",
+				input: "new Blob()",
 			},
 			{
 				name:  "empty array",

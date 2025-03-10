@@ -250,6 +250,9 @@ type formData struct {
 }
 
 func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
+	if len(f.data) == 0 {
+		return nil, "", nil
+	}
 	buf := new(bytes.Buffer)
 	writer := multipart.NewWriter(buf)
 	for _, key := range f.keys {
@@ -261,7 +264,7 @@ func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
 				if err != nil {
 					return nil, "", err
 				}
-				data, _ := buffer.GetReader(value)
+				data, _, _ := buffer.GetReader(value)
 				if data == nil {
 					fw.Write(nil)
 					continue

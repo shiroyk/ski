@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"reflect"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -32,44 +33,44 @@ func (b *Blob) prototype(rt *sobek.Runtime) *sobek.Object {
 }
 
 func (b *Blob) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
-	if len(call.Arguments) == 0 {
-		panic(rt.NewTypeError("Blob constructor requires at least 1 arguments"))
-	}
 
-	blobParts := call.Argument(0)
-	if sobek.IsUndefined(blobParts) {
-		panic(rt.NewTypeError("Blob must have a callable @iterator property"))
-	}
-	buf := new(bytes.Buffer)
+	var buf bytes.Buffer
 
-	var err error
-	rt.ForOf(blobParts, func(part sobek.Value) bool {
-		if r, ok := GetReader(part); ok {
-			_, err = io.Copy(buf, r)
-		} else if v, ok := GetBuffer(rt, part); ok {
-			_, err = buf.Write(v)
-		} else {
-			_, err = buf.WriteString(part.String())
+	ret := &blob{}
+
+	if len(call.Arguments) > 0 {
+		blobParts := call.Argument(0)
+		if sobek.IsUndefined(blobParts) {
+			panic(rt.NewTypeError("Blob must have a callable @iterator property"))
 		}
-		if err != nil {
-			js.Throw(rt, err)
-		}
-		return true
-	})
-
-	blob := &blob{
-		data: bytes.NewReader(buf.Bytes()),
-		size: int64(buf.Len()),
+		var err error
+		rt.ForOf(blobParts, func(part sobek.Value) bool {
+			if r, t, ok := GetReader(part); ok {
+				_, err = io.Copy(&buf, r)
+				ret.type_ = strings.ToLower(t)
+			} else if v, ok := GetBuffer(rt, part); ok {
+				_, err = buf.Write(v)
+			} else {
+				_, err = buf.WriteString(part.String())
+			}
+			if err != nil {
+				js.Throw(rt, err)
+			}
+			return true
+		})
 	}
+
+	ret.data = bytes.NewReader(buf.Bytes())
+	ret.size = int64(buf.Len())
 
 	if opts := call.Argument(1); !sobek.IsUndefined(opts) {
 		options := opts.ToObject(rt)
 		if t := options.Get("type"); !sobek.IsUndefined(t) {
-			blob.type_ = t.String()
+			ret.type_ = strings.ToLower(t.String())
 		}
 	}
 
-	obj := rt.ToValue(blob).(*sobek.Object)
+	obj := rt.ToValue(ret).(*sobek.Object)
 	_ = obj.SetPrototype(call.This.Prototype())
 	return obj
 }

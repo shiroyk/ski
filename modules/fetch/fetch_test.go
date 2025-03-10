@@ -180,7 +180,7 @@ func TestFetch(t *testing.T) {
 				name:         "JSON body",
 				input:        `body: JSON.stringify({message: "hello"})`,
 				expectedBody: `{"message":"hello"}`,
-				contentType:  "text/plain; charset=UTF-8",
+				contentType:  "text/plain;charset=UTF-8",
 			},
 			{
 				name:         "FormData body",

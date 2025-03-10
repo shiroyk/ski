@@ -5,16 +5,18 @@ import (
 	"github.com/shiroyk/ski/js/types"
 )
 
-// GetReader extracts the underlying Reader from a Blob or File.
+// GetReader extracts the underlying Reader and type from a Blob or File.
 // false if value is not a Blob or File.
-func GetReader(value sobek.Value) (Reader, bool) {
+func GetReader(value sobek.Value) (Reader, string, bool) {
 	switch value.ExportType() {
 	case TypeBlob:
-		return value.Export().(*blob).data, true
+		b := value.Export().(*blob)
+		return b.data, b.type_, true
 	case TypeFile:
-		return value.Export().(*file).data, true
+		f := value.Export().(*file)
+		return f.data, f.type_, true
 	default:
-		return nil, false
+		return nil, "", false
 	}
 }
 
@@ -29,6 +31,8 @@ func IsBuffer(rt *sobek.Runtime, value sobek.Value) bool {
 // GetBuffer returns the underlying byte buffer from a ArrayBuffer, TypedArray, DataView, Buffer.
 func GetBuffer(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
 	switch value.ExportType() {
+	case types.TypeNil:
+		return nil, false
 	case types.TypeArrayBuffer:
 		return value.Export().(sobek.ArrayBuffer).Bytes(), true
 	default:

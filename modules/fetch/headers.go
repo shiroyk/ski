@@ -1,8 +1,8 @@
 package fetch
 
 import (
-	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -32,21 +32,46 @@ func (h *Headers) prototype(rt *sobek.Runtime) *sobek.Object {
 }
 
 func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
-	header := make(headers)
+	var header headers
 	if init := call.Argument(0); !sobek.IsUndefined(init) {
 		switch {
 		case init.ExportType() == typeHeaders:
-			other := init.Export().(headers)
-			header = headers(http.Header.Clone(http.Header(other)))
+			h2 := init.Export().(headers)
+			header = make(headers, len(h2))
+			for k, v := range h2 {
+				name := normalizeHeaderName(k)
+				for _, vv := range v {
+					header[name] = append(header[name], normalizeHeaderValue(vv))
+				}
+			}
 		default:
 			obj := init.ToObject(rt)
-			for _, key := range obj.Keys() {
-				value := obj.Get(key)
-				if !sobek.IsUndefined(value) {
-					header[normalizeHeaderName(key)] = []string{value.String()}
+			if l := obj.Get("length"); l != nil {
+				length := int(l.ToInteger())
+				header = make(headers, length)
+
+				for i := range length {
+					kv := obj.Get(strconv.Itoa(i)).ToObject(rt)
+					if v := kv.Get("length"); v == nil || v.ToInteger() != 2 {
+						panic(rt.NewTypeError("Invalid value"))
+					}
+					key := kv.Get("0").String()
+					value := kv.Get("1").String()
+					name := normalizeHeaderName(key)
+					value = normalizeHeaderValue(value)
+					header[name] = append(header[name], value)
+				}
+			} else {
+				header = make(headers)
+				for _, key := range obj.Keys() {
+					name := normalizeHeaderName(key)
+					value := normalizeHeaderValue(obj.Get(key).String())
+					header[name] = append(header[name], value)
 				}
 			}
 		}
+	} else {
+		header = make(headers)
 	}
 
 	obj := rt.ToValue(header).(*sobek.Object)
@@ -55,10 +80,13 @@ func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 }
 
 func (*Headers) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	if len(call.Arguments) < 2 {
+		panic(rt.NewTypeError("Failed to execute 'append' on 'Headers': 2 arguments required, but only %d present", len(call.Arguments)))
+	}
+
 	this := toHeaders(rt, call.This)
 	name := normalizeHeaderName(call.Argument(0).String())
-	value := call.Argument(1).String()
-
+	value := normalizeHeaderValue(call.Argument(1).String())
 	this[name] = append(this[name], value)
 	return sobek.Undefined()
 }
@@ -87,9 +115,13 @@ func (*Headers) has(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 func (*Headers) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	if len(call.Arguments) < 2 {
+		panic(rt.NewTypeError("Failed to execute 'append' on 'Headers': 2 arguments required, but only %d present", len(call.Arguments)))
+	}
+
 	this := toHeaders(rt, call.This)
 	name := normalizeHeaderName(call.Argument(0).String())
-	value := call.Argument(1).String()
+	value := normalizeHeaderValue(call.Argument(1).String())
 	this[name] = []string{value}
 	return sobek.Undefined()
 }
@@ -157,6 +189,18 @@ type headers map[string][]string
 
 func normalizeHeaderName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
+}
+
+// normalizeHeaderValue LF(0x0A) CR(0x0D) TAB(0x09) SPACE(0x20)
+func normalizeHeaderValue(value string) string {
+	return strings.TrimFunc(value, func(r rune) bool {
+		switch r {
+		case 0x0A, 0x0D, 0x09, 0x20:
+			return true
+		default:
+			return false
+		}
+	})
 }
 
 func toHeaders(rt *sobek.Runtime, value sobek.Value) headers {

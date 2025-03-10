@@ -30,10 +30,11 @@ func Fetch(client Client) modules.ModuleFunc {
 			}
 			initRequest(rt, call.Argument(1), req)
 		}
+		r := req.toRequest(rt)
 
 		return promise.New(rt, func(callback promise.Callback) {
 			defer req.cancel()
-			res, err := client.Do(req.toRequest(rt))
+			res, err := client.Do(r)
 			callback(func() (any, error) {
 				if err != nil {
 					return nil, err

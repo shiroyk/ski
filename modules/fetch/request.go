@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/promise"
+	"github.com/shiroyk/ski/js/types"
 	"github.com/shiroyk/ski/modules/buffer"
 	"github.com/shiroyk/ski/modules/signal"
 	"github.com/shiroyk/ski/modules/stream"
@@ -57,12 +58,12 @@ func (r *Request) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 		redirect:    "follow",
 		referrer:    "",
 		integrity:   "",
-		body:        http.NoBody,
 	}
 
 	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
 		if req, ok := toRequest(arg); ok {
-			instance = req
+			c := *req
+			instance = &c
 		} else {
 			instance.url = arg.String()
 		}
@@ -227,7 +228,12 @@ func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			if err != nil {
 				return nil, err
 			}
-			return js.New(rt, "Blob", rt.ToValue(rt.NewArrayBuffer(data))), nil
+			opt := sobek.Undefined()
+			if v := this.headers.Export().(headers)["content-type"]; len(v) > 0 {
+				opt = rt.NewObject()
+				_ = opt.(*sobek.Object).Set("type", v[0])
+			}
+			return js.New(rt, "Blob", rt.NewArray(rt.NewArrayBuffer(data)), opt), nil
 		})
 	})
 }
@@ -329,6 +335,10 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	init := opt.ToObject(rt)
 	if method := init.Get("method"); method != nil {
 		req.method = strings.ToUpper(method.String())
+		switch req.method {
+		case http.MethodConnect, http.MethodTrace, "TRACK":
+			panic(rt.NewTypeError("Invalid request method"))
+		}
 	}
 	if mode := init.Get("mode"); mode != nil {
 		req.mode = mode.String()
@@ -363,36 +373,46 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 		return
 	}
 	if b := init.Get("body"); b != nil {
-		var body io.Reader = http.NoBody
+		var body io.Reader
 		switch b.ExportType() {
+		case types.TypeNil:
 		case typeFormData:
 			data := b.Export().(*formData)
 			reader, contentType, err := data.encode(rt)
 			if err != nil {
 				js.Throw(rt, err)
 			}
-			h := req.headers.Export().(headers)
-			h["content-type"] = []string{contentType}
-			body = reader
+			if reader != nil {
+				h := req.headers.Export().(headers)
+				h["content-type"] = []string{contentType}
+				body = reader
+			}
 		case url.TypeURLSearchParams:
 			h := req.headers.Export().(headers)
-			h["content-type"] = []string{"application/x-www-form-url"}
+			h["content-type"] = []string{"application/x-www-form-urlencoded;charset=UTF-8"}
 			body = strings.NewReader(b.String())
 		case stream.TypeReadableStream:
 			body = stream.GetStreamSource(rt, b)
 		default:
-			if v, ok := buffer.GetReader(b); ok {
+			if v, t, ok := buffer.GetReader(b); ok {
 				body = v
+				if t != "" {
+					h := req.headers.Export().(headers)
+					if _, ok := h["content-type"]; !ok {
+						h["content-type"] = []string{strings.ToLower(t)}
+					}
+				}
 			} else if v, ok := buffer.GetBuffer(rt, b); ok {
 				body = bytes.NewReader(v)
 			} else {
 				body = strings.NewReader(b.String())
 				h := req.headers.Export().(headers)
 				if _, ok := h["content-type"]; !ok {
-					h["content-type"] = []string{"text/plain; charset=UTF-8"}
+					h["content-type"] = []string{"text/plain;charset=UTF-8"}
 				}
 			}
 		}
+		req.bodyUsed = false
 		req.body = body
 	}
 }

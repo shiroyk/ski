@@ -15,6 +15,7 @@ var (
 	TypeArrayBuffer = reflect.TypeOf(sobek.ArrayBuffer{})
 	TypeError       = reflect.TypeOf((*error)(nil)).Elem()
 	TypePromise     = reflect.TypeOf((*sobek.Promise)(nil))
+	TypeNil         = reflect.TypeOf(nil)
 )
 
 func IsFunc(value sobek.Value) bool {

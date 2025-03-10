@@ -110,6 +110,7 @@ func TestRequest(t *testing.T) {
 				input: `
 				export default async () => {
 					const request = new Request("https://example.com", {
+						method: "POST",
 						body: "test data"
 					});
 					await request.text();
