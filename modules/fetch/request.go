@@ -40,6 +40,7 @@ func (r *Request) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("signal", rt.ToValue(r.signal), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
 	_ = p.Set("clone", r.clone)
+	_ = p.Set("bytes", r.bytes)
 	_ = p.Set("text", r.text)
 	_ = p.Set("json", r.json)
 	_ = p.Set("arrayBuffer", r.arrayBuffer)
@@ -162,6 +163,19 @@ func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	_ = obj.SetSymbol(symRequest, instance)
 	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
 	return obj
+}
+
+func (*Request) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toThisRequest(rt, call.This)
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
+		})
+	})
 }
 
 func (r *Request) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
