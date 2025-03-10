@@ -22,7 +22,9 @@ const (
 )
 
 var skipTests = map[string]bool{
-	"fetch/api/idlharness.any.js":             true,
+	"fetch/api/idlharness.any.js": true,
+	"url/idlharness.any.js":       true,
+
 	"fetch/api/abort/cache.https.any.js":      true,
 	"fetch/api/basic/response-url.sub.any.js": true,
 
@@ -49,7 +51,10 @@ func TestWPT(t *testing.T) {
 		cache: make(map[string]*sobek.Program),
 	}
 
-	ctx.runWPTTest(t, "fetch")
+	t.Run("WPT", func(t *testing.T) {
+		ctx.runWPTTest(t, "fetch")
+		ctx.runWPTTest(t, "url")
+	})
 }
 
 type testCtx struct {
@@ -81,6 +86,7 @@ func (c *testCtx) newVM() (js.VM, error) {
 self.GLOBAL = {
 	isWorker: () => true,
 	isShadowRealm: () => false,
+	isWindow: () => false,
 };
 location = {
 	href: "http://example.com/",
@@ -206,7 +212,14 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 	}
 
 	rt := vm.Runtime()
-	tests := rt.Get("tests").ToObject(rt).Get("tests").ToObject(rt)
+	result := rt.Get("tests")
+	if result == nil {
+		return
+	}
+	tests := result.ToObject(rt).Get("tests")
+	if tests == nil {
+		return
+	}
 
 	rt.ForOf(tests, func(v sobek.Value) (ok bool) {
 		current := v.ToObject(rt)

@@ -7,7 +7,7 @@ cd wpt
 git init
 git remote add origin https://github.com/web-platform-tests/wpt
 git sparse-checkout init --cone
-git sparse-checkout set resources common fetch
+git sparse-checkout set resources common fetch url
 git fetch origin --depth=1 "${sha}"
 git reset --hard "${sha}"
 cd -
