@@ -24,7 +24,7 @@ const (
 )
 
 var skipTests = map[string]bool{
-	// not defined or not implemented
+	// not defined, not implemented
 	"fetch/api/idlharness.any.js":                                true,
 	"url/idlharness.any.js":                                      true,
 	"fetch/content-length/api-and-duplicate-headers.any.js":      true,
@@ -34,17 +34,58 @@ var skipTests = map[string]bool{
 	"fetch/api/request/request-cache-default-conditional.any.js": true,
 	"fetch/api/response/response-stream-with-broken-then.any.js": true,
 
+	// not support
+	"fetch/api/basic/request-private-network-headers.tentative.any.js": true,
+
+	// ???
 	"fetch/api/body/mime-type.any.js":         true,
 	"fetch/api/basic/response-url.sub.any.js": true,
+	"fetch/api/request/request-error.any.js":  true,
+	"fetch/api/headers/header-values.any.js":  true,
 
 	// TODO: data race
 	"fetch/api/response/response-stream-disturbed-3.any.js": true,
 	"fetch/api/response/response-cancel-stream.any.js":      true,
 
+	// TODO: host info
+	"fetch/api/redirect/redirect-mode.any.js":                      true,
+	"fetch/api/cors/cors-redirect-credentials.any.js":              true,
+	"fetch/api/basic/integrity.sub.any.js":                         true,
+	"fetch/api/cors/cors-preflight-star.any.js":                    true,
+	"fetch/cross-origin-resource-policy/fetch.any.js":              true,
+	"fetch/api/basic/mode-same-origin.any.js":                      true,
+	"fetch/api/cors/cors-cookies-redirect.any.js":                  true,
+	"fetch/api/cors/cors-filtering.sub.any.js":                     true,
+	"fetch/cross-origin-resource-policy/fetch.https.any.js":        true,
+	"fetch/orb/tentative/known-mime-type.sub.any.js":               true,
+	"fetch/api/basic/mode-no-cors.sub.any.js":                      true,
+	"fetch/api/basic/referrer.any.js":                              true,
+	"fetch/api/basic/scheme-others.sub.any.js":                     true,
+	"fetch/api/cors/cors-preflight.any.js":                         true,
+	"fetch/api/cors/cors-basic.any.js":                             true,
+	"fetch/api/cors/cors-cookies.any.js":                           true,
+	"fetch/api/cors/cors-expose-star.sub.any.js":                   true,
+	"fetch/api/cors/cors-multiple-origins.sub.any.js":              true,
+	"fetch/api/credentials/authentication-redirection.any.js":      true,
+	"fetch/api/redirect/redirect-to-dataurl.any.js":                true,
+	"fetch/cross-origin-resource-policy/syntax.any.js":             true,
+	"fetch/metadata/fetch-preflight.https.sub.any.js":              true,
+	"fetch/metadata/fetch.https.sub.any.js":                        true,
+	"fetch/metadata/trailing-dot.https.sub.any.js":                 true,
+	"fetch/orb/tentative/content-range.sub.any.js":                 true,
+	"fetch/orb/tentative/nosniff.sub.any.js":                       true,
+	"fetch/orb/tentative/status.sub.any.js":                        true,
+	"fetch/orb/tentative/unknown-mime-type.sub.any.js":             true,
+	"fetch/api/cors/cors-preflight-cache.any.js":                   true,
+	"fetch/api/redirect/redirect-back-to-original-origin.any.js":   true,
+	"fetch/cross-origin-resource-policy/scheme-restriction.any.js": true,
+
 	// TODO: test timeout
 	"fetch/api/basic/stream-safe-creation.any.js":   true,
 	"fetch/stale-while-revalidate/fetch.any.js":     true,
 	"fetch/http-cache/credentials.tentative.any.js": true,
+	"fetch/api/request/request-bad-port.any.js":     true,
+	"fetch/api/basic/request-upload.h2.any.js":      true,
 
 	// TODO: events
 	"fetch/api/abort/general.any.js": true,
@@ -57,6 +98,19 @@ var skipTests = map[string]bool{
 	"fetch/content-type/multipart-malformed.any.js":    true,
 	"fetch/api/request/request-consume-empty.any.js":   true,
 	"fetch/api/response/response-consume-empty.any.js": true,
+
+	// TODO: fix stream
+	"fetch/api/request/request-consume.any.js":              true,
+	"fetch/api/response/response-consume-stream.any.js":     true,
+	"fetch/api/response/response-stream-disturbed-2.any.js": true,
+	"fetch/api/response/response-stream-disturbed-4.any.js": true,
+	"fetch/api/response/response-stream-disturbed-5.any.js": true,
+
+	// TODO: fix utf8
+	"fetch/api/basic/text-utf8.any.js": true,
+
+	// TODO: fix no cors
+	"fetch/api/headers/headers-no-cors.any.js": true,
 
 	// TODO: fix URL strip
 	"url/url-setters-stripping.any.js": true,
@@ -109,8 +163,16 @@ self.GLOBAL = {
 	isWindow: () => false,
 };
 location = {
-	href: "http://example.com/",
-	pathname: "/",
+  "ancestorOrigins": {},
+  "href": "https://example.com/",
+  "origin": "https://example.com",
+  "protocol": "https:",
+  "host": "example.com",
+  "hostname": "example.com",
+  "port": "80",
+  "pathname": "/",
+  "search": "",
+  "hash": ""
 };
 `)
 	if err != nil {

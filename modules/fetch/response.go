@@ -196,12 +196,12 @@ func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 	obj := rt.NewObject()
 	_ = obj.SetSymbol(symResponse, &response{
-		status:     this.status,
 		statusCode: this.statusCode,
 		headers:    this.headers,
 		body:       body,
 		bodyUsed:   this.bodyUsed,
 		url:        this.url,
+		type_:      this.type_,
 	})
 	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
 	return obj

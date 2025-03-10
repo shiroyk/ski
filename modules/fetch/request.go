@@ -38,6 +38,7 @@ func (r *Request) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("referrer", rt.ToValue(r.referrer), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("integrity", rt.ToValue(r.integrity), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("signal", rt.ToValue(r.signal), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("keepalive", rt.ToValue(r.keepalive), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
 	_ = p.Set("clone", r.clone)
 	_ = p.Set("bytes", r.bytes)
@@ -127,6 +128,10 @@ func (*Request) integrity(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 
 func (*Request) signal(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return toThisRequest(rt, call.This).signal
+}
+
+func (*Request) keepalive(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(toThisRequest(rt, call.This).keepalive)
 }
 
 func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -272,6 +277,7 @@ type request struct {
 	redirect        string
 	referrer        string
 	integrity       string
+	keepalive       bool
 }
 
 func (r *request) read() ([]byte, error) {
@@ -371,6 +377,9 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	}
 	if integrity := init.Get("integrity"); integrity != nil {
 		req.integrity = integrity.String()
+	}
+	if keepalive := init.Get("keepalive"); keepalive != nil {
+		req.keepalive = keepalive.ToBoolean()
 	}
 	if v := init.Get("signal"); v != nil {
 		if v.ExportType() != signal.TypeAbortSignal {
