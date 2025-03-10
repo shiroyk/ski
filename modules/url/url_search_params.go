@@ -18,6 +18,8 @@ type URLSearchParams struct{}
 
 func (u *URLSearchParams) prototype(rt *sobek.Runtime) *sobek.Object {
 	p := rt.NewObject()
+	_ = p.DefineAccessorProperty("size", rt.ToValue(u.size), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+
 	_ = p.Set("append", u.append)
 	_ = p.Set("delete", u.delete)
 	_ = p.Set("forEach", u.forEach)
@@ -56,9 +58,6 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 			key, err := pkgurl.QueryUnescape(k)
 			if err != nil {
 				js.Throw(rt, fmt.Errorf("invalid key '%s': %s", k, err))
-			}
-			if key == "" {
-				continue
 			}
 			value, err := pkgurl.QueryUnescape(v)
 			if err != nil {
@@ -123,7 +122,7 @@ var (
 	TypeURLSearchParams = reflect.TypeOf((*urlSearchParams)(nil))
 )
 
-func toUrlSearchParams(rt *sobek.Runtime, value sobek.Value) *urlSearchParams {
+func toURLSearchParams(rt *sobek.Runtime, value sobek.Value) *urlSearchParams {
 	if value.ExportType() == TypeURLSearchParams {
 		return value.Export().(*urlSearchParams)
 	}
@@ -155,8 +154,17 @@ func (u urlSearchParams) String() string {
 	return buf.String()
 }
 
+func (*URLSearchParams) size(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toURLSearchParams(rt, call.This)
+	size := 0
+	for _, v := range this.data {
+		size += len(v)
+	}
+	return rt.ToValue(size)
+}
+
 func (*URLSearchParams) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
 	value := call.Argument(1).String()
 
@@ -170,7 +178,7 @@ func (*URLSearchParams) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 }
 
 func (*URLSearchParams) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
 	this.keys = slices.DeleteFunc(this.keys, func(k string) bool { return k == name })
 	delete(this.data, name)
@@ -178,7 +186,7 @@ func (*URLSearchParams) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 }
 
 func (*URLSearchParams) forEach(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	callback, ok := sobek.AssertFunction(call.Argument(0))
 	if !ok {
 		panic(rt.NewTypeError("callback is not a function"))
@@ -198,18 +206,18 @@ func (*URLSearchParams) forEach(call sobek.FunctionCall, rt *sobek.Runtime) sobe
 }
 
 func (*URLSearchParams) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
 	if v, ok := this.data[name]; ok {
 		if len(v) > 0 {
 			return rt.ToValue(v[0])
 		}
 	}
-	return rt.ToValue(nil)
+	return sobek.Null()
 }
 
 func (*URLSearchParams) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
 	v, ok := this.data[name]
 	if ok {
@@ -219,14 +227,14 @@ func (*URLSearchParams) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 }
 
 func (*URLSearchParams) has(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
 	_, ok := this.data[name]
 	return rt.ToValue(ok)
 }
 
 func (*URLSearchParams) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
 	value := call.Argument(1).String()
 
@@ -238,13 +246,13 @@ func (*URLSearchParams) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 }
 
 func (*URLSearchParams) sort(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	slices.Sort(this.keys)
 	return sobek.Undefined()
 }
 
 func (*URLSearchParams) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	return js.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			if !yield(key) {
@@ -255,7 +263,7 @@ func (*URLSearchParams) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 }
 
 func (*URLSearchParams) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	return js.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			var value any
@@ -270,15 +278,13 @@ func (*URLSearchParams) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 }
 
 func (*URLSearchParams) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toUrlSearchParams(rt, call.This)
+	this := toURLSearchParams(rt, call.This)
 	return js.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
-			var value any
-			if values := this.data[key]; len(values) > 0 {
-				value = values[0]
-			}
-			if !yield(rt.NewArray(key, value)) {
-				return
+			for _, value := range this.data[key] {
+				if !yield(rt.NewArray(key, value)) {
+					return
+				}
 			}
 		}
 	})

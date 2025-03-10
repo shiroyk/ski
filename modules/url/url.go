@@ -286,8 +286,13 @@ func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		panic(rt.NewTypeError("URL parse requires at least 1 argument"))
 	}
 
+	raw := call.Argument(0)
+	if sobek.IsUndefined(raw) {
+		return sobek.Null()
+	}
+
 	var (
-		rawURL    = call.Argument(0).String()
+		rawURL    = raw.String()
 		parsedURL *pkgurl.URL
 		err       error
 	)
@@ -320,8 +325,13 @@ func (*URL) canParse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		panic(rt.NewTypeError("URL canParse requires at least 1 argument"))
 	}
 
+	raw := call.Argument(0)
+	if sobek.IsUndefined(raw) {
+		return rt.ToValue(false)
+	}
+
 	var (
-		rawURL = call.Argument(0).String()
+		rawURL = raw.String()
 		err    error
 	)
 

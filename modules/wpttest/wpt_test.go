@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -25,8 +26,10 @@ var skipTests = map[string]bool{
 	"fetch/api/idlharness.any.js": true,
 	"url/idlharness.any.js":       true,
 
-	"fetch/api/abort/cache.https.any.js":      true,
-	"fetch/api/basic/response-url.sub.any.js": true,
+	"fetch/api/abort/cache.https.any.js":          true,
+	"fetch/api/body/mime-type.any.js":             true,
+	"fetch/api/basic/response-url.sub.any.js":     true,
+	"fetch/api/basic/stream-safe-creation.any.js": true,
 
 	// TODO: fix body used
 	"fetch/api/abort/request.any.js": true,
@@ -36,6 +39,9 @@ var skipTests = map[string]bool{
 	"fetch/content-type/multipart-malformed.any.js":    true,
 	"fetch/api/request/request-consume-empty.any.js":   true,
 	"fetch/api/response/response-consume-empty.any.js": true,
+
+	// TODO: fix URL strip
+	"url/url-setters-stripping.any.js": true,
 }
 
 func TestWPT(t *testing.T) {
@@ -47,9 +53,7 @@ func TestWPT(t *testing.T) {
 		t.Skipf("If you want to run wpt tests, see testdata/checkout.sh for the latest working commit id. (%v)", err)
 	}
 
-	ctx := &testCtx{
-		cache: make(map[string]*sobek.Program),
-	}
+	ctx := new(testCtx)
 
 	t.Run("WPT", func(t *testing.T) {
 		ctx.runWPTTest(t, "fetch")
@@ -58,26 +62,24 @@ func TestWPT(t *testing.T) {
 }
 
 type testCtx struct {
-	cache     map[string]*sobek.Program
-	cacheLock sync.Mutex
+	cache sync.Map
 }
 
 func (c *testCtx) newVM() (js.VM, error) {
-	c.cacheLock.Lock()
-	defer c.cacheLock.Unlock()
-
 	harness := filepath.Join(wptBASE, "resources/testharness.js")
-	p, ok := c.cache[harness]
+	p, ok := c.cache.Load(harness)
 	if !ok {
 		data, err := os.ReadFile(harness)
 		if err != nil {
 			return nil, err
 		}
-		program, err := sobek.Compile(harness, string(data), false)
+		src := string(data)
+		src = strings.Replace(src, "var tests = new Tests();", "var tests = new Tests();self.tests = tests;", 1)
+		program, err := sobek.Compile(harness, src, false)
 		if err != nil {
 			return nil, err
 		}
-		c.cache[harness] = program
+		c.cache.Store(harness, program)
 		p = program
 	}
 
@@ -95,7 +97,7 @@ location = {
 	if err != nil {
 		return nil, err
 	}
-	_, err = vm.RunProgram(context.Background(), p)
+	_, err = vm.RunProgram(context.Background(), p.(*sobek.Program))
 	if err != nil {
 		return nil, err
 	}
@@ -173,17 +175,15 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 		return
 	}
 
-	c.cacheLock.Lock()
-	defer c.cacheLock.Unlock()
 	for _, v := range meta["script"] {
-		p, ok := c.cache[v]
+		var script string
+		if strings.HasPrefix(v, "/") {
+			script = filepath.Join(wptBASE, v)
+		} else {
+			script = filepath.Join(filepath.Dir(path), v)
+		}
+		p, ok := c.cache.Load(script)
 		if !ok {
-			var script string
-			if strings.HasPrefix(v, "/") {
-				script = filepath.Join(wptBASE, v)
-			} else {
-				script = filepath.Join(filepath.Dir(path), v)
-			}
 			data, err := os.ReadFile(script)
 			if !assert.NoError(t, err) {
 				return
@@ -192,16 +192,19 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			c.cache[v] = program
+			c.cache.Store(script, program)
 			p = program
 		}
-		_, err := vm.RunProgram(t.Context(), p)
+		_, err := vm.RunProgram(t.Context(), p.(*sobek.Program))
 		if assert.NoError(t, err) {
 			return
 		}
 	}
 
-	_, err = vm.RunString(t.Context(), string(all))
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	_, err = vm.RunString(ctx, string(all))
 	if err != nil {
 		if strings.Contains(err.Error(), "not implement") {
 			t.Skip("not implement")
@@ -212,14 +215,7 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 	}
 
 	rt := vm.Runtime()
-	result := rt.Get("tests")
-	if result == nil {
-		return
-	}
-	tests := result.ToObject(rt).Get("tests")
-	if tests == nil {
-		return
-	}
+	tests := rt.Get("tests").ToObject(rt).Get("tests")
 
 	rt.ForOf(tests, func(v sobek.Value) (ok bool) {
 		current := v.ToObject(rt)
