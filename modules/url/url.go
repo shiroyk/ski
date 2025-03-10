@@ -64,7 +64,8 @@ func (u *URL) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.
 	)
 
 	if base := call.Argument(1); !sobek.IsUndefined(base) {
-		baseURL, err := pkgurl.Parse(base.String())
+		var baseURL *pkgurl.URL
+		baseURL, err = pkgurl.Parse(base.String())
 		if err != nil {
 			panic(rt.NewTypeError(err.Error()))
 		}

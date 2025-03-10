@@ -182,7 +182,7 @@ func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	body := this.body
-	if !this.bodyUsed {
+	if body != nil && !this.bodyUsed {
 		b1, b2 := new(bytes.Buffer), new(bytes.Buffer)
 		if c, ok := body.(io.Closer); ok {
 			defer c.Close()

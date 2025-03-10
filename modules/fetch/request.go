@@ -131,7 +131,7 @@ func (*Request) signal(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	body := this.body
-	if !this.bodyUsed {
+	if body != nil && !this.bodyUsed {
 		b1, b2 := new(bytes.Buffer), new(bytes.Buffer)
 		if c, ok := body.(io.Closer); ok {
 			defer c.Close()
