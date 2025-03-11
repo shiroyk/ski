@@ -80,11 +80,8 @@ var skipTests = map[string]bool{
 	"fetch/cross-origin-resource-policy/scheme-restriction.any.js": true,
 
 	// TODO: test timeout
-	"fetch/api/basic/stream-safe-creation.any.js":   true,
-	"fetch/stale-while-revalidate/fetch.any.js":     true,
-	"fetch/http-cache/credentials.tentative.any.js": true,
-	"fetch/api/request/request-bad-port.any.js":     true,
-	"fetch/api/basic/request-upload.h2.any.js":      true,
+	"fetch/api/request/request-bad-port.any.js": true,
+	"fetch/api/basic/request-upload.h2.any.js":  true,
 
 	// TODO: events
 	"fetch/api/abort/general.any.js": true,
@@ -94,6 +91,7 @@ var skipTests = map[string]bool{
 
 	// TODO: fix FormData
 	"fetch/api/body/formdata.any.js":                   true,
+	"fetch/api/body/cloned-any.js":                     true,
 	"fetch/content-type/multipart-malformed.any.js":    true,
 	"fetch/api/request/request-consume-empty.any.js":   true,
 	"fetch/api/response/response-consume-empty.any.js": true,
@@ -192,7 +190,7 @@ func (c *testCtx) runWPTTest(t *testing.T, dir string) {
 		if d.IsDir() {
 			return nil
 		}
-		if !strings.HasSuffix(path, ".any.js") {
+		if !strings.HasSuffix(path, "any.js") {
 			return nil
 		}
 		name := strings.TrimPrefix(path, "testdata/wpt/")
@@ -209,6 +207,7 @@ func (c *testCtx) runWPTTest(t *testing.T, dir string) {
 }
 
 func (c *testCtx) testScript(t *testing.T, path string) {
+	t.Parallel()
 	file, err := os.Open(path)
 	if !assert.NoError(t, err) {
 		return
