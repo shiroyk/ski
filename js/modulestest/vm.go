@@ -17,7 +17,7 @@ type VM struct{ js.VM }
 func (vm *VM) RunModule(ctx context.Context, source string, args ...any) (ret sobek.Value, err error) {
 	module, err := js.CompileModule("", source)
 	if err != nil {
-		return
+		return nil, err
 	}
 	return vm.VM.RunModule(ctx, module, args...)
 }
