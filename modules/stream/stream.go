@@ -331,6 +331,14 @@ func NewReadableStream(rt *sobek.Runtime, source io.Reader) sobek.Value {
 	return obj
 }
 
+// IsLocked returns ReadableStream is locked.
+func IsLocked(value sobek.Value) bool {
+	if value != nil && value.ExportType() == TypeReadableStream {
+		return value.Export().(*readableStream).locked()
+	}
+	return false
+}
+
 // GetStreamSource extracts the underlying io.Reader from a ReadableStream.
 func GetStreamSource(rt *sobek.Runtime, value sobek.Value) io.Reader {
 	if value.ExportType() == TypeReadableStream {

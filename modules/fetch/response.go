@@ -18,7 +18,10 @@ import (
 	"github.com/shiroyk/ski/modules/url"
 )
 
-var errBodyAlreadyRead = errors.New("body stream already read")
+var (
+	errBodyAlreadyRead  = errors.New("body stream already read")
+	errBodyStreamLocked = errors.New("body stream is locked")
+)
 
 // Response represents the response to a request.
 // https://developer.mozilla.org/en-US/docs/Web/API/Response
@@ -213,7 +216,7 @@ func (*Response) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		b, err := this.text()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			return js.New(rt, "FormData", rt.ToValue(b)), nil
 		})
@@ -224,7 +227,12 @@ func (*Response) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
 		v, err := this.text()
-		callback(func() (any, error) { return v, err })
+		callback(func() (any, error) {
+			if err != nil {
+				panic(rt.NewTypeError(err.Error()))
+			}
+			return v, nil
+		})
 	})
 }
 
@@ -289,7 +297,12 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
 		v, err := this.json()
-		callback(func() (any, error) { return v, err })
+		callback(func() (any, error) {
+			if err != nil {
+				panic(rt.NewTypeError(err.Error()))
+			}
+			return v, nil
+		})
 	})
 }
 
@@ -299,7 +312,7 @@ func (*Response) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			return rt.NewArrayBuffer(data), nil
 		})
@@ -327,7 +340,10 @@ func (*Response) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if this.body == nil {
 		return sobek.Null()
 	}
-	return stream.NewReadableStream(rt, this.body)
+	if this.bodyStream == nil {
+		this.bodyStream = stream.NewReadableStream(rt, this.body)
+	}
+	return this.bodyStream
 }
 
 func (*Response) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -336,7 +352,7 @@ func (*Response) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
@@ -349,7 +365,7 @@ func (*Response) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			opt := sobek.Undefined()
 			if v := this.headers.Export().(headers)["content-type"]; len(v) > 0 {
@@ -364,7 +380,7 @@ func (*Response) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 type response struct {
 	status               string
 	statusCode           int
-	headers              sobek.Value
+	headers, bodyStream  sobek.Value
 	body                 io.Reader
 	bodyUsed, redirected bool
 	url, type_           string
@@ -376,6 +392,9 @@ func (r *response) read() ([]byte, error) {
 	}
 	if r.bodyUsed {
 		return nil, errBodyAlreadyRead
+	}
+	if stream.IsLocked(r.bodyStream) {
+		return nil, errBodyStreamLocked
 	}
 	r.bodyUsed = true
 	if c, ok := r.body.(io.Closer); ok {

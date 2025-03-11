@@ -44,8 +44,7 @@ var skipTests = map[string]bool{
 	"fetch/api/headers/header-values.any.js":  true,
 
 	// TODO: data race
-	"fetch/api/response/response-stream-disturbed-3.any.js": true,
-	"fetch/api/response/response-cancel-stream.any.js":      true,
+	"fetch/api/response/response-cancel-stream.any.js": true,
 
 	// TODO: host info
 	"fetch/api/redirect/redirect-mode.any.js":                      true,
