@@ -178,6 +178,18 @@ func TestBlob(t *testing.T) {
 		assert.Equal(t, "hello world", string(obj.Get("bytes").Export().([]byte)))
 	})
 
+	t.Run("stream", func(t *testing.T) {
+		_, err := vm.RunModule(ctx, `
+			export default async () => {
+				const blob = new Blob(["hello world"], { type: "text/plain" });
+				const reader = blob.stream().getReader();
+				const { value } = await reader.read();
+				assert.equal('hello world', String.fromCharCode.apply(String, value));
+			}
+		`)
+		require.NoError(t, err)
+	})
+
 	t.Run("slice parameters", func(t *testing.T) {
 		tests := []struct {
 			name     string

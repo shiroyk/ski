@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/promise"
+	"github.com/shiroyk/ski/modules/stream"
 )
 
 var (
@@ -29,6 +30,7 @@ func (b *Blob) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("slice", b.slice)
 	_ = p.Set("text", b.text)
 	_ = p.Set("bytes", b.bytes)
+	_ = p.Set("stream", b.stream)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Blob") })
 	return p
 }
@@ -169,6 +171,11 @@ func (*Blob) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
 	})
+}
+
+func (*Blob) stream(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toBlob(rt, call.This)
+	return stream.NewReadableStream(rt, this.data)
 }
 
 type blob struct {
