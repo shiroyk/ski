@@ -161,6 +161,7 @@ func TestBlob(t *testing.T) {
 					sliceWithTypeText: await sliceWithType.text(),
 					sliceWithType: sliceWithType.type,
 					arrayBuffer: await blob.arrayBuffer(),
+					bytes: await blob.bytes(),
 				};
 			}
 		`)
@@ -173,7 +174,8 @@ func TestBlob(t *testing.T) {
 		assert.Equal(t, "text/plain", obj.Get("sliceType").String())
 		assert.Equal(t, "hello", obj.Get("sliceWithTypeText").String())
 		assert.Equal(t, "text/html", obj.Get("sliceWithType").String())
-		assert.Equal(t, 11, len(obj.Get("arrayBuffer").Export().(sobek.ArrayBuffer).Bytes()))
+		assert.Equal(t, "hello world", string(obj.Get("arrayBuffer").Export().(sobek.ArrayBuffer).Bytes()))
+		assert.Equal(t, "hello world", string(obj.Get("bytes").Export().([]byte)))
 	})
 
 	t.Run("slice parameters", func(t *testing.T) {

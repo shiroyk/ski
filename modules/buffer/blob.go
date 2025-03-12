@@ -28,6 +28,7 @@ func (b *Blob) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("arrayBuffer", b.arrayBuffer)
 	_ = p.Set("slice", b.slice)
 	_ = p.Set("text", b.text)
+	_ = p.Set("bytes", b.bytes)
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Blob") })
 	return p
 }
@@ -153,6 +154,19 @@ func (*Blob) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				return nil, err
 			}
 			return string(data), nil
+		})
+	})
+}
+
+func (*Blob) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toBlob(rt, call.This)
+	return promise.New(rt, func(callback promise.Callback) {
+		data, err := this.read()
+		callback(func() (any, error) {
+			if err != nil {
+				return nil, err
+			}
+			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
 	})
 }
