@@ -258,7 +258,7 @@ type formData struct {
 
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
-func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
+func (f *formData) encode() (io.Reader, string, error) {
 	if len(f.data) == 0 {
 		return http.NoBody, "", nil
 	}
@@ -268,21 +268,13 @@ func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
 		for _, value := range f.data[key] {
 			switch value.ExportType() {
 			case buffer.TypeFile:
-				name := value.ToObject(rt).Get("name").String()
+				name := value.(*sobek.Object).Get("name").String()
 				data, t, ok := buffer.GetReader(value)
 				if !ok {
 					continue
 				}
-				h := make(textproto.MIMEHeader)
-				h.Set("Content-Disposition",
-					fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-						quoteEscaper.Replace(key), quoteEscaper.Replace(name)))
-				h.Set("Content-Type", t)
-				part, err := writer.CreatePart(h)
+				err := f.write(writer, data, key, name, t)
 				if err != nil {
-					js.Throw(rt, err)
-				}
-				if _, err = io.Copy(part, data); err != nil {
 					return nil, "", err
 				}
 			default:
@@ -296,6 +288,23 @@ func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
 		return nil, "", err
 	}
 	return buf, writer.FormDataContentType(), nil
+}
+
+func (f *formData) write(writer *multipart.Writer, data io.Reader, key, name, t string) error {
+	if c, ok := data.(io.Closer); ok {
+		defer c.Close()
+	}
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition",
+		fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+			quoteEscaper.Replace(key), quoteEscaper.Replace(name)))
+	h.Set("Content-Type", t)
+	part, err := writer.CreatePart(h)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(part, data)
+	return err
 }
 
 var (
@@ -349,9 +358,6 @@ func parseFromData(body io.Reader, bodyUsed *bool, contentType string) (*multipa
 		if body == nil {
 			return nil, errInvalidMimeType
 		}
-		defer func() {
-			*bodyUsed = true
-		}()
 	default:
 		return nil, errInvalidMimeType
 	}
@@ -359,6 +365,12 @@ func parseFromData(body io.Reader, bodyUsed *bool, contentType string) (*multipa
 	if !ok {
 		return nil, errInvalidMimeType
 	}
+	defer func() {
+		*bodyUsed = true
+		if c, ok := body.(io.Closer); ok {
+			c.Close()
+		}
+	}()
 	return multipart.NewReader(body, boundary).ReadForm(defaultMaxMemory)
 }
 

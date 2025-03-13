@@ -86,7 +86,7 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 		switch arg.ExportType() {
 		case typeFormData:
 			data := arg.Export().(*formData)
-			reader, t, err := data.encode(rt)
+			reader, t, err := data.encode()
 			if err != nil {
 				js.Throw(rt, err)
 			}

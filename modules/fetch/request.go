@@ -419,7 +419,7 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 		case types.TypeNil:
 		case typeFormData:
 			data := b.Export().(*formData)
-			reader, contentType, err := data.encode(rt)
+			reader, contentType, err := data.encode()
 			if err != nil {
 				js.Throw(rt, err)
 			}
