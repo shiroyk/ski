@@ -211,3 +211,12 @@ func toHeaders(rt *sobek.Runtime, value sobek.Value) headers {
 }
 
 var typeHeaders = reflect.TypeOf((headers)(nil))
+
+func getContentType(value sobek.Value) string {
+	h, _ := value.Export().(headers)
+	var contentType string
+	if v := h["content-type"]; len(v) > 0 {
+		contentType = v[0]
+	}
+	return contentType
+}

@@ -220,3 +220,15 @@ func toBlob(rt *sobek.Runtime, value sobek.Value) *blob {
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type Blob`))
 }
+
+// NewBlob returns a new Blob object.
+func NewBlob(rt *sobek.Runtime, data Reader, size int64, type_ string) sobek.Value {
+	b := rt.Get("Blob")
+	if b == nil {
+		panic(rt.NewTypeError("Blob is undefined"))
+	}
+	ret := &blob{data, size, type_}
+	obj := rt.ToValue(ret).(*sobek.Object)
+	_ = obj.SetPrototype(b.ToObject(rt).Get("prototype").ToObject(rt))
+	return obj
+}

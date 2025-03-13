@@ -67,7 +67,7 @@ func TestFormData(t *testing.T) {
 		assert.Equal(t, "hello", obj.Get("text").String())
 		assert.Equal(t, "test.txt", obj.Get("fileName").String())
 		assert.Equal(t, "1", obj.Get("multi").String())
-		assert.True(t, sobek.IsUndefined(obj.Get("none")))
+		assert.True(t, sobek.IsNull(obj.Get("none")))
 		assert.Equal(t, "1,2", obj.Get("all").String())
 	})
 

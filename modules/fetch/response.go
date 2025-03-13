@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -84,11 +86,15 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 		switch arg.ExportType() {
 		case typeFormData:
 			data := arg.Export().(*formData)
-			reader, _, err := data.encode(rt)
+			reader, t, err := data.encode(rt)
 			if err != nil {
 				js.Throw(rt, err)
 			}
-			res.body = reader
+			if reader != nil {
+				res.body = reader
+				h := res.headers.Export().(headers)
+				h["content-type"] = []string{strings.ToLower(t)}
+			}
 		case url.TypeURLSearchParams:
 			res.body = strings.NewReader(arg.String())
 			h := res.headers.Export().(headers)
@@ -103,7 +109,7 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 					}
 				}
 			} else if v, ok := buffer.GetBuffer(rt, arg); ok {
-				res.body = bytes.NewReader(v)
+				res.body = bytes.NewReader(slices.Clone(v))
 			} else {
 				res.body = strings.NewReader(arg.String())
 			}
@@ -213,12 +219,12 @@ func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*Response) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		b, err := this.text()
+		form, err := this.form()
 		callback(func() (any, error) {
 			if err != nil {
 				panic(rt.NewTypeError(err.Error()))
 			}
-			return js.New(rt, "FormData", rt.ToValue(b)), nil
+			return newFormData(rt, form), nil
 		})
 	})
 }
@@ -368,9 +374,9 @@ func (*Response) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				panic(rt.NewTypeError(err.Error()))
 			}
 			opt := sobek.Undefined()
-			if v := this.headers.Export().(headers)["content-type"]; len(v) > 0 {
+			if v := getContentType(this.headers); v != "" {
 				opt = rt.NewObject()
-				_ = opt.(*sobek.Object).Set("type", v[0])
+				_ = opt.(*sobek.Object).Set("type", v)
 			}
 			return js.New(rt, "Blob", rt.NewArray(rt.NewArrayBuffer(data)), opt), nil
 		})
@@ -386,6 +392,16 @@ type response struct {
 	url, type_           string
 }
 
+func (r *response) form() (*multipart.Form, error) {
+	if stream.IsLocked(r.bodyStream) {
+		return nil, errBodyStreamLocked
+	}
+	if r.body == http.NoBody {
+		return new(multipart.Form), nil
+	}
+	return parseFromData(r.body, &r.bodyUsed, getContentType(r.headers))
+}
+
 func (r *response) read() ([]byte, error) {
 	if r.body == nil {
 		return []byte{}, nil
@@ -396,7 +412,6 @@ func (r *response) read() ([]byte, error) {
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
-	r.bodyUsed = true
 	if c, ok := r.body.(io.Closer); ok {
 		defer c.Close()
 	}
@@ -404,6 +419,7 @@ func (r *response) read() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	r.bodyUsed = true
 	return data, nil
 }
 

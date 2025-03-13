@@ -36,6 +36,8 @@ var skipTests = map[string]bool{
 
 	// not support
 	"fetch/api/basic/request-private-network-headers.tentative.any.js": true,
+	// uft-8 bom
+	"fetch/api/basic/text-utf8.any.js": true,
 
 	// ???
 	"fetch/api/body/mime-type.any.js":        true,
@@ -89,22 +91,12 @@ var skipTests = map[string]bool{
 	// TODO: fix body used
 	"fetch/api/abort/request.any.js": true,
 
-	// TODO: fix FormData
-	"fetch/api/body/formdata.any.js":                   true,
-	"fetch/api/body/cloned-any.js":                     true,
-	"fetch/content-type/multipart-malformed.any.js":    true,
-	"fetch/api/request/request-consume-empty.any.js":   true,
-	"fetch/api/response/response-consume-empty.any.js": true,
-
 	// TODO: fix stream
 	"fetch/api/request/request-consume.any.js":              true,
 	"fetch/api/response/response-consume-stream.any.js":     true,
 	"fetch/api/response/response-stream-disturbed-2.any.js": true,
 	"fetch/api/response/response-stream-disturbed-4.any.js": true,
 	"fetch/api/response/response-stream-disturbed-5.any.js": true,
-
-	// TODO: fix utf8
-	"fetch/api/basic/text-utf8.any.js": true,
 
 	// TODO: fix no cors
 	"fetch/api/headers/headers-no-cors.any.js": true,

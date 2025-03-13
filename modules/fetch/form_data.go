@@ -2,11 +2,17 @@ package fetch
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
+	"net/http"
+	"net/textproto"
 	"net/url"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -66,15 +72,16 @@ func (f *FormData) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 		if err != nil {
 			js.Throw(rt, err)
 		}
-		for name, vv := range values {
+		for name, v := range values {
 			ele, ok := ret.data[name]
 			if !ok {
 				ret.keys = append(ret.keys, name)
-				ele = make([]sobek.Value, 0)
+				ele = make([]sobek.Value, 0, len(v))
 			}
-			for _, v := range vv {
-				ele = append(ele, rt.ToValue(v))
+			for _, vv := range v {
+				ele = append(ele, rt.ToValue(vv))
 			}
+			ret.data[name] = ele
 		}
 	}
 
@@ -97,7 +104,7 @@ func (*FormData) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	ele, ok := this.data[name]
 	if !ok {
 		this.keys = append(this.keys, name)
-		ele = make([]sobek.Value, 0)
+		ele = make([]sobek.Value, 0, 1)
 	}
 
 	switch value.ExportType() {
@@ -154,10 +161,10 @@ func (*FormData) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	name := call.Argument(0).String()
 	if v, ok := this.data[name]; ok {
 		if len(v) > 0 {
-			return rt.ToValue(v[0])
+			return v[0]
 		}
 	}
-	return sobek.Undefined()
+	return sobek.Null()
 }
 
 func (*FormData) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -249,9 +256,11 @@ type formData struct {
 	data map[string][]sobek.Value
 }
 
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
 func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
 	if len(f.data) == 0 {
-		return nil, "", nil
+		return http.NoBody, "", nil
 	}
 	buf := new(bytes.Buffer)
 	writer := multipart.NewWriter(buf)
@@ -260,16 +269,20 @@ func (f *formData) encode(rt *sobek.Runtime) (io.Reader, string, error) {
 			switch value.ExportType() {
 			case buffer.TypeFile:
 				name := value.ToObject(rt).Get("name").String()
-				fw, err := writer.CreateFormFile(key, name)
-				if err != nil {
-					return nil, "", err
-				}
-				data, _, _ := buffer.GetReader(value)
-				if data == nil {
-					fw.Write(nil)
+				data, t, ok := buffer.GetReader(value)
+				if !ok {
 					continue
 				}
-				if _, err = io.Copy(fw, data); err != nil {
+				h := make(textproto.MIMEHeader)
+				h.Set("Content-Disposition",
+					fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+						quoteEscaper.Replace(key), quoteEscaper.Replace(name)))
+				h.Set("Content-Type", t)
+				part, err := writer.CreatePart(h)
+				if err != nil {
+					js.Throw(rt, err)
+				}
+				if _, err = io.Copy(part, data); err != nil {
 					return nil, "", err
 				}
 			default:
@@ -294,4 +307,100 @@ func toFormData(rt *sobek.Runtime, value sobek.Value) *formData {
 		return value.Export().(*formData)
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type FormData`))
+}
+
+const (
+	defaultMaxMemory = 32 << 20 // 32 MB
+)
+
+var (
+	errInvalidMimeType = errors.New("Invalid MIME type")
+)
+
+func parseFromData(body io.Reader, bodyUsed *bool, contentType string) (*multipart.Form, error) {
+	if *bodyUsed {
+		return nil, errBodyAlreadyRead
+	}
+	d, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, errInvalidMimeType
+	}
+	switch d {
+	case "application/x-www-form-urlencoded":
+		if body == nil {
+			return new(multipart.Form), nil
+		}
+		defer func() {
+			*bodyUsed = true
+			if c, ok := body.(io.Closer); ok {
+				c.Close()
+			}
+		}()
+		b, err := io.ReadAll(body)
+		if err != nil {
+			return nil, err
+		}
+		query, err := url.ParseQuery(string(b))
+		if err != nil {
+			return nil, err
+		}
+		return &multipart.Form{Value: query}, nil
+	case "multipart/form-data", "multipart/mixed":
+		if body == nil {
+			return nil, errInvalidMimeType
+		}
+		defer func() {
+			*bodyUsed = true
+		}()
+	default:
+		return nil, errInvalidMimeType
+	}
+	boundary, ok := params["boundary"]
+	if !ok {
+		return nil, errInvalidMimeType
+	}
+	return multipart.NewReader(body, boundary).ReadForm(defaultMaxMemory)
+}
+
+func newFormData(rt *sobek.Runtime, form *multipart.Form) *sobek.Object {
+	f := rt.Get("FormData")
+	if f == nil {
+		panic(rt.NewTypeError("FormData is undefined"))
+	}
+
+	var ret formData
+	ret.data = make(map[string][]sobek.Value, len(form.Value)+len(form.File))
+
+	for k, v := range form.Value {
+		ele, ok := ret.data[k]
+		if !ok {
+			ret.keys = append(ret.keys, k)
+			ele = make([]sobek.Value, 0, len(v))
+		}
+		for _, vv := range v {
+			ele = append(ele, rt.ToValue(vv))
+		}
+		ret.data[k] = ele
+	}
+
+	for k, v := range form.File {
+		ele, ok := ret.data[k]
+		if !ok {
+			ret.keys = append(ret.keys, k)
+			ele = make([]sobek.Value, 0, len(v))
+		}
+		for _, vv := range v {
+			f, err := vv.Open()
+			if err != nil {
+				js.Throw(rt, err)
+			}
+			file := buffer.NewFile(rt, f, vv.Size, vv.Header.Get("Content-Type"), vv.Filename, 0)
+			ele = append(ele, file)
+		}
+		ret.data[k] = ele
+	}
+
+	obj := rt.ToValue(&ret).(*sobek.Object)
+	_ = obj.SetPrototype(f.ToObject(rt).Get("prototype").ToObject(rt))
+	return obj
 }

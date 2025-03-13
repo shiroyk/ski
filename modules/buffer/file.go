@@ -91,3 +91,15 @@ func (f *File) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	_ = ctor.Set("prototype", proto)
 	return ctor, nil
 }
+
+// NewFile creates a new File object
+func NewFile(rt *sobek.Runtime, r Reader, size int64, type_, name string, lastModified int64) sobek.Value {
+	f := rt.Get("File")
+	if f == nil {
+		panic(rt.NewTypeError("File is undefined"))
+	}
+	ret := &file{&blob{r, size, type_}, name, "", lastModified}
+	obj := rt.ToValue(ret).(*sobek.Object)
+	_ = obj.SetPrototype(f.ToObject(rt).Get("prototype").ToObject(rt))
+	return obj
+}

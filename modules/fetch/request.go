@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime/multipart"
 	"net/http"
 	urlpkg "net/url"
+	"slices"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -229,12 +231,12 @@ func (r *Request) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 func (r *Request) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		data, err := this.read()
+		form, err := this.form()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
-			return js.New(rt, "FormData", rt.ToValue(string(data))), nil
+			return newFormData(rt, form), nil
 		})
 	})
 }
@@ -248,9 +250,9 @@ func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				return nil, err
 			}
 			opt := sobek.Undefined()
-			if v := this.headers.Export().(headers)["content-type"]; len(v) > 0 {
+			if v := getContentType(this.headers); v != "" {
 				opt = rt.NewObject()
-				_ = opt.(*sobek.Object).Set("type", v[0])
+				_ = opt.(*sobek.Object).Set("type", v)
 			}
 			return js.New(rt, "Blob", rt.NewArray(rt.NewArrayBuffer(data)), opt), nil
 		})
@@ -262,22 +264,35 @@ func (r *Request) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if this.body == nil {
 		return sobek.Null()
 	}
-	return stream.NewReadableStream(rt, this.body)
+	if this.bodyStream == nil {
+		this.bodyStream = stream.NewReadableStream(rt, this.body)
+	}
+	return this.bodyStream
 }
 
 type request struct {
-	method          string
-	url             string
-	headers, signal sobek.Value
-	body            io.Reader
-	bodyUsed        bool
-	mode            string
-	credentials     string
-	cache           string
-	redirect        string
-	referrer        string
-	integrity       string
-	keepalive       bool
+	method                      string
+	url                         string
+	headers, signal, bodyStream sobek.Value
+	body                        io.Reader
+	bodyUsed                    bool
+	mode                        string
+	credentials                 string
+	cache                       string
+	redirect                    string
+	referrer                    string
+	integrity                   string
+	keepalive                   bool
+}
+
+func (r *request) form() (*multipart.Form, error) {
+	if stream.IsLocked(r.bodyStream) {
+		return nil, errBodyStreamLocked
+	}
+	if r.body == http.NoBody {
+		return new(multipart.Form), nil
+	}
+	return parseFromData(r.body, &r.bodyUsed, getContentType(r.headers))
 }
 
 func (r *request) read() ([]byte, error) {
@@ -286,6 +301,9 @@ func (r *request) read() ([]byte, error) {
 	}
 	if r.bodyUsed {
 		return nil, errBodyAlreadyRead
+	}
+	if stream.IsLocked(r.bodyStream) {
+		return nil, errBodyStreamLocked
 	}
 	r.bodyUsed = true
 	if c, ok := r.body.(io.Closer); ok {
@@ -426,7 +444,7 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 					}
 				}
 			} else if v, ok := buffer.GetBuffer(rt, b); ok {
-				body = bytes.NewReader(v)
+				body = bytes.NewReader(slices.Clone(v))
 			} else {
 				body = strings.NewReader(b.String())
 				h := req.headers.Export().(headers)
