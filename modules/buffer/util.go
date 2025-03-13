@@ -1,6 +1,8 @@
 package buffer
 
 import (
+	"io"
+
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js/types"
 )
@@ -42,12 +44,38 @@ func GetBuffer(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
 		case rt.InstanceOf(value, rt.Get("DataView").(*sobek.Object)):
 			fallthrough
 		case types.IsTypedArray(rt, value):
-			buffer, ok := value.ToObject(rt).Get("buffer").Export().(sobek.ArrayBuffer)
+			array := value.ToObject(rt)
+			b, ok := array.Get("buffer").Export().(sobek.ArrayBuffer)
 			if !ok {
 				panic(rt.NewTypeError("TypedArray buffer is not an ArrayBuffer"))
 			}
-			return buffer.Bytes(), true
+			byteLength := array.Get("byteLength").ToInteger()
+			byteOffset := array.Get("byteOffset").ToInteger()
+			bytes := b.Bytes()
+			return bytes[byteOffset : byteOffset+byteLength], true
 		}
 	}
 	return nil, false
+}
+
+// ReadAll reads all data from io.ReaderAt.
+func ReadAll(r io.ReaderAt) ([]byte, error) {
+	s := make([]byte, 0, 512)
+	off := int64(0)
+	for {
+		n, err := r.ReadAt(s[len(s):cap(s)], off)
+		s = s[:len(s)+n]
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			return s, err
+		}
+		off = int64(n)
+
+		if len(s) == cap(s) {
+			// Add more capacity (let append pick how much).
+			s = append(s, 0)[:len(s)]
+		}
+	}
 }

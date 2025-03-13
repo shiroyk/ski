@@ -18,9 +18,8 @@ func (f *File) prototype(rt *sobek.Runtime) *sobek.Object {
 	if b == nil {
 		panic(rt.NewTypeError("Blob is undefined"))
 	}
-	proto := b.ToObject(rt).Prototype()
+	proto := b.ToObject(rt).Get("prototype").ToObject(rt)
 	_ = p.SetPrototype(proto)
-	_ = p.Set("prototype", proto)
 	_ = p.DefineAccessorProperty("name", rt.ToValue(f.name), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("lastModified", rt.ToValue(f.lastModified), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("webkitRelativePath", rt.ToValue(f.webkitRelativePath), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
@@ -90,6 +89,5 @@ func (f *File) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	ctor := rt.ToValue(f.constructor).(*sobek.Object)
 	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
 	_ = ctor.Set("prototype", proto)
-	_ = ctor.SetPrototype(proto)
 	return ctor, nil
 }

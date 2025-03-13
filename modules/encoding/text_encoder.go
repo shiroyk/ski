@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"github.com/grafana/sobek"
+	"github.com/shiroyk/ski/js"
 )
 
 // TextEncoder takes a stream of code points as input and emits a stream of UTF-8 bytes.
@@ -32,7 +33,7 @@ func (*TextEncoder) encode(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	if v := call.Argument(0); !sobek.IsUndefined(v) {
 		text = v.String()
 	}
-	return rt.ToValue(rt.NewArrayBuffer([]byte(text)))
+	return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer([]byte(text))))
 }
 
 func (*TextEncoder) encodeInto(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {

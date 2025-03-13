@@ -46,19 +46,23 @@ func (b *Blob) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 		if sobek.IsUndefined(blobParts) {
 			panic(rt.NewTypeError("Blob must have a callable @iterator property"))
 		}
-		var err error
+		var (
+			data []byte
+			err  error
+		)
 		rt.ForOf(blobParts, func(part sobek.Value) bool {
 			if r, t, ok := GetReader(part); ok {
-				_, err = io.Copy(&buf, r)
+				data, err = ReadAll(r)
 				ret.type_ = strings.ToLower(t)
 			} else if v, ok := GetBuffer(rt, part); ok {
-				_, err = buf.Write(v)
+				data = v
 			} else {
-				_, err = buf.WriteString(part.String())
+				data = []byte(part.String())
 			}
 			if err != nil {
 				js.Throw(rt, err)
 			}
+			buf.Write(data)
 			return true
 		})
 	}
@@ -86,10 +90,63 @@ func (*Blob) type_(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(toBlob(rt, call.This).type_)
 }
 
+func (*Blob) slice(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toBlob(rt, call.This)
+	start := 0
+	size := int(this.size)
+	end := size
+	contentType := ""
+
+	if v := call.Argument(0); !sobek.IsUndefined(v) {
+		start = int(v.ToInteger())
+		if start < 0 {
+			start = max(size+start, 0)
+		} else {
+			start = min(start, size)
+		}
+	}
+	if v := call.Argument(1); !sobek.IsUndefined(v) {
+		end = int(v.ToInteger())
+		if end < 0 {
+			end = max(size+end, 0)
+		} else {
+			end = min(end, size)
+		}
+	}
+	if v := call.Argument(2); !sobek.IsUndefined(v) {
+		s := v.String()
+		if !strings.ContainsFunc(s, invalidContentType) {
+			contentType = strings.ToLower(s)
+		}
+	}
+
+	span := max(end-start, 0)
+	b := &blob{
+		type_: contentType,
+	}
+
+	if span > 0 {
+		data := make([]byte, span)
+		_, err := this.data.ReadAt(data, int64(start))
+		if err != nil && err != io.EOF {
+			js.Throw(rt, err)
+		}
+		b.data = bytes.NewReader(data)
+		b.size = int64(span)
+	} else {
+		b.data = bytes.NewReader(nil)
+		b.type_ = contentType
+	}
+
+	obj := rt.ToValue(b).(*sobek.Object)
+	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
+	return obj
+}
+
 func (*Blob) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		data, err := this.read()
+		data, err := ReadAll(this.data)
 		callback(func() (any, error) {
 			if err != nil {
 				return nil, err
@@ -99,58 +156,10 @@ func (*Blob) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	})
 }
 
-func (*Blob) slice(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toBlob(rt, call.This)
-	start := 0
-	size := int(this.size)
-	end := size
-	contentType := this.type_
-
-	if v := call.Argument(0); !sobek.IsUndefined(v) {
-		start = int(v.ToInteger())
-	}
-	if v := call.Argument(1); !sobek.IsUndefined(v) {
-		end = int(v.ToInteger())
-	}
-	if v := call.Argument(2); !sobek.IsUndefined(v) {
-		contentType = v.String()
-	}
-
-	if start < 0 {
-		start = size + start
-	}
-	if end < 0 {
-		end = size + end
-	}
-
-	if start < 0 {
-		start = 0
-	}
-	if end > size {
-		end = size
-	}
-	if start > end {
-		start = end
-	}
-
-	data := make([]byte, end-start)
-	_, err := this.data.ReadAt(data, int64(start))
-	if err != nil {
-		js.Throw(rt, err)
-	}
-
-	obj := rt.ToValue(&blob{
-		data:  bytes.NewReader(data),
-		type_: contentType,
-	}).(*sobek.Object)
-	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
-	return obj
-}
-
 func (*Blob) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		data, err := this.read()
+		data, err := ReadAll(this.data)
 		callback(func() (any, error) {
 			if err != nil {
 				return nil, err
@@ -163,7 +172,7 @@ func (*Blob) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (*Blob) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		data, err := this.read()
+		data, err := ReadAll(this.data)
 		callback(func() (any, error) {
 			if err != nil {
 				return nil, err
@@ -184,19 +193,6 @@ type blob struct {
 	type_ string
 }
 
-func (b *blob) read() ([]byte, error) {
-	err := b.reset()
-	if err != nil {
-		return nil, err
-	}
-	return io.ReadAll(b.data)
-}
-
-func (b *blob) reset() error {
-	_, err := b.data.Seek(0, io.SeekStart)
-	return err
-}
-
 type Reader interface {
 	io.Reader
 	io.ReaderAt
@@ -208,8 +204,11 @@ func (b *Blob) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	ctor := rt.ToValue(b.constructor).(*sobek.Object)
 	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
 	_ = ctor.Set("prototype", proto)
-	_ = ctor.SetPrototype(proto)
 	return ctor, nil
+}
+
+func invalidContentType(r rune) bool {
+	return r < 0x20 || r > 0x7e
 }
 
 func toBlob(rt *sobek.Runtime, value sobek.Value) *blob {

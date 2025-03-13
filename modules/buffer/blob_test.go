@@ -171,7 +171,7 @@ func TestBlob(t *testing.T) {
 		assert.Equal(t, "text/plain", obj.Get("type").String())
 		assert.Equal(t, "hello world", obj.Get("text").String())
 		assert.Equal(t, "world", obj.Get("sliceText").String())
-		assert.Equal(t, "text/plain", obj.Get("sliceType").String())
+		assert.Equal(t, "", obj.Get("sliceType").String())
 		assert.Equal(t, "hello", obj.Get("sliceWithTypeText").String())
 		assert.Equal(t, "text/html", obj.Get("sliceWithType").String())
 		assert.Equal(t, "hello world", string(obj.Get("arrayBuffer").Export().(sobek.ArrayBuffer).Bytes()))

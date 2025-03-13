@@ -38,15 +38,15 @@ var skipTests = map[string]bool{
 	"fetch/api/basic/request-private-network-headers.tentative.any.js": true,
 
 	// ???
-	"fetch/api/body/mime-type.any.js":         true,
-	"fetch/api/basic/response-url.sub.any.js": true,
-	"fetch/api/request/request-error.any.js":  true,
-	"fetch/api/headers/header-values.any.js":  true,
+	"fetch/api/body/mime-type.any.js":        true,
+	"fetch/api/request/request-error.any.js": true,
+	"fetch/api/headers/header-values.any.js": true,
 
 	// TODO: data race
 	"fetch/api/response/response-cancel-stream.any.js": true,
 
 	// TODO: host info
+	"fetch/api/basic/response-url.sub.any.js":                      true,
 	"fetch/api/redirect/redirect-mode.any.js":                      true,
 	"fetch/api/cors/cors-redirect-credentials.any.js":              true,
 	"fetch/api/basic/integrity.sub.any.js":                         true,
@@ -127,6 +127,8 @@ func TestWPT(t *testing.T) {
 	t.Run("WPT", func(t *testing.T) {
 		ctx.runWPTTest(t, "fetch")
 		ctx.runWPTTest(t, "url")
+		ctx.runWPTTest(t, "FileAPI/blob")
+		ctx.runWPTTest(t, "FileAPI/file")
 	})
 }
 

@@ -109,6 +109,7 @@ func TestFile(t *testing.T) {
 
 	t.Run("blob methods", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
+console.log(File instanceof Function);
 			export default async () => {
 				const file = new File(["hello world"], "test.txt", { type: "text/plain" });
 				const slice = file.slice(0, 5);
@@ -125,7 +126,7 @@ func TestFile(t *testing.T) {
 		assert.Equal(t, "hello world", obj.Get("text").String())
 		assert.Equal(t, "hello", obj.Get("sliceText").String())
 		assert.Equal(t, 11, len(obj.Get("arrayBuffer").Export().(sobek.ArrayBuffer).Bytes()))
-		assert.Equal(t, "text/plain", obj.Get("type").String())
+		assert.Equal(t, "", obj.Get("type").String())
 	})
 
 	t.Run("webkitRelativePath", func(t *testing.T) {
