@@ -31,6 +31,8 @@ var skipTests = map[string]bool{
 	"fetch/api/abort/cache.https.any.js":                         true,
 	"fetch/api/basic/request-upload.any.js":                      true,
 	"fetch/api/basic/request-headers.any.js":                     true,
+	"fetch/api/headers/header-values.any.js":                     true,
+	"fetch/api/request/request-error.any.js":                     true,
 	"fetch/api/request/request-cache-default-conditional.any.js": true,
 	"fetch/api/response/response-stream-with-broken-then.any.js": true,
 
@@ -39,10 +41,12 @@ var skipTests = map[string]bool{
 	// uft-8 bom
 	"fetch/api/basic/text-utf8.any.js": true,
 
+	// encode empty FormData https://github.com/web-platform-tests/wpt/pull/3950
+	"fetch/api/request/request-consume-empty.any.js":   true,
+	"fetch/api/response/response-consume-empty.any.js": true,
+
 	// ???
-	"fetch/api/body/mime-type.any.js":        true,
-	"fetch/api/request/request-error.any.js": true,
-	"fetch/api/headers/header-values.any.js": true,
+	"fetch/api/body/mime-type.any.js": true,
 
 	// TODO: data race
 	"fetch/api/response/response-cancel-stream.any.js": true,

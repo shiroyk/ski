@@ -396,9 +396,6 @@ func (r *response) form() (*multipart.Form, error) {
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
-	if r.body == http.NoBody {
-		return new(multipart.Form), nil
-	}
 	return parseFromData(r.body, &r.bodyUsed, getContentType(r.headers))
 }
 

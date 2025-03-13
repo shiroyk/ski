@@ -7,7 +7,6 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
-	"net/http"
 	"net/textproto"
 	"net/url"
 	"reflect"
@@ -259,9 +258,6 @@ type formData struct {
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 func (f *formData) encode() (io.Reader, string, error) {
-	if len(f.data) == 0 {
-		return http.NoBody, "", nil
-	}
 	buf := new(bytes.Buffer)
 	writer := multipart.NewWriter(buf)
 	for _, key := range f.keys {
@@ -371,7 +367,14 @@ func parseFromData(body io.Reader, bodyUsed *bool, contentType string) (*multipa
 			c.Close()
 		}
 	}()
-	return multipart.NewReader(body, boundary).ReadForm(defaultMaxMemory)
+	form, err := multipart.NewReader(body, boundary).ReadForm(defaultMaxMemory)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return new(multipart.Form), nil
+		}
+		return nil, err
+	}
+	return form, nil
 }
 
 func newFormData(rt *sobek.Runtime, form *multipart.Form) *sobek.Object {
