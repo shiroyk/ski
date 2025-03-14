@@ -115,6 +115,9 @@ type readableStream struct {
 func (r *readableStream) locked() bool { return r.reader != nil }
 
 func (r *readableStream) close() error {
+	if r.cancel {
+		return nil
+	}
 	if closer, ok := r.source.(io.Closer); ok {
 		if err := closer.Close(); err != nil {
 			return err

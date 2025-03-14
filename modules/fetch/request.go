@@ -178,7 +178,7 @@ func (*Request) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
@@ -191,7 +191,7 @@ func (r *Request) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			return string(data), nil
 		})
@@ -204,11 +204,11 @@ func (r *Request) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			var ret any
 			if err = json.Unmarshal(data, &ret); err != nil {
-				return nil, err
+				panic(js.New(rt, "SyntaxError", rt.ToValue(err.Error())))
 			}
 			return ret, nil
 		})
@@ -221,7 +221,7 @@ func (r *Request) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			return rt.NewArrayBuffer(data), nil
 		})
@@ -247,7 +247,7 @@ func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		data, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
-				return nil, err
+				panic(rt.NewTypeError(err.Error()))
 			}
 			opt := sobek.Undefined()
 			if v := getContentType(this.headers); v != "" {

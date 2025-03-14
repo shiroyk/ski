@@ -96,9 +96,7 @@ var skipTests = map[string]bool{
 	"fetch/api/abort/request.any.js": true,
 
 	// TODO: fix stream
-	"fetch/api/request/request-consume.any.js":              true,
 	"fetch/api/response/response-consume-stream.any.js":     true,
-	"fetch/api/response/response-stream-disturbed-2.any.js": true,
 	"fetch/api/response/response-stream-disturbed-4.any.js": true,
 	"fetch/api/response/response-stream-disturbed-5.any.js": true,
 

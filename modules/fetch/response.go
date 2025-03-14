@@ -101,7 +101,11 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 			h["content-type"] = []string{"application/x-www-form-urlencoded;charset=UTF-8"}
 		default:
 			if v, t, ok := buffer.GetReader(arg); ok {
-				res.body = v
+				all, err := buffer.ReadAll(v)
+				if err != nil {
+					js.Throw(rt, err)
+				}
+				res.body = bytes.NewReader(all)
 				if t != "" {
 					h := res.headers.Export().(headers)
 					if _, ok := h["content-type"]; !ok {
@@ -232,12 +236,12 @@ func (*Response) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 func (*Response) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		v, err := this.text()
+		v, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
 				panic(rt.NewTypeError(err.Error()))
 			}
-			return v, nil
+			return string(v), nil
 		})
 	})
 }
@@ -302,12 +306,16 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		v, err := this.json()
+		v, err := this.read()
 		callback(func() (any, error) {
 			if err != nil {
 				panic(rt.NewTypeError(err.Error()))
 			}
-			return v, nil
+			var ret any
+			if err = json.Unmarshal(v, &ret); err != nil {
+				panic(js.New(rt, "SyntaxError", rt.ToValue(err.Error())))
+			}
+			return ret, nil
 		})
 	})
 }
@@ -418,26 +426,6 @@ func (r *response) read() ([]byte, error) {
 	}
 	r.bodyUsed = true
 	return data, nil
-}
-
-func (r *response) text() (string, error) {
-	data, err := r.read()
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-func (r *response) json() (any, error) {
-	data, err := r.read()
-	if err != nil {
-		return nil, err
-	}
-	var ret any
-	if err = json.Unmarshal(data, &ret); err != nil {
-		return nil, err
-	}
-	return ret, nil
 }
 
 func (r *response) String() string {
