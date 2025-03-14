@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/promise"
+	"github.com/shiroyk/ski/js/types"
 	"github.com/shiroyk/ski/modules/stream"
 )
 
@@ -177,7 +178,7 @@ func (*Blob) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			if err != nil {
 				return nil, err
 			}
-			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
+			return types.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
 	})
 }

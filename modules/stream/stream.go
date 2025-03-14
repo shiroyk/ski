@@ -288,7 +288,7 @@ func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime
 			}
 			ret := rt.NewObject()
 			_ = ret.Set("done", false)
-			value := js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(bytes[:n])))
+			value := types.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(bytes[:n])))
 			_ = ret.Set("value", value)
 			return ret, nil
 		})

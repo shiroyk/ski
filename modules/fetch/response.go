@@ -65,7 +65,7 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 		if v := init.Get("status"); v != nil {
 			code := int(v.ToInteger())
 			if code < http.StatusOK || code > http.StatusNetworkAuthenticationRequired {
-				panic(js.New(rt, "RangeError", rt.ToValue("Invalid status code")))
+				panic(types.New(rt, "RangeError", rt.ToValue("Invalid status code")))
 			}
 			res.statusCode = code
 			res.status = fmt.Sprintf("%d %s", code, http.StatusText(code))
@@ -74,12 +74,12 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 			res.status = fmt.Sprintf("%d %s", res.statusCode, v.String())
 		}
 		if v := init.Get("headers"); v != nil {
-			res.headers = js.New(rt, "Headers", v)
+			res.headers = types.New(rt, "Headers", v)
 		}
 	}
 
 	if res.headers == nil {
-		res.headers = js.New(rt, "Headers")
+		res.headers = types.New(rt, "Headers")
 	}
 
 	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
@@ -174,7 +174,7 @@ func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		res := &response{
 			url:        u,
 			statusCode: 302,
-			headers: js.New(rt, "Headers", rt.ToValue(headers{
+			headers: types.New(rt, "Headers", rt.ToValue(headers{
 				"location": []string{u},
 			})),
 			type_: "default",
@@ -279,7 +279,7 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		if arg := call.Argument(1); !sobek.IsUndefined(arg) {
 			opts := arg.ToObject(rt)
 			if v := opts.Get("headers"); v != nil {
-				res.headers = js.New(rt, "Headers", v)
+				res.headers = types.New(rt, "Headers", v)
 			}
 			if v := opts.Get("status"); v != nil {
 				res.statusCode = int(v.ToInteger())
@@ -293,7 +293,7 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			}
 		}
 		if res.headers == nil {
-			res.headers = js.New(rt, "Headers", rt.ToValue(headers{"content-type": {"application/json"}}))
+			res.headers = types.New(rt, "Headers", rt.ToValue(headers{"content-type": {"application/json"}}))
 		} else {
 			h := res.headers.Export().(headers)
 			if _, ok := h["content-type"]; !ok {
@@ -313,7 +313,7 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			}
 			var ret any
 			if err = json.Unmarshal(v, &ret); err != nil {
-				panic(js.New(rt, "SyntaxError", rt.ToValue(err.Error())))
+				panic(types.New(rt, "SyntaxError", rt.ToValue(err.Error())))
 			}
 			return ret, nil
 		})
@@ -339,7 +339,7 @@ func (*Response) error(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		_ = res.SetSymbol(symResponse, &response{
 			status:     "",
 			statusCode: 0,
-			headers:    js.New(rt, "Headers"),
+			headers:    types.New(rt, "Headers"),
 			type_:      "error",
 			bodyUsed:   false,
 		})
@@ -368,7 +368,7 @@ func (*Response) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			if err != nil {
 				panic(rt.NewTypeError(err.Error()))
 			}
-			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
+			return types.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
 	})
 }
@@ -386,7 +386,7 @@ func (*Response) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				opt = rt.NewObject()
 				_ = opt.(*sobek.Object).Set("type", v)
 			}
-			return js.New(rt, "Blob", rt.NewArray(rt.NewArrayBuffer(data)), opt), nil
+			return types.New(rt, "Blob", rt.NewArray(rt.NewArrayBuffer(data)), opt), nil
 		})
 	})
 }
@@ -448,7 +448,7 @@ func NewResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
 	instance := &response{
 		status:     res.Status,
 		statusCode: res.StatusCode,
-		headers:    js.New(rt, "Headers", rt.ToValue(headers(res.Header))),
+		headers:    types.New(rt, "Headers", rt.ToValue(headers(res.Header))),
 		body:       res.Body,
 		type_:      "basic",
 	}
@@ -458,7 +458,7 @@ func NewResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
 			instance.redirected = location != instance.url
 		}
 	}
-	obj := js.New(rt, "Response")
+	obj := types.New(rt, "Response")
 	_ = obj.SetSymbol(symResponse, instance)
 	return obj
 }

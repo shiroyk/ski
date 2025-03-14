@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
 
 	"github.com/grafana/sobek"
 )
@@ -65,32 +64,4 @@ func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
 	}
 	_, err := freeze(sobek.Undefined(), obj)
 	return err
-}
-
-// Iterator returns a JavaScript iterator
-func Iterator(rt *sobek.Runtime, seq iter.Seq[any]) *sobek.Object {
-	p := rt.NewObject()
-	next, _ := iter.Pull(seq)
-	_ = p.SetSymbol(sobek.SymIterator, func(call sobek.FunctionCall) sobek.Value { return call.This })
-	_ = p.Set("next", func(call sobek.FunctionCall) sobek.Value {
-		ret := rt.NewObject()
-		value, ok := next()
-		_ = ret.Set("value", value)
-		_ = ret.Set("done", !ok)
-		return ret
-	})
-	return p
-}
-
-// New create a new object from the constructor name
-func New(rt *sobek.Runtime, name string, args ...sobek.Value) *sobek.Object {
-	ctor := rt.Get(name)
-	if ctor == nil {
-		panic(rt.NewTypeError("%s is not defined", name))
-	}
-	o, err := rt.New(ctor, args...)
-	if err != nil {
-		Throw(rt, err)
-	}
-	return o
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/types"
 	"github.com/shiroyk/ski/modules/buffer"
 )
 
@@ -114,7 +115,7 @@ func (*FormData) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 			filename = rt.ToValue("blob")
 		}
 
-		file := js.New(rt, "File", rt.NewArray(value), filename)
+		file := types.New(rt, "File", rt.NewArray(value), filename)
 		ele = append(ele, file)
 	default:
 		if !sobek.IsUndefined(value) {
@@ -199,7 +200,7 @@ func (*FormData) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			filename = rt.ToValue("blob")
 		}
 
-		file := js.New(rt, "File", rt.NewArray(value), filename)
+		file := types.New(rt, "File", rt.NewArray(value), filename)
 		this.data[name] = []sobek.Value{file}
 	default:
 		if !sobek.IsUndefined(value) {
@@ -211,7 +212,7 @@ func (*FormData) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*FormData) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			if !yield(key) {
 				return
@@ -222,7 +223,7 @@ func (*FormData) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*FormData) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			var value any
 			if values := this.data[key]; len(values) > 0 {
@@ -237,7 +238,7 @@ func (*FormData) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 
 func (*FormData) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			var value any
 			if values := this.data[key]; len(values) > 0 {

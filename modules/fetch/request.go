@@ -180,7 +180,7 @@ func (*Request) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			if err != nil {
 				panic(rt.NewTypeError(err.Error()))
 			}
-			return js.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
+			return types.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data))), nil
 		})
 	})
 }
@@ -208,7 +208,7 @@ func (r *Request) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			}
 			var ret any
 			if err = json.Unmarshal(data, &ret); err != nil {
-				panic(js.New(rt, "SyntaxError", rt.ToValue(err.Error())))
+				panic(types.New(rt, "SyntaxError", rt.ToValue(err.Error())))
 			}
 			return ret, nil
 		})
@@ -254,7 +254,7 @@ func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 				opt = rt.NewObject()
 				_ = opt.(*sobek.Object).Set("type", v)
 			}
-			return js.New(rt, "Blob", rt.NewArray(rt.NewArrayBuffer(data)), opt), nil
+			return types.New(rt, "Blob", rt.NewArray(rt.NewArrayBuffer(data)), opt), nil
 		})
 	})
 }
@@ -364,7 +364,7 @@ func toRequest(value sobek.Value) (*request, bool) {
 
 func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	if sobek.IsUndefined(opt) {
-		req.headers = js.New(rt, "Headers")
+		req.headers = types.New(rt, "Headers")
 		return
 	}
 	init := opt.ToObject(rt)
@@ -403,9 +403,9 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 		req.signal = v
 	}
 	if header := init.Get("headers"); header != nil {
-		req.headers = js.New(rt, "Headers", header)
+		req.headers = types.New(rt, "Headers", header)
 	} else {
-		req.headers = js.New(rt, "Headers")
+		req.headers = types.New(rt, "Headers")
 	}
 	if req.method == http.MethodGet || req.method == http.MethodHead {
 		return
@@ -461,7 +461,7 @@ func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
 		method:      req.Method,
 		url:         req.URL.String(),
 		body:        req.Body,
-		headers:     js.New(rt, "Headers", rt.ToValue(map[string][]string(req.Header))),
+		headers:     types.New(rt, "Headers", rt.ToValue(map[string][]string(req.Header))),
 		referrer:    req.Referer(),
 		signal:      signal.New(rt, req.Context()),
 		mode:        "cors",
@@ -469,7 +469,7 @@ func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
 		cache:       "default",
 		redirect:    "follow",
 	}
-	obj := js.New(rt, "Request")
+	obj := types.New(rt, "Request")
 	_ = obj.SetSymbol(symRequest, instance)
 	return obj
 }

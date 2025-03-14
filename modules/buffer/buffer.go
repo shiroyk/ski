@@ -387,7 +387,7 @@ func (*Buffer) fill(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*Buffer) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for i := range this {
 			if !yield(i) {
 				break
@@ -398,7 +398,7 @@ func (*Buffer) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*Buffer) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for i, b := range this {
 			if !yield(rt.NewArray(i, int64(b))) {
 				break
@@ -941,7 +941,7 @@ func toBigInt(rt *sobek.Runtime, value sobek.Value) uint64 {
 		return uint64(v.Int64())
 	}
 	msg := fmt.Sprintf(`The value of "value" is out of range. It must be >= -(2n ** 63n) and < 2n ** 63. Received %sn`, v.String())
-	panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+	panic(types.New(rt, "RangeError", rt.ToValue(msg)))
 }
 
 func toBigUint(rt *sobek.Runtime, value sobek.Value) uint64 {
@@ -953,7 +953,7 @@ func toBigUint(rt *sobek.Runtime, value sobek.Value) uint64 {
 		return v.Uint64()
 	}
 	msg := fmt.Sprintf(`The value of "value" is out of range. It must be >= 0n and < 2n ** 64n. Received %sn`, v.String())
-	panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+	panic(types.New(rt, "RangeError", rt.ToValue(msg)))
 }
 
 type integer interface {
@@ -1084,5 +1084,5 @@ func (b buffer) fill(rt *sobek.Runtime, offset, end int, buf []byte) {
 
 func throwRangeError(rt *sobek.Runtime, field string, min, max, received any) {
 	msg := fmt.Sprintf(`The value of "%s" is out of range. It must be >= %d && <= %d. Received %d`, field, min, max, received)
-	panic(js.New(rt, "RangeError", rt.ToValue(msg)))
+	panic(types.New(rt, "RangeError", rt.ToValue(msg)))
 }

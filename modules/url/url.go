@@ -7,6 +7,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/types"
 	"github.com/shiroyk/ski/modules"
 )
 
@@ -77,7 +78,7 @@ func (u *URL) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.
 		panic(rt.NewTypeError(err.Error()))
 	}
 
-	searchParams := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
+	searchParams := types.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
 
 	obj := rt.ToValue(&url{
 		url:          parsedURL,
@@ -311,7 +312,7 @@ func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		return sobek.Null()
 	}
 
-	searchParams := js.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
+	searchParams := types.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
 
 	obj := rt.ToValue(&url{
 		url:          parsedURL,

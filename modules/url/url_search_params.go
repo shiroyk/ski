@@ -9,6 +9,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/types"
 )
 
 // URLSearchParams defines utility methods to work with the query string of a URL,
@@ -253,7 +254,7 @@ func (*URLSearchParams) sort(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 
 func (*URLSearchParams) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURLSearchParams(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			if !yield(key) {
 				return
@@ -264,7 +265,7 @@ func (*URLSearchParams) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 
 func (*URLSearchParams) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURLSearchParams(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			var value any
 			if values := this.data[key]; len(values) > 0 {
@@ -279,7 +280,7 @@ func (*URLSearchParams) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 
 func (*URLSearchParams) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURLSearchParams(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for _, key := range this.keys {
 			for _, value := range this.data[key] {
 				if !yield(rt.NewArray(key, value)) {

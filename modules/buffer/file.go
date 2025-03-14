@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/types"
 )
 
 // File object is a specific kind of Blob, and can be used in any context that a Blob can.
@@ -33,7 +33,7 @@ func (f *File) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 	}
 
 	options := call.Argument(2)
-	b := js.New(rt, "Blob", call.Argument(0), options)
+	b := types.New(rt, "Blob", call.Argument(0), options)
 
 	filename := call.Argument(1).String()
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/types"
 )
 
 // Headers allows you to perform various actions on HTTP request and response headers.
@@ -145,7 +146,7 @@ func (*Headers) forEach(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 
 func (*Headers) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHeaders(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for key, value := range this {
 			if !yield(rt.NewArray(key, strings.Join(value, ", "))) {
 				return
@@ -156,7 +157,7 @@ func (*Headers) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 
 func (*Headers) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHeaders(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for key := range this {
 			if !yield(key) {
 				return
@@ -167,7 +168,7 @@ func (*Headers) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 func (*Headers) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHeaders(rt, call.This)
-	return js.Iterator(rt, func(yield func(any) bool) {
+	return types.Iterator(rt, func(yield func(any) bool) {
 		for _, value := range this {
 			if !yield(value) {
 				return
