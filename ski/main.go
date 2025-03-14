@@ -23,6 +23,7 @@ import (
 	_ "github.com/shiroyk/ski/modules/cache"
 	_ "github.com/shiroyk/ski/modules/crypto"
 	_ "github.com/shiroyk/ski/modules/encoding/base64"
+	_ "github.com/shiroyk/ski/modules/ext"
 )
 
 var (

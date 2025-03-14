@@ -14,19 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type valuesContext struct {
-	context.Context
-	values map[any]any
-}
-
-func (v *valuesContext) Value(key any) any {
-	return v.values[key]
-}
-
-func (v *valuesContext) SetValue(key, value any) {
-	v.values[key] = value
-}
-
 func TestVM(t *testing.T) {
 	t.Run("basic execution", func(t *testing.T) {
 		vm := NewVM()
@@ -61,18 +48,6 @@ func TestVM(t *testing.T) {
 		result, err := vm.RunModule(context.Background(), module, 2, 3)
 		require.NoError(t, err)
 		assert.Equal(t, int64(5), result.ToInteger())
-	})
-
-	t.Run("context values", func(t *testing.T) {
-		vm := NewVM()
-
-		ctx := &valuesContext{context.Background(), map[any]any{"test": "value"}}
-
-		val, err := vm.RunString(ctx, `$ctx.foo = "bar"; $ctx.test`)
-		require.NoError(t, err)
-
-		assert.Equal(t, "value", val.String())
-		assert.Equal(t, "bar", ctx.Value("foo"))
 	})
 
 	t.Run("context cancel", func(t *testing.T) {

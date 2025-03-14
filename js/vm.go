@@ -92,7 +92,7 @@ func NewVM(opts ...Option) VM {
 	vm := &vmImpl{
 		runtime:   rt,
 		eventloop: NewEventLoop(),
-		vmctx:     &vmctx{context.Background()},
+		ctx:       context.Background(),
 	}
 	for _, opt := range opts {
 		opt(vm)
@@ -101,23 +101,18 @@ func NewVM(opts ...Option) VM {
 		vm.release = func() {}
 	}
 
-	global := rt.GlobalObject()
-	_ = global.SetSymbol(symbolVM, &vmself{vm})
-	_ = global.DefineDataProperty("$ctx", jsContext(vm.vmctx, rt),
-		sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = rt.GlobalObject().SetSymbol(symbolVM, &vmself{vm})
 
 	return vm
 }
 
 type (
 	vmImpl struct {
-		*vmctx
+		ctx       context.Context
 		runtime   *sobek.Runtime
 		eventloop *EventLoop
 		release   func()
 	}
-
-	vmctx struct{ ctx context.Context }
 
 	vmself struct{ vm *vmImpl }
 )
@@ -236,48 +231,9 @@ func (vm *vmImpl) Run(ctx context.Context, task func() error) (err error) {
 }
 
 var (
-	reflectTypeCtx    = reflect.TypeOf((*vmctx)(nil))
 	reflectTypeVmself = reflect.TypeOf((*vmself)(nil))
 	symbolVM          = sobek.NewSymbol("Symbol.__vm__")
 )
-
-func jsContext(ctx *vmctx, rt *sobek.Runtime) *sobek.Object {
-	obj := rt.ToValue(ctx).ToObject(rt)
-	proto := rt.NewObject()
-	_ = obj.SetPrototype(proto)
-	err := FreezeObject(rt, obj)
-	if err != nil {
-		panic(err)
-	}
-
-	_ = proto.Set("toString", func(call sobek.FunctionCall) sobek.Value {
-		return rt.ToValue("[context]")
-	})
-
-	proxy := rt.NewProxy(obj, &sobek.ProxyTrapConfig{
-		Get: func(target *sobek.Object, property string, receiver sobek.Value) (value sobek.Value) {
-			return rt.ToValue(toCtx(rt, target).Value(property))
-		},
-		Set: func(target *sobek.Object, property string, value sobek.Value, receiver sobek.Value) (success bool) {
-			ctx2 := toCtx(rt, target)
-			if c, ok := ctx2.(interface{ SetValue(key, value any) }); ok {
-				c.SetValue(property, value.Export())
-				return true
-			}
-			return
-		},
-	})
-	return rt.ToValue(proxy).ToObject(rt)
-}
-
-func toCtx(rt *sobek.Runtime, v sobek.Value) context.Context {
-	if v.ExportType() == reflectTypeCtx {
-		if u := v.Export().(*vmctx); u != nil && u.ctx != nil {
-			return u.ctx
-		}
-	}
-	panic(rt.NewTypeError("value of this must be of type vmctx"))
-}
 
 // self get VM self
 func self(rt *sobek.Runtime) *vmImpl {

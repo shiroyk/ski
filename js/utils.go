@@ -55,13 +55,3 @@ func Unwrap(value sobek.Value) (any, error) {
 
 // Context returns the current context of the sobek.Runtime
 func Context(rt *sobek.Runtime) context.Context { return self(rt).ctx }
-
-func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
-	global := rt.GlobalObject().Get("Object").ToObject(rt)
-	freeze, ok := sobek.AssertFunction(global.Get("freeze"))
-	if !ok {
-		panic("failed to get the Object.freeze function from the runtime")
-	}
-	_, err := freeze(sobek.Undefined(), obj)
-	return err
-}
