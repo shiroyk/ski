@@ -19,6 +19,13 @@ var (
 	TypeNil         = reflect.TypeOf(nil)
 )
 
+var (
+	IsNumber = sobek.IsNumber
+	IsString = sobek.IsString
+	IsBigInt = sobek.IsBigInt
+)
+
+// IsFunc check value is a function
 func IsFunc(value sobek.Value) bool {
 	if value == nil {
 		return false
@@ -26,27 +33,7 @@ func IsFunc(value sobek.Value) bool {
 	return value.ExportType() == TypeFunc
 }
 
-func IsNumber(value sobek.Value) bool {
-	if value == nil {
-		return false
-	}
-	return value.ExportType() == TypeInt || value.ExportType() == TypeFloat
-}
-
-func IsInt(value sobek.Value) bool {
-	if value == nil {
-		return false
-	}
-	return value.ExportType() == TypeInt
-}
-
-func IsString(value sobek.Value) bool {
-	if value == nil {
-		return false
-	}
-	return value.ExportType() == TypeString
-}
-
+// IsPromise check value is sobek.Promise.
 func IsPromise(value sobek.Value) bool {
 	if value == nil {
 		return false
