@@ -44,7 +44,7 @@ func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 
 	u8 := rt.Get("Uint8Array")
 	if u8 == nil {
-		panic(rt.NewTypeError("Uint8Array is undefined"))
+		panic(rt.NewTypeError("Uint8Array is not defined"))
 	}
 	_ = p.SetPrototype(u8.ToObject(rt).Prototype())
 	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Buffer") })
@@ -160,7 +160,7 @@ func (*Buffer) from(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	case types.TypeBytes:
 		return newBuffer(rt, call.This, arg.Export().([]byte))
 	case types.TypeArrayBuffer:
-		return newBufferFrom(rt, call.This, arg)
+		return newBuffer(rt, call.This, arg.Export().(sobek.ArrayBuffer).Bytes())
 	case types.TypeString:
 		buf := newBuffer(rt, call.This, decode(rt, arg.String(), call.Argument(1)))
 		return buf
@@ -836,26 +836,8 @@ func newBuffer(rt *sobek.Runtime, this sobek.Value, data []byte) *sobek.Object {
 	if !ok {
 		panic(rt.NewTypeError("Uint8Array is not a constructor"))
 	}
-	bufCtor := this.(*sobek.Object).Prototype().Get("constructor").(*sobek.Object)
+	bufCtor := this.(*sobek.Object).Get("constructor").(*sobek.Object)
 	object, err := ctor(bufCtor, rt.ToValue(rt.NewArrayBuffer(data)))
-	if err != nil {
-		panic(err)
-	}
-	_ = object.SetSymbol(symBuffer, symBuffer)
-	return object
-}
-
-func newBufferFrom(rt *sobek.Runtime, this sobek.Value, buf sobek.Value) *sobek.Object {
-	u8 := rt.Get("Uint8Array")
-	if u8 == nil {
-		panic(rt.NewTypeError("Uint8Array is undefined"))
-	}
-	ctor, ok := sobek.AssertConstructor(u8)
-	if !ok {
-		panic(rt.NewTypeError("Uint8Array is not a constructor"))
-	}
-	bufCtor := this.(*sobek.Object).Prototype().Get("constructor").(*sobek.Object)
-	object, err := ctor(bufCtor, buf)
 	if err != nil {
 		panic(err)
 	}
