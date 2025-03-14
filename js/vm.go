@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
-	"runtime/debug"
+	"runtime"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -209,7 +209,7 @@ func (vm *vmImpl) Run(ctx context.Context, task func() error) (err error) {
 			} else {
 				err = fmt.Errorf(`%s`, x)
 			}
-			stack := string(debug.Stack())
+			stack := stack()
 			Logger(ctx).Error(err.Error()+"\n"+stack, slog.String("stack", stack))
 		}
 		vm.ctx = context.Background()
@@ -243,6 +243,22 @@ func self(rt *sobek.Runtime) *vmImpl {
 	}
 	panic(rt.NewTypeError(`symbol value of "VM" must be of type vmself, ` +
 		`this shouldn't happen, maybe not call from VM.Runtime`))
+}
+
+func stack() string {
+	const maxDepth = 32
+	pcs := make([]uintptr, maxDepth)
+	n := runtime.Callers(3, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+	var sb strings.Builder
+	for {
+		frame, more := frames.Next()
+		sb.WriteString(fmt.Sprintf("%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line))
+		if !more {
+			break
+		}
+	}
+	return sb.String()
 }
 
 // fieldNameMapper provides custom mapping between Go and JavaScript property names.
