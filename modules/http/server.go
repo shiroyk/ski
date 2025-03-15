@@ -144,7 +144,7 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 				message := err.Get("message").String()
 				msg = fmt.Sprintf("Internal Server Error %s %s %s", method, url, message)
 			}
-			slog.Error(msg, slog.String("source", "server"))
+			serv.logger().Error(msg, slog.String("source", "server"))
 			return fetch.NewResponse(rt, &http.Response{
 				StatusCode: code,
 				Header:     make(http.Header),
@@ -173,7 +173,7 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 			if serv.onListen != nil {
 				_, _ = serv.onListen(sobek.Undefined(), serv.addr())
 			} else {
-				slog.Info(fmt.Sprintf("listening on %s", serv.url()),
+				serv.logger().Info(fmt.Sprintf("listening on %s", serv.url()),
 					slog.String("source", "server"))
 			}
 			return nil
@@ -337,7 +337,7 @@ func (s *httpServer) writeResponse(w http.ResponseWriter, r *http.Request, done 
 	w.WriteHeader(res.StatusCode)
 
 	if _, err := io.Copy(w, res.Body); err != nil {
-		slog.Error("Failed to write response",
+		s.logger().Error("Failed to write response",
 			slog.String("source", "server"),
 			slog.String("error", err.Error()),
 			slog.String("method", r.Method),
@@ -399,7 +399,7 @@ func (s *httpServer) writeError(w http.ResponseWriter, r *http.Request, done fun
 	}
 
 EX:
-	slog.Error("Exception in onError while handling exception", slog.String("message", err.Error()))
+	s.logger().Error("Exception in onError while handling exception", slog.String("message", err.Error()))
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write(internalServerError)
 	done()
@@ -459,6 +459,8 @@ func (s *httpServer) handlePendingPromise(w http.ResponseWriter, r *http.Request
 	_, err := then(object, resolve, reject)
 	return err
 }
+
+func (s *httpServer) logger() *slog.Logger { return js.Logger(js.Context(s.rt)) }
 
 var (
 	internalServerError = []byte(http.StatusText(http.StatusInternalServerError))
