@@ -73,7 +73,7 @@ func (b *Blob) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 
 	if opts := call.Argument(1); !sobek.IsUndefined(opts) {
 		options := opts.ToObject(rt)
-		if t := options.Get("type"); !sobek.IsUndefined(t) {
+		if t := options.Get("type"); t != nil {
 			ret.type_ = strings.ToLower(t.String())
 		}
 	}
