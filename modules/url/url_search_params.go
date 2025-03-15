@@ -1,7 +1,6 @@
 package url
 
 import (
-	"fmt"
 	pkgurl "net/url"
 	"reflect"
 	"slices"
@@ -47,8 +46,8 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 		goto RET
 	}
 
-	switch {
-	case params.ExportType().Kind() == reflect.String:
+	switch params.ExportType() {
+	case types.TypeString:
 		// "foo=1&bar=2"
 		str := strings.TrimPrefix(params.String(), "?")
 		for _, kv := range strings.Split(str, "&") {
@@ -58,11 +57,11 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 			k, v, _ := strings.Cut(kv, "=")
 			key, err := pkgurl.QueryUnescape(k)
 			if err != nil {
-				js.Throw(rt, fmt.Errorf("invalid key '%s': %s", k, err))
+				panic(rt.NewTypeError("invalid key '%s': %s", k, err))
 			}
 			value, err := pkgurl.QueryUnescape(v)
 			if err != nil {
-				js.Throw(rt, fmt.Errorf("invalid value '%s': %s", k, err))
+				panic(rt.NewTypeError("invalid value '%s': %s", k, err))
 			}
 			values, ok := ret.data[key]
 			if !ok {
@@ -71,7 +70,7 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 			ret.data[key] = append(values, value)
 		}
 
-	case params.ExportType() == TypeURLSearchParams:
+	case TypeURLSearchParams:
 		other := params.Export().(*urlSearchParams)
 		ret.keys = make([]string, len(other.keys))
 		copy(ret.keys, other.keys)
@@ -82,23 +81,28 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 		}
 
 	default:
-		// {foo: "1", bar: ["2", "3"]}
 		object := params.ToObject(rt)
-		for _, key := range object.Keys() {
-			value := object.Get(key)
-			if value.ExportType().Kind() == reflect.Array || value.ExportType().Kind() == reflect.Slice {
-				arr := value.ToObject(rt)
-				length := arr.Get("length").ToInteger()
-				values := make([]string, 0, length)
-				rt.ForOf(value, func(v sobek.Value) (ok bool) {
-					values = append(values, v.String())
-					return true
-				})
-				if len(values) > 0 {
-					ret.keys = append(ret.keys, key)
-					ret.data[key] = values
+		if object.GetSymbol(sobek.SymIterator) != nil {
+			// [["foo", "1"], ["bar", "2"]]
+			rt.ForOf(object, func(v sobek.Value) bool {
+				item := v.ToObject(rt)
+				length := item.Get("length")
+				if length == nil || length.ToInteger() != 2 {
+					panic(rt.NewTypeError("The provided value cannot be converted to a sequence."))
 				}
-			} else {
+
+				key := item.Get("0").String()
+				value := item.Get("1").String()
+				if _, ok := ret.data[key]; !ok {
+					ret.keys = append(ret.keys, key)
+				}
+				ret.data[key] = []string{value}
+				return true
+			})
+		} else {
+			// {foo: "1", bar: ["2", "3"]}
+			for _, key := range object.Keys() {
+				value := object.Get(key)
 				ret.keys = append(ret.keys, key)
 				ret.data[key] = []string{value.String()}
 			}

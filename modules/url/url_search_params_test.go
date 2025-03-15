@@ -39,7 +39,12 @@ func TestURLSearchParams(t *testing.T) {
 			{
 				name:     "object",
 				input:    `new URLSearchParams({foo: "1", bar: ["2", "3"]})`,
-				expected: "foo=1&bar=2&bar=3",
+				expected: "foo=1&bar=2%2C3",
+			},
+			{
+				name:     "sequence",
+				input:    `new URLSearchParams([["foo", "1"], ["bar", "2"]])`,
+				expected: "foo=1&bar=2",
 			},
 			{
 				name:     "URLSearchParams",
