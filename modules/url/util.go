@@ -74,21 +74,30 @@ func queryEscape(s string) string {
 }
 
 func queryUnescape(s string) string {
-	i := strings.IndexAny(s, "%+")
-	if i == -1 {
+	hasPlus, length := false, len(s)
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '%':
+			if i+2 < len(s) && ishex(s[i+1]) && ishex(s[i+2]) {
+				length -= 2
+			}
+		case '+':
+			hasPlus = true
+		}
+	}
+
+	if !hasPlus && length == len(s) {
 		return s
 	}
 
 	var builder strings.Builder
-	builder.Grow(len(s))
-	builder.WriteString(s[:i])
+	builder.Grow(length)
 
-	for ; i < len(s); i++ {
+	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case '%':
 			if i+2 < len(s) && ishex(s[i+1]) && ishex(s[i+2]) {
-				decoded := unhex(s[i+1])<<4 | unhex(s[i+2])
-				builder.WriteByte(decoded)
+				builder.WriteByte(unhex(s[i+1])<<4 | unhex(s[i+2]))
 				i += 2
 			} else {
 				builder.WriteByte('%')
