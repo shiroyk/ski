@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
-	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/types"
 	"github.com/shiroyk/ski/modules"
 )
@@ -40,7 +39,7 @@ func (u *URL) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("port", rt.ToValue(u.port), rt.ToValue(u.setPort), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("protocol", rt.ToValue(u.protocol), rt.ToValue(u.setProtocol), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("username", rt.ToValue(u.username), rt.ToValue(u.setUsername), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-	_ = p.DefineAccessorProperty("search", rt.ToValue(u.search), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("search", rt.ToValue(u.search), rt.ToValue(u.setSearch), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("searchParams", rt.ToValue(u.searchParams), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
 	_ = p.Set("canParse", u.canParse)
@@ -78,12 +77,8 @@ func (u *URL) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.
 		panic(rt.NewTypeError(err.Error()))
 	}
 
-	searchParams := types.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
-
-	obj := rt.ToValue(&url{
-		url:          parsedURL,
-		searchParams: searchParams,
-	}).(*sobek.Object)
+	parsedURL.ForceQuery = false
+	obj := rt.ToValue(&url{url: parsedURL}).(*sobek.Object)
 	_ = obj.SetPrototype(call.This.Prototype())
 	return obj
 }
@@ -114,7 +109,9 @@ type url struct {
 }
 
 func (u *url) String() string {
-	u.url.RawQuery = u.searchParams.String()
+	if u.searchParams != nil {
+		u.url.RawQuery = u.searchParams.String()
+	}
 	return u.url.String()
 }
 
@@ -172,9 +169,11 @@ func (*URL) setHref(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURL(rt, call.This)
 	newURL, err := pkgurl.Parse(call.Argument(0).String())
 	if err != nil {
-		js.Throw(rt, err)
+		panic(rt.NewTypeError(err.Error()))
 	}
+	newURL.ForceQuery = false
 	this.url = newURL
+	this.searchParams = nil
 	return sobek.Undefined()
 }
 
@@ -271,15 +270,32 @@ func (*URL) setUsername(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 
 func (*URL) search(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURL(rt, call.This)
-	search := this.searchParams.String()
+	if this.searchParams != nil {
+		this.url.RawQuery = this.searchParams.String()
+	}
+	search := this.url.RawQuery
 	if len(search) > 0 {
 		search = "?" + search
 	}
 	return rt.ToValue(search)
 }
 
+func (*URL) setSearch(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toURL(rt, call.This)
+	this.url.RawQuery = strings.TrimPrefix(call.Argument(0).String(), "?")
+	if this.searchParams == nil {
+		this.searchParams = types.New(rt, "URLSearchParams", rt.ToValue(this.url.RawQuery))
+	} else {
+		this.searchParams.Export().(*urlSearchParams).fromString(this.url.RawQuery)
+	}
+	return sobek.Undefined()
+}
+
 func (*URL) searchParams(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURL(rt, call.This)
+	if this.searchParams == nil {
+		this.searchParams = types.New(rt, "URLSearchParams", rt.ToValue("?"+this.url.RawQuery))
+	}
 	return this.searchParams
 }
 
@@ -312,12 +328,8 @@ func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		return sobek.Null()
 	}
 
-	searchParams := types.New(rt, "URLSearchParams", rt.ToValue(parsedURL.RawQuery))
-
-	obj := rt.ToValue(&url{
-		url:          parsedURL,
-		searchParams: searchParams,
-	}).(*sobek.Object)
+	parsedURL.ForceQuery = false
+	obj := rt.ToValue(&url{url: parsedURL}).(*sobek.Object)
 	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
 	return obj
 }

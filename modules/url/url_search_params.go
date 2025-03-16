@@ -1,7 +1,6 @@
 package url
 
 import (
-	pkgurl "net/url"
 	"reflect"
 	"slices"
 	"strings"
@@ -49,26 +48,7 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 	switch params.ExportType() {
 	case types.TypeString:
 		// "foo=1&bar=2"
-		str := strings.TrimPrefix(params.String(), "?")
-		for _, kv := range strings.Split(str, "&") {
-			if kv == "" {
-				continue
-			}
-			k, v, _ := strings.Cut(kv, "=")
-			key, err := pkgurl.QueryUnescape(k)
-			if err != nil {
-				panic(rt.NewTypeError("invalid key '%s': %s", k, err))
-			}
-			value, err := pkgurl.QueryUnescape(v)
-			if err != nil {
-				panic(rt.NewTypeError("invalid value '%s': %s", k, err))
-			}
-			values, ok := ret.data[key]
-			if !ok {
-				ret.keys = append(ret.keys, key)
-			}
-			ret.data[key] = append(values, value)
-		}
+		ret.fromString(params.String())
 
 	case TypeURLSearchParams:
 		other := params.Export().(*urlSearchParams)
@@ -96,7 +76,7 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 				if _, ok := ret.data[key]; !ok {
 					ret.keys = append(ret.keys, key)
 				}
-				ret.data[key] = []string{value}
+				ret.data[key] = append(ret.data[key], value)
 				return true
 			})
 		} else {
@@ -104,6 +84,9 @@ func (u *URLSearchParams) constructor(call sobek.ConstructorCall, rt *sobek.Runt
 			for _, key := range object.Keys() {
 				value := object.Get(key)
 				ret.keys = append(ret.keys, key)
+				if value == nil {
+					continue
+				}
 				ret.data[key] = []string{value.String()}
 			}
 		}
@@ -139,24 +122,43 @@ type urlSearchParams struct {
 	data map[string][]string
 }
 
-func (u urlSearchParams) String() string {
-	if u.data == nil {
+func (u *urlSearchParams) String() string {
+	if len(u.data) == 0 {
 		return ""
 	}
 	var buf strings.Builder
 	for _, key := range u.keys {
 		vs := u.data[key]
-		keyEscaped := pkgurl.QueryEscape(key)
+		keyEscaped := queryEscape(key)
 		for _, v := range vs {
 			if buf.Len() > 0 {
 				buf.WriteByte('&')
 			}
 			buf.WriteString(keyEscaped)
 			buf.WriteByte('=')
-			buf.WriteString(pkgurl.QueryEscape(v))
+			buf.WriteString(queryEscape(v))
 		}
 	}
 	return buf.String()
+}
+
+func (u *urlSearchParams) fromString(str string) {
+	str = strings.TrimPrefix(str, "?")
+	kvs := strings.Split(str, "&")
+	u.keys = make([]string, 0, len(kvs))
+	u.data = make(map[string][]string, len(kvs))
+	for _, kv := range kvs {
+		if kv == "" {
+			continue
+		}
+		k, v, _ := strings.Cut(kv, "=")
+		k = queryUnescape(k)
+		values, ok := u.data[k]
+		if !ok {
+			u.keys = append(u.keys, k)
+		}
+		u.data[k] = append(values, queryUnescape(v))
+	}
 }
 
 func (*URLSearchParams) size(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -176,7 +178,7 @@ func (*URLSearchParams) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 	ele, ok := this.data[name]
 	if !ok {
 		this.keys = append(this.keys, name)
-		ele = make([]string, 0)
+		ele = make([]string, 0, 1)
 	}
 	this.data[name] = append(ele, value)
 	return sobek.Undefined()
@@ -185,6 +187,13 @@ func (*URLSearchParams) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 func (*URLSearchParams) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
+	if v := call.Argument(1); !sobek.IsUndefined(v) {
+		elem := slices.DeleteFunc(this.data[name], func(s string) bool { return s == v.String() })
+		if len(elem) > 0 {
+			this.data[name] = elem
+			return sobek.Undefined()
+		}
+	}
 	this.keys = slices.DeleteFunc(this.keys, func(k string) bool { return k == name })
 	delete(this.data, name)
 	return sobek.Undefined()
@@ -234,7 +243,10 @@ func (*URLSearchParams) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 func (*URLSearchParams) has(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toURLSearchParams(rt, call.This)
 	name := call.Argument(0).String()
-	_, ok := this.data[name]
+	elem, ok := this.data[name]
+	if v := call.Argument(1); !sobek.IsUndefined(v) {
+		ok = slices.Contains(elem, v.String())
+	}
 	return rt.ToValue(ok)
 }
 

@@ -175,6 +175,6 @@ func TestURLSearchParams(t *testing.T) {
 			}
 		`)
 		require.NoError(t, err)
-		assert.Equal(t, "special=%21%40%23%24%25%5E%26%2A%28%29", result.String())
+		assert.Equal(t, "special=%21%40%23%24%25%5E%26*%28%29", result.String())
 	})
 }
