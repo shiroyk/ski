@@ -39,7 +39,7 @@ func TestResponse(t *testing.T) {
 		obj := result.ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
 		assert.Equal(t, int64(201), obj.Get("status").ToInteger())
-		assert.Equal(t, "201 Created", obj.Get("statusText").String())
+		assert.Equal(t, "Created", obj.Get("statusText").String())
 		assert.Equal(t, "text/plain", obj.Get("contentType").String())
 		assert.Equal(t, "test", obj.Get("customHeader").String())
 		assert.Equal(t, "default", obj.Get("type").String())

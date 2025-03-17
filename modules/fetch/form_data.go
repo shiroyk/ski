@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -323,8 +324,8 @@ var (
 	errInvalidMimeType = errors.New("Invalid MIME type")
 )
 
-func parseFromData(body io.Reader, bodyUsed *bool, contentType string) (*multipart.Form, error) {
-	if *bodyUsed {
+func parseFromData(body io.Reader, bodyUsed *atomic.Bool, contentType string) (*multipart.Form, error) {
+	if bodyUsed.Load() {
 		return nil, errBodyAlreadyRead
 	}
 	d, params, err := mime.ParseMediaType(contentType)
@@ -337,7 +338,7 @@ func parseFromData(body io.Reader, bodyUsed *bool, contentType string) (*multipa
 			return new(multipart.Form), nil
 		}
 		defer func() {
-			*bodyUsed = true
+			bodyUsed.Store(true)
 			if c, ok := body.(io.Closer); ok {
 				c.Close()
 			}
@@ -363,7 +364,7 @@ func parseFromData(body io.Reader, bodyUsed *bool, contentType string) (*multipa
 		return nil, errInvalidMimeType
 	}
 	defer func() {
-		*bodyUsed = true
+		bodyUsed.Store(true)
 		if c, ok := body.(io.Closer); ok {
 			c.Close()
 		}

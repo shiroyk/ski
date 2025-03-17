@@ -11,6 +11,7 @@ import (
 	urlpkg "net/url"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -101,7 +102,7 @@ func (*Request) headers(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 }
 
 func (*Request) bodyUsed(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(toThisRequest(rt, call.This).bodyUsed)
+	return rt.ToValue(toThisRequest(rt, call.This).bodyUsed.Load())
 }
 
 func (*Request) mode(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -139,7 +140,7 @@ func (*Request) keepalive(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	body := this.body
-	if body != nil && !this.bodyUsed {
+	if body != nil && !this.bodyUsed.Load() {
 		b1, b2 := new(bytes.Buffer), new(bytes.Buffer)
 		if c, ok := body.(io.Closer); ok {
 			defer c.Close()
@@ -275,7 +276,7 @@ type request struct {
 	url                         string
 	headers, signal, bodyStream sobek.Value
 	body                        io.Reader
-	bodyUsed                    bool
+	bodyUsed                    atomic.Bool
 	mode                        string
 	credentials                 string
 	cache                       string
@@ -296,13 +297,13 @@ func (r *request) read() ([]byte, error) {
 	if r.body == nil {
 		return []byte{}, nil
 	}
-	if r.bodyUsed {
+	if r.bodyUsed.Load() {
 		return nil, errBodyAlreadyRead
 	}
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
-	r.bodyUsed = true
+	r.bodyUsed.Store(true)
 	if c, ok := r.body.(io.Closer); ok {
 		defer c.Close()
 	}
@@ -450,7 +451,7 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 				}
 			}
 		}
-		req.bodyUsed = false
+		req.bodyUsed.Store(false)
 		req.body = body
 	}
 }
