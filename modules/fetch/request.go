@@ -303,6 +303,9 @@ func (r *request) read() ([]byte, error) {
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
+	if stream.IsClosed(r.bodyStream) {
+		return nil, errBodyAlreadyRead
+	}
 	r.bodyUsed.Store(true)
 	if c, ok := r.body.(io.Closer); ok {
 		defer c.Close()

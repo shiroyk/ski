@@ -3,6 +3,7 @@ package stream
 import (
 	"io"
 	"reflect"
+	"sync/atomic"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -60,8 +61,8 @@ func (*ReadableStream) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 
 func (*ReadableStream) getReader(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toReadableStream(rt, call.This)
-	if this.cancel {
-		panic(rt.NewTypeError("stream is already canceled"))
+	if this.closed.Load() {
+		panic(rt.NewTypeError("stream is already closed"))
 	}
 
 	if this.locked() {
@@ -72,6 +73,7 @@ func (*ReadableStream) getReader(call sobek.FunctionCall, rt *sobek.Runtime) sob
 		stream: this,
 	}
 	this.reader = reader
+	reader.closed, reader.closedResolve, reader.closedReject = rt.NewPromise()
 
 	obj := rt.ToValue(reader).(*sobek.Object)
 
@@ -109,40 +111,39 @@ func (*ReadableStream) pipeThrough(_ sobek.FunctionCall, rt *sobek.Runtime) sobe
 type readableStream struct {
 	source io.Reader
 	reader *streamReader
-	cancel bool
+	closed atomic.Bool
 }
 
 func (r *readableStream) locked() bool { return r.reader != nil }
 
-func (r *readableStream) close() error {
-	if r.cancel {
+func (r *readableStream) close() (err error) {
+	if r.closed.Load() {
 		return nil
 	}
 	if closer, ok := r.source.(io.Closer); ok {
-		if err := closer.Close(); err != nil {
-			return err
-		}
+		err = closer.Close()
 	}
-	r.cancel = true
-	r.source = nil
+	r.closed.Store(true)
+	if r.reader == nil {
+		return
+	}
+	_ = r.reader.closedResolve(sobek.Undefined())
 	r.reader = nil
-	return nil
+	return
 }
 
 type streamReader struct {
-	stream *readableStream
+	stream                      *readableStream
+	closed                      *sobek.Promise
+	closedResolve, closedReject func(any) error
 }
 
 func (r *streamReader) read(buf []byte) (int, error) {
-	if r.stream.source == nil {
+	if r.stream.closed.Load() || r.stream.source == nil {
 		return 0, io.EOF
 	}
 
-	n, err := r.stream.source.Read(buf)
-	if err != nil && err != io.EOF {
-		return 0, err
-	}
-	return n, err
+	return r.stream.source.Read(buf)
 }
 
 func toReadableStream(rt *sobek.Runtime, value sobek.Value) *readableStream {
@@ -159,12 +160,38 @@ func toStreamReader(rt *sobek.Runtime, value sobek.Value) *streamReader {
 	panic(rt.NewTypeError(`Value of "this" must be of type StreamReader`))
 }
 
+type baseReadableStreamReader struct{}
+
+func (baseReadableStreamReader) closed(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toStreamReader(rt, call.This)
+	return rt.ToValue(this.closed)
+}
+
+func (baseReadableStreamReader) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toStreamReader(rt, call.This)
+	err := this.stream.close()
+	if err != nil {
+		return promise.Reject(rt, err)
+	}
+	return promise.Resolve(rt, sobek.Undefined())
+}
+
+func (baseReadableStreamReader) releaseLock(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	this := toStreamReader(rt, call.This)
+	if this.stream != nil {
+		this.stream.reader = nil
+		this.stream = nil
+	}
+	return sobek.Undefined()
+}
+
 // ReadableStreamDefaultReader represents a reader that allows reading chunks of data from a ReadableStream.
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader
-type ReadableStreamDefaultReader struct{}
+type ReadableStreamDefaultReader struct{ baseReadableStreamReader }
 
 func (r *ReadableStreamDefaultReader) prototype(rt *sobek.Runtime) *sobek.Object {
 	p := rt.NewObject()
+	_ = p.DefineAccessorProperty("closed", rt.ToValue(r.closed), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.Set("read", r.read)
 	_ = p.Set("cancel", r.cancel)
 	_ = p.Set("releaseLock", r.releaseLock)
@@ -196,6 +223,7 @@ func (*ReadableStreamDefaultReader) read(call sobek.FunctionCall, rt *sobek.Runt
 					ret := rt.NewObject()
 					_ = ret.Set("done", true)
 					_ = ret.Set("value", sobek.Undefined())
+					_ = this.closedResolve(sobek.Undefined())
 					return ret, nil
 				}
 				return nil, err
@@ -212,31 +240,14 @@ func (*ReadableStreamDefaultReader) read(call sobek.FunctionCall, rt *sobek.Runt
 	})
 }
 
-func (*ReadableStreamDefaultReader) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toStreamReader(rt, call.This)
-	err := this.stream.close()
-	if err != nil {
-		return promise.Reject(rt, err)
-	}
-	return promise.Resolve(rt, sobek.Undefined())
-}
-
-func (*ReadableStreamDefaultReader) releaseLock(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toStreamReader(rt, call.This)
-	if this.stream != nil {
-		this.stream.reader = nil
-		this.stream = nil
-	}
-	return sobek.Undefined()
-}
-
 // ReadableStreamBYOBReader represents a reader that allows reading chunks of data from a ReadableStream
 // into a developer-supplied buffer.
 // https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamBYOBReader
-type ReadableStreamBYOBReader struct{}
+type ReadableStreamBYOBReader struct{ baseReadableStreamReader }
 
 func (r *ReadableStreamBYOBReader) prototype(rt *sobek.Runtime) *sobek.Object {
 	p := rt.NewObject()
+	_ = p.DefineAccessorProperty("closed", rt.ToValue(r.closed), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.Set("read", r.read)
 	_ = p.Set("cancel", r.cancel)
 	_ = p.Set("releaseLock", r.releaseLock)
@@ -282,6 +293,7 @@ func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime
 					ret := rt.NewObject()
 					_ = ret.Set("done", true)
 					_ = ret.Set("value", sobek.Undefined())
+					_ = this.closedResolve(sobek.Undefined())
 					return ret, nil
 				}
 				return nil, err
@@ -293,24 +305,6 @@ func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime
 			return ret, nil
 		})
 	})
-}
-
-func (*ReadableStreamBYOBReader) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toStreamReader(rt, call.This)
-	err := this.stream.close()
-	if err != nil {
-		return promise.Reject(rt, err)
-	}
-	return promise.Resolve(rt, sobek.Undefined())
-}
-
-func (*ReadableStreamBYOBReader) releaseLock(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toStreamReader(rt, call.This)
-	if this.stream != nil {
-		this.stream.reader = nil
-		this.stream = nil
-	}
-	return sobek.Undefined()
 }
 
 func (r *ReadableStream) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
@@ -332,20 +326,4 @@ func NewReadableStream(rt *sobek.Runtime, source io.Reader) sobek.Value {
 	obj := rt.ToValue(rs).(*sobek.Object)
 	_ = obj.SetPrototype(ctor.ToObject(rt).Prototype())
 	return obj
-}
-
-// IsLocked returns ReadableStream is locked.
-func IsLocked(value sobek.Value) bool {
-	if value != nil && value.ExportType() == TypeReadableStream {
-		return value.Export().(*readableStream).locked()
-	}
-	return false
-}
-
-// GetStreamSource extracts the underlying io.Reader from a ReadableStream.
-func GetStreamSource(rt *sobek.Runtime, value sobek.Value) io.Reader {
-	if value.ExportType() == TypeReadableStream {
-		return value.Export().(*readableStream).source
-	}
-	panic(rt.NewTypeError(`Value is not a ReadableStream`))
 }

@@ -101,7 +101,7 @@ func TestReadableStream(t *testing.T) {
 		assert.False(t, obj.Get("locked").ToBoolean())
 		getReader, _ := sobek.AssertFunction(obj.Get("getReader"))
 		_, err = getReader(sobek.Undefined())
-		assert.ErrorContains(t, err, "stream is already canceled") // Should throw error after cancel
+		assert.ErrorContains(t, err, "stream is already closed") // Should throw error after cancel
 	})
 
 	t.Run("lock errors", func(t *testing.T) {

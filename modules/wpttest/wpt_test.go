@@ -48,9 +48,6 @@ var skipTests = map[string]bool{
 	// ???
 	"fetch/api/body/mime-type.any.js": true,
 
-	// TODO: data race
-	"fetch/api/response/response-cancel-stream.any.js": true,
-
 	// TODO: host info
 	"fetch/api/basic/response-url.sub.any.js":                      true,
 	"fetch/api/redirect/redirect-mode.any.js":                      true,
@@ -97,7 +94,6 @@ var skipTests = map[string]bool{
 
 	// TODO: fix stream
 	"fetch/api/response/response-consume-stream.any.js":     true,
-	"fetch/api/response/response-stream-disturbed-4.any.js": true,
 	"fetch/api/response/response-stream-disturbed-5.any.js": true,
 
 	// TODO: fix no cors

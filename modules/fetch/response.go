@@ -24,6 +24,7 @@ import (
 var (
 	errBodyAlreadyRead  = errors.New("body stream already read")
 	errBodyStreamLocked = errors.New("body stream is locked")
+	errBodyStreamRead   = errors.New("body stream already read")
 )
 
 // Response represents the response to a request.
@@ -444,6 +445,9 @@ func (r *response) read() ([]byte, error) {
 	}
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
+	}
+	if stream.IsClosed(r.bodyStream) {
+		return nil, errBodyStreamRead
 	}
 	if c, ok := r.body.(io.Closer); ok {
 		defer c.Close()
