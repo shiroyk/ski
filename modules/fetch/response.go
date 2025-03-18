@@ -183,6 +183,7 @@ func (*Response) redirected(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	return rt.ToValue(toResponse(rt, call.This).redirected)
 }
 
+// redirect returns a Response resulting in a redirect to the specified URL.
 func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if call.This.ExportType() == types.TypeFunc {
 		u := call.Argument(0).String()
@@ -207,6 +208,7 @@ func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	panic(rt.NewTypeError(`(intermediate value).redirect is not a function`))
 }
 
+// clone returns a copy of the Response object
 func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	used := this.bodyUsed.Load()
@@ -240,6 +242,7 @@ func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return obj
 }
 
+// formData returns a promise which resolves with the body as a FormData object.
 func (*Response) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -253,6 +256,7 @@ func (*Response) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	})
 }
 
+// text returns a promise which resolves with the body text as a string.
 func (*Response) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -266,6 +270,8 @@ func (*Response) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// json static method of the Response interface returns a Response that contains the provided JSON data as body.
+// returns a promise which resolves with the result of parsing the body text as JSON.
 func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if call.This.ExportType() == types.TypeFunc {
 		data := call.Argument(0)
@@ -339,6 +345,7 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// arrayBuffer returns a promise that resolves with an ArrayBuffer.
 func (*Response) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -352,6 +359,7 @@ func (*Response) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	})
 }
 
+// error returns a new Response object associated with a network error.
 func (*Response) error(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if call.This.ExportType() == types.TypeFunc {
 		res := rt.NewObject()
@@ -367,6 +375,7 @@ func (*Response) error(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	panic(rt.NewTypeError(`(intermediate value).error is not a function`))
 }
 
+// body returns a ReadableStream
 func (*Response) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	if this.body == nil {
@@ -378,6 +387,7 @@ func (*Response) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return this.bodyStream
 }
 
+// bytes returns a promise that resolves with a Uint8Array.
 func (*Response) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -391,6 +401,7 @@ func (*Response) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// blob returns a promise that resolves with a Blob.
 func (*Response) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -456,6 +467,7 @@ func (r *response) String() string {
 
 var symResponse = sobek.NewSymbol("Symbol.Response")
 
+// toResponse converts a js Response object to a response
 func toResponse(rt *sobek.Runtime, value sobek.Value) *response {
 	if o, ok := value.(*sobek.Object); ok {
 		if v := o.GetSymbol(symResponse); v != nil {

@@ -137,6 +137,7 @@ func (*Request) keepalive(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue(toThisRequest(rt, call.This).keepalive)
 }
 
+// clone creates a clone of the request
 func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	body := this.body
@@ -173,6 +174,7 @@ func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return obj
 }
 
+// bytes returns a promise which resolves with the body as a Uint8Array
 func (*Request) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -186,6 +188,7 @@ func (*Request) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// text returns a promise which resolves with the body text as a string
 func (r *Request) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -199,6 +202,7 @@ func (r *Request) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// json returns a promise that resolves with the result of parsing the request's body as JSON
 func (r *Request) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -216,6 +220,7 @@ func (r *Request) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// arrayBuffer returns a promise that resolves with an ArrayBuffer.
 func (r *Request) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -229,6 +234,7 @@ func (r *Request) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 	})
 }
 
+// formData returns a promise which resolves with the body as a FormData object
 func (r *Request) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -242,6 +248,7 @@ func (r *Request) formData(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	})
 }
 
+// blob returns a promise that resolves with a Blob.
 func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -260,6 +267,7 @@ func (*Request) blob(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// body returns a ReadableStream
 func (r *Request) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toThisRequest(rt, call.This)
 	if this.body == nil {
@@ -348,6 +356,7 @@ func (r *request) toRequest(rt *sobek.Runtime) *http.Request {
 
 var symRequest = sobek.NewSymbol("Symbol.Request")
 
+// toThisRequest returns a request from the "this" value
 func toThisRequest(rt *sobek.Runtime, value sobek.Value) *request {
 	if o, ok := value.(*sobek.Object); ok {
 		if v := o.GetSymbol(symRequest); v != nil {
@@ -357,6 +366,7 @@ func toThisRequest(rt *sobek.Runtime, value sobek.Value) *request {
 	panic(rt.NewTypeError(`Value of "this" must be of type Request`))
 }
 
+// toRequest returns a request from the value
 func toRequest(value sobek.Value) (*request, bool) {
 	if o, ok := value.(*sobek.Object); ok {
 		if v := o.GetSymbol(symRequest); v != nil {
@@ -366,6 +376,7 @@ func toRequest(value sobek.Value) (*request, bool) {
 	return nil, false
 }
 
+// initRequest builds a request from the RequestInit options
 func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 	if sobek.IsUndefined(opt) {
 		req.headers = types.New(rt, "Headers")

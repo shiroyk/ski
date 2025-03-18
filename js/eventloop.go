@@ -69,6 +69,7 @@ func (e *EventLoop) Start(task func() error) (err error) {
 	}
 }
 
+// Enqueue add a job to the job queue.
 type Enqueue func(func() error)
 
 // EnqueueJob return a function Enqueue to add a job to the job queue.

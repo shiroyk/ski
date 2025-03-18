@@ -205,6 +205,7 @@ func (s *Server) url(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(this.url())
 }
 
+// finished returns a promise that resolves when the server is finished.
 func (s *Server) finished(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -213,6 +214,7 @@ func (s *Server) finished(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	})
 }
 
+// ref make the server block the event loop from finishing.
 func (s *Server) ref(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
 	if this.ref == nil {
@@ -221,12 +223,14 @@ func (s *Server) ref(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return call.This
 }
 
+// unref make the server not block the event loop from finishing.
 func (s *Server) unref(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
 	this.ref(func() error { this.ref = nil; return nil })
 	return call.This
 }
 
+// close closes the server, immediately closes all active net.
 func (s *Server) close(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
 	if err := this.close(); err != nil {
@@ -235,6 +239,7 @@ func (s *Server) close(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return sobek.Undefined()
 }
 
+// shutdown shutdowns the server,  gracefully shuts down the server without interrupting any active connections.
 func (s *Server) shutdown(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {

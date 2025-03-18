@@ -97,6 +97,7 @@ func (f *FormData) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return ctor, nil
 }
 
+// append adds a new key/value pair to the FormData.
 func (*FormData) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	name := call.Argument(0).String()
@@ -129,6 +130,7 @@ func (*FormData) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	return sobek.Undefined()
 }
 
+// delete removes a key/value pair from the FormData.
 func (*FormData) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	name := call.Argument(0).String()
@@ -137,6 +139,7 @@ func (*FormData) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	return sobek.Undefined()
 }
 
+// forEach calls a function for each key, value in the FormData.
 func (*FormData) forEach(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	callback, ok := sobek.AssertFunction(call.Argument(0))
@@ -157,6 +160,7 @@ func (*FormData) forEach(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	return sobek.Undefined()
 }
 
+// get returns the value of the first element associated with the given key.
 func (*FormData) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	name := call.Argument(0).String()
@@ -168,6 +172,7 @@ func (*FormData) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return sobek.Null()
 }
 
+// getAll returns an array of values associated with the given key.
 func (*FormData) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	name := call.Argument(0).String()
@@ -178,6 +183,7 @@ func (*FormData) getAll(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	return rt.NewArray()
 }
 
+// has returns true if the FormData contains the given key.
 func (*FormData) has(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	name := call.Argument(0).String()
@@ -185,6 +191,7 @@ func (*FormData) has(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(ok)
 }
 
+// set adds a new key/value pair to the FormData.
 func (*FormData) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	name := call.Argument(0).String()
@@ -211,6 +218,7 @@ func (*FormData) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return sobek.Undefined()
 }
 
+// keys returns an iterator of keys in the FormData.
 func (*FormData) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	return types.Iterator(rt, func(yield func(any) bool) {
@@ -222,6 +230,7 @@ func (*FormData) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// values returns an iterator of values in the FormData.
 func (*FormData) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	return types.Iterator(rt, func(yield func(any) bool) {
@@ -237,6 +246,7 @@ func (*FormData) values(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	})
 }
 
+// entries returns an iterator of key/value pairs in the FormData.
 func (*FormData) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFormData(rt, call.This)
 	return types.Iterator(rt, func(yield func(any) bool) {
@@ -259,6 +269,7 @@ type formData struct {
 
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
+// encode encodes the FormData into a reader and content type.
 func (f *formData) encode() (io.Reader, string, error) {
 	buf := new(bytes.Buffer)
 	writer := multipart.NewWriter(buf)
@@ -288,6 +299,7 @@ func (f *formData) encode() (io.Reader, string, error) {
 	return buf, writer.FormDataContentType(), nil
 }
 
+// write writes a file to the multipart writer.
 func (f *formData) write(writer *multipart.Writer, data io.Reader, key, name, t string) error {
 	if c, ok := data.(io.Closer); ok {
 		defer c.Close()
@@ -324,6 +336,7 @@ var (
 	errInvalidMimeType = errors.New("Invalid MIME type")
 )
 
+// parseFromData parses the body as a FormData.
 func parseFromData(body io.Reader, bodyUsed *atomic.Bool, contentType string) (*multipart.Form, error) {
 	if bodyUsed.Load() {
 		return nil, errBodyAlreadyRead
@@ -379,6 +392,7 @@ func parseFromData(body io.Reader, bodyUsed *atomic.Bool, contentType string) (*
 	return form, nil
 }
 
+// newFormData creates a new FormData object.
 func newFormData(rt *sobek.Runtime, form *multipart.Form) *sobek.Object {
 	f := rt.Get("FormData")
 	if f == nil {

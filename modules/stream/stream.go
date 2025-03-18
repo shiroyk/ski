@@ -45,11 +45,13 @@ func (*ReadableStream) constructor(_ sobek.ConstructorCall, rt *sobek.Runtime) *
 	panic(rt.NewTypeError("ReadableStream constructor not implement"))
 }
 
+// locked returns whether or not the readable stream is locked to a reader.
 func (*ReadableStream) locked(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toReadableStream(rt, call.This)
 	return rt.ToValue(this.locked())
 }
 
+// cancel returns a Promise that resolves when the stream is canceled.
 func (*ReadableStream) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toReadableStream(rt, call.This)
 	err := this.close()
@@ -59,6 +61,7 @@ func (*ReadableStream) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 	return promise.Resolve(rt, sobek.Undefined())
 }
 
+// getReader creates a reader and locks the stream to it.
 func (*ReadableStream) getReader(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toReadableStream(rt, call.This)
 	if this.closed.Load() {
@@ -162,11 +165,13 @@ func toStreamReader(rt *sobek.Runtime, value sobek.Value) *streamReader {
 
 type baseReadableStreamReader struct{}
 
+// closed returns whether or not the stream is closed.
 func (baseReadableStreamReader) closed(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
 	return rt.ToValue(this.closed)
 }
 
+// cancel returns a Promise that resolves when the stream is canceled.
 func (baseReadableStreamReader) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
 	err := this.stream.close()
@@ -176,6 +181,7 @@ func (baseReadableStreamReader) cancel(call sobek.FunctionCall, rt *sobek.Runtim
 	return promise.Resolve(rt, sobek.Undefined())
 }
 
+// releaseLock releases the lock on the stream.
 func (baseReadableStreamReader) releaseLock(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
 	if this.stream != nil {
@@ -212,6 +218,7 @@ func (r *ReadableStreamDefaultReader) Instantiate(rt *sobek.Runtime) (sobek.Valu
 	return ctor, nil
 }
 
+// read takes as an argument a view on a buffer that supplied data is to be read into, and returns a Promise
 func (*ReadableStreamDefaultReader) read(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
 	bytes := make([]byte, 1024) // default chunk size
@@ -268,6 +275,7 @@ func (r *ReadableStreamBYOBReader) Instantiate(rt *sobek.Runtime) (sobek.Value, 
 	return ctor, nil
 }
 
+// read returns a Promise providing access to the next chunk.
 func (*ReadableStreamBYOBReader) read(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toStreamReader(rt, call.This)
 	if len(call.Arguments) < 1 {

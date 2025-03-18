@@ -83,14 +83,17 @@ func (b *Blob) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 	return obj
 }
 
+// size returns the size of the blob
 func (*Blob) size(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(toBlob(rt, call.This).size)
 }
 
+// type returns the type of the blob
 func (*Blob) type_(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(toBlob(rt, call.This).type_)
 }
 
+// slice returns a new Blob object which contains data from a subset of the blob on which it's called.
 func (*Blob) slice(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	start := 0
@@ -144,6 +147,7 @@ func (*Blob) slice(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return obj
 }
 
+// arrayBuffer returns a promise that resolves with the Blob as an ArrayBuffer.
 func (*Blob) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -157,6 +161,7 @@ func (*Blob) arrayBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	})
 }
 
+// text returns a promise which resolves with the Blob as a string
 func (*Blob) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -170,6 +175,7 @@ func (*Blob) text(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// bytes returns a promise which resolves with the Blob as a Uint8Array.
 func (*Blob) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
@@ -183,6 +189,7 @@ func (*Blob) bytes(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// stream returns a new ReadableStream.
 func (*Blob) stream(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBlob(rt, call.This)
 	return stream.NewReadableStream(rt, this.data)

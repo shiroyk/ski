@@ -94,6 +94,7 @@ func (*TextDecoder) ignoreBOM(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 	return rt.ToValue(this.ignoreBOM)
 }
 
+// decode returns a string containing text decoded from the buffer passed as a parameter.
 func (*TextDecoder) decode(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toTextDecoder(rt, call.This)
 	var input []byte

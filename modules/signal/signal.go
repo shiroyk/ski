@@ -56,10 +56,13 @@ func (a *AbortController) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return ctor, nil
 }
 
+// signal returns the AbortSignal object associated with this object.
 func (*AbortController) signal(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(toAbortController(rt, call.This).signal)
 }
 
+// abort invoking this method will set this object's AbortSignal's aborted flag and signal to
+// any observers that the associated activity is to be aborted.
 func (*AbortController) abort(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	reason := ErrAbort
 	if r := call.Argument(0); !sobek.IsUndefined(r) {
@@ -98,11 +101,13 @@ func (a *AbortSignal) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return ctor, nil
 }
 
+// aborted returns true if this AbortSignal's AbortController has signaled to abort, and false otherwise.
 func (a *AbortSignal) aborted(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toAbortSignal(rt, call.This)
 	return rt.ToValue(this.aborted)
 }
 
+// reason returns the reason
 func (a *AbortSignal) reason(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toAbortSignal(rt, call.This)
 	if this.aborted {
@@ -196,6 +201,7 @@ func Context(rt *sobek.Runtime, value sobek.Value) context.Context {
 	panic(rt.NewTypeError(`Value must be of type AbortSignal`))
 }
 
+// New creates a new AbortSignal
 func New(rt *sobek.Runtime, ctx context.Context) sobek.Value {
 	signal := new(abortSignal)
 	signal.ctx, signal.cancel = context.WithCancelCause(ctx)

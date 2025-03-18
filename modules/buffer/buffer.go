@@ -153,6 +153,7 @@ func (b *Buffer) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 	}
 }
 
+// from return a new Buffer from the given argument
 func (*Buffer) from(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	arg := call.Argument(0)
 
@@ -183,6 +184,7 @@ func (*Buffer) from(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	panic(rt.NewTypeError("First argument must be a string, Buffer, ArrayBuffer or Array or Array-like object."))
 }
 
+// alloc a new Buffer of size bytes. If fill is undefined, the Buffer will be zero-filled.
 func (*Buffer) alloc(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	size := int(call.Argument(0).ToInteger())
 	if size < 0 {
@@ -205,10 +207,12 @@ func (*Buffer) alloc(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return buf
 }
 
+// isBuffer returns true if the value is a buffer
 func (*Buffer) isBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(rt.InstanceOf(call.Argument(0), call.This.(*sobek.Object)))
 }
 
+// byteLength returns the byte length of a string when encoded using encoding.
 func (*Buffer) byteLength(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	value := call.Argument(0)
 	if data, ok := GetBuffer(rt, value); ok {
@@ -217,6 +221,7 @@ func (*Buffer) byteLength(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue(len(decode(rt, value.String(), call.Argument(1))))
 }
 
+// concat returns a new Buffer which is the result of concatenating all the Buffer instances in the list together.
 func (*Buffer) concat(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	list := call.Argument(0)
 
@@ -258,11 +263,13 @@ func (*Buffer) concat(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return newBuffer(rt, call.This, data.Bytes()[:totalLength])
 }
 
+// toString decodes buf to a string according to the specified character encoding in encoding.
 func (*Buffer) toString(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	return rt.ToValue(encode(rt, this, call.Argument(0)))
 }
 
+// toJSON returns a JSON representation of buffer.
 func (*Buffer) toJSON(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	b, _ := json.Marshal(map[string]any{
@@ -272,6 +279,7 @@ func (*Buffer) toJSON(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(string(b))
 }
 
+// equals returns true if both buf and otherBuffer have exactly the same bytes
 func (*Buffer) equals(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	buf1 := toBuffer(rt, call.This)
 	if !IsBuffer(rt, call.Argument(0)) {
@@ -282,6 +290,8 @@ func (*Buffer) equals(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(bytes.Equal(buf1, buf2))
 }
 
+// compare compares buf with target and returns a number indicating whether buf comes before, after,
+// or is the same as target in sort order
 func (*Buffer) compare(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	var buf1, buf2 []byte
 	b1 := call.Argument(0)
@@ -302,6 +312,7 @@ func (*Buffer) compare(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(bytes.Compare(buf1, buf2))
 }
 
+// copy copies data from a region of buf to a region in target, even if the target memory region overlaps with buf.
 func (*Buffer) copy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	var target buffer
@@ -336,6 +347,7 @@ func (*Buffer) copy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(len(data))
 }
 
+// write writes string to buf at offset according to the character encoding in encoding.
 func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	src := call.Argument(0).String()
@@ -356,6 +368,7 @@ func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return call.This
 }
 
+// fill fills buf with the specified value.
 func (*Buffer) fill(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0)
@@ -385,6 +398,7 @@ func (*Buffer) fill(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return call.This
 }
 
+// keys returns an iterator for index
 func (*Buffer) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	return types.Iterator(rt, func(yield func(any) bool) {
@@ -396,6 +410,7 @@ func (*Buffer) keys(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// entries returns an iterator for [index, value] pairs
 func (*Buffer) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	return types.Iterator(rt, func(yield func(any) bool) {
@@ -407,84 +422,98 @@ func (*Buffer) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	})
 }
 
+// readBigInt64BE reads an int64 value in big-endian byte order
 func (*Buffer) readBigInt64BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 8)
 	return rt.ToValue(big.NewInt(int64(binary.BigEndian.Uint64(data))))
 }
 
+// readBigInt64LE reads an int64 value in little-endian byte order
 func (*Buffer) readBigInt64LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 8)
 	return rt.ToValue(big.NewInt(int64(binary.LittleEndian.Uint64(data))))
 }
 
+// readBigUInt64BE reads an uint64 value in big-endian byte order
 func (*Buffer) readBigUInt64BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 8)
 	return rt.ToValue(new(big.Int).SetUint64(binary.BigEndian.Uint64(data)))
 }
 
+// readBigUInt64LE reads an uint64 value in little-endian byte order
 func (*Buffer) readBigUInt64LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 8)
 	return rt.ToValue(new(big.Int).SetUint64(binary.LittleEndian.Uint64(data)))
 }
 
+// readDoubleBE reads an float64 value in big-endian byte order
 func (*Buffer) readDoubleBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 8)
 	return rt.ToValue(math.Float64frombits(binary.BigEndian.Uint64(data)))
 }
 
+// readDoubleLE reads a float64 value in little-endian byte order
 func (*Buffer) readDoubleLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 8)
 	return rt.ToValue(math.Float64frombits(binary.LittleEndian.Uint64(data)))
 }
 
+// readFloatBE reads a float32 value in big-endian byte order
 func (*Buffer) readFloatBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 4)
 	return rt.ToValue(math.Float32frombits(binary.BigEndian.Uint32(data)))
 }
 
+// readFloatLE reads a float32 value in little-endian byte order
 func (*Buffer) readFloatLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 4)
 	return rt.ToValue(math.Float32frombits(binary.LittleEndian.Uint32(data)))
 }
 
+// readInt16BE reads an int16 value in big-endian byte order
 func (*Buffer) readInt16BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 2)
 	return rt.ToValue(int16(binary.BigEndian.Uint16(data)))
 }
 
+// readInt16LE reads an int16 value in little-endian byte order
 func (*Buffer) readInt16LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 2)
 	return rt.ToValue(int16(binary.LittleEndian.Uint16(data)))
 }
 
+// readInt32BE reads an int32 value in big-endian byte order
 func (*Buffer) readInt32BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 4)
 	return rt.ToValue(int32(binary.BigEndian.Uint32(data)))
 }
 
+// readInt32LE reads an int32 value in little-endian byte order
 func (*Buffer) readInt32LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 4)
 	return rt.ToValue(int32(binary.LittleEndian.Uint32(data)))
 }
 
+// readInt8 reads an int8 value
 func (*Buffer) readInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 1)
 	return rt.ToValue(int8(data[0]))
 }
 
+// readIntBE reads an int64 value in big-endian byte order
 func (*Buffer) readIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	offset := this.offset(rt, call.Argument(0), 1)
@@ -502,6 +531,7 @@ func (*Buffer) readIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	return rt.ToValue(value)
 }
 
+// readIntLE reads an int64 value in little-endian byte order
 func (*Buffer) readIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	offset := this.offset(rt, call.Argument(0), 1)
@@ -519,36 +549,42 @@ func (*Buffer) readIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	return rt.ToValue(value)
 }
 
+// readUInt16BE reads an uint16 value in big-endian byte order
 func (*Buffer) readUInt16BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 2)
 	return rt.ToValue(binary.BigEndian.Uint16(data))
 }
 
+// readUInt16LE reads an uint16 value in little-endian byte order
 func (*Buffer) readUInt16LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 2)
 	return rt.ToValue(binary.LittleEndian.Uint16(data))
 }
 
+// readUInt32BE reads an uint32 value in big-endian byte order
 func (*Buffer) readUInt32BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 4)
 	return rt.ToValue(binary.BigEndian.Uint32(data))
 }
 
+// readUInt32LE reads an uint32 value in little-endian byte order
 func (*Buffer) readUInt32LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 4)
 	return rt.ToValue(binary.LittleEndian.Uint32(data))
 }
 
+// readUInt8 reads an uint8 value
 func (*Buffer) readUInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	data := this.readOff(rt, call.Argument(0), 1)
 	return rt.ToValue(data[0])
 }
 
+// readUIntBE reads an uint64 value in big-endian byte order
 func (*Buffer) readUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	offset := this.offset(rt, call.Argument(0), 1)
@@ -565,6 +601,7 @@ func (*Buffer) readUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue(value)
 }
 
+// readUIntLE reads an uint64 value in little-endian byte order
 func (*Buffer) readUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	offset := this.offset(rt, call.Argument(0), 1)
@@ -581,6 +618,7 @@ func (*Buffer) readUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue(value)
 }
 
+// writeBigInt64BE writes an int64 value in big-endian byte order
 func (*Buffer) writeBigInt64BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toBigInt(rt, call.Argument(0))
@@ -590,6 +628,7 @@ func (*Buffer) writeBigInt64BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 	return rt.ToValue(result)
 }
 
+// writeBigInt64LE writes an int64 value in little-endian byte order
 func (*Buffer) writeBigInt64LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toBigInt(rt, call.Argument(0))
@@ -599,6 +638,7 @@ func (*Buffer) writeBigInt64LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek
 	return rt.ToValue(result)
 }
 
+// writeBigUInt64BE writes an uint64 value in big-endian byte order
 func (*Buffer) writeBigUInt64BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toBigUint(rt, call.Argument(0))
@@ -608,6 +648,7 @@ func (*Buffer) writeBigUInt64BE(call sobek.FunctionCall, rt *sobek.Runtime) sobe
 	return rt.ToValue(result)
 }
 
+// writeBigUInt64LE writes an uint64 value in little-endian byte order
 func (*Buffer) writeBigUInt64LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toBigUint(rt, call.Argument(0))
@@ -617,6 +658,7 @@ func (*Buffer) writeBigUInt64LE(call sobek.FunctionCall, rt *sobek.Runtime) sobe
 	return rt.ToValue(result)
 }
 
+// writeDoubleBE writes a float64 value in big-endian byte order
 func (*Buffer) writeDoubleBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
@@ -626,6 +668,7 @@ func (*Buffer) writeDoubleBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	return rt.ToValue(result)
 }
 
+// writeDoubleLE writes a float64 value in little-endian byte order
 func (*Buffer) writeDoubleLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
@@ -635,6 +678,7 @@ func (*Buffer) writeDoubleLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	return rt.ToValue(result)
 }
 
+// writeFloatBE writes a float32 value in big-endian byte order
 func (*Buffer) writeFloatBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
@@ -644,6 +688,7 @@ func (*Buffer) writeFloatBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	return rt.ToValue(result)
 }
 
+// writeFloatLE writes a float32 value in little-endian byte order
 func (*Buffer) writeFloatLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
@@ -653,6 +698,7 @@ func (*Buffer) writeFloatLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	return rt.ToValue(result)
 }
 
+// writeInt16BE writes an int16 value in big-endian byte order
 func (*Buffer) writeInt16BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[int16](rt, call.Argument(0))
@@ -662,6 +708,7 @@ func (*Buffer) writeInt16BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	return rt.ToValue(result)
 }
 
+// writeInt16LE writes an int16 value in little-endian byte order
 func (*Buffer) writeInt16LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[int16](rt, call.Argument(0))
@@ -671,6 +718,7 @@ func (*Buffer) writeInt16LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	return rt.ToValue(result)
 }
 
+// writeInt32BE writes an int32 value in big-endian byte order
 func (*Buffer) writeInt32BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[int32](rt, call.Argument(0))
@@ -680,6 +728,7 @@ func (*Buffer) writeInt32BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	return rt.ToValue(result)
 }
 
+// writeInt32LE writes an int32 value in little-endian byte order
 func (*Buffer) writeInt32LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[int32](rt, call.Argument(0))
@@ -689,6 +738,7 @@ func (*Buffer) writeInt32LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	return rt.ToValue(result)
 }
 
+// writeInt8 writes an int8 value
 func (*Buffer) writeInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[int8](rt, call.Argument(0))
@@ -696,6 +746,7 @@ func (*Buffer) writeInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	return rt.ToValue(result)
 }
 
+// writeIntBE writes an integer value in big-endian byte order
 func (*Buffer) writeIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToInteger()
@@ -721,6 +772,7 @@ func (*Buffer) writeIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue(offset + byteLength)
 }
 
+// writeIntLE writes an integer value in little-endian byte order
 func (*Buffer) writeIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToInteger()
@@ -736,7 +788,7 @@ func (*Buffer) writeIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		}
 	}
 
-	for i := 0; i < int(byteLength); i++ {
+	for i := range byteLength {
 		data[i] = byte(value)
 		value >>= 8
 	}
@@ -746,6 +798,7 @@ func (*Buffer) writeIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue(offset + byteLength)
 }
 
+// writeUInt16BE writes an uint16 value in big-endian byte order
 func (*Buffer) writeUInt16BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[uint16](rt, call.Argument(0))
@@ -755,6 +808,7 @@ func (*Buffer) writeUInt16BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	return rt.ToValue(result)
 }
 
+// writeUInt16LE writes an uint16 value in little-endian byte order
 func (*Buffer) writeUInt16LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[uint16](rt, call.Argument(0))
@@ -764,6 +818,7 @@ func (*Buffer) writeUInt16LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	return rt.ToValue(result)
 }
 
+// writeUInt32BE writes an uint32 value in big-endian byte order
 func (*Buffer) writeUInt32BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[uint32](rt, call.Argument(0))
@@ -773,6 +828,7 @@ func (*Buffer) writeUInt32BE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	return rt.ToValue(result)
 }
 
+// writeUInt32LE writes an uint32 value in little-endian byte order
 func (*Buffer) writeUInt32LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[uint32](rt, call.Argument(0))
@@ -782,6 +838,7 @@ func (*Buffer) writeUInt32LE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	return rt.ToValue(result)
 }
 
+// writeUInt8 writes an uint8 value
 func (*Buffer) writeUInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := toInteger[uint8](rt, call.Argument(0))
@@ -789,6 +846,7 @@ func (*Buffer) writeUInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue(result)
 }
 
+// writeUIntBE writes an unsigned integer in big-endian byte order
 func (*Buffer) writeUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := uint64(call.Argument(0).ToInteger())
@@ -808,6 +866,7 @@ func (*Buffer) writeUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	return rt.ToValue(offset + byteLength)
 }
 
+// writeUIntLE writes an unsigned integer in little-endian byte order
 func (*Buffer) writeUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := uint64(call.Argument(0).ToInteger())
@@ -817,7 +876,7 @@ func (*Buffer) writeUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	checkUint(rt, value, byteLength)
 	data := make([]byte, byteLength)
 
-	for i := 0; i < int(byteLength); i++ {
+	for i := range byteLength {
 		data[i] = byte(value)
 		value >>= 8
 	}
@@ -827,6 +886,7 @@ func (*Buffer) writeUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	return rt.ToValue(offset + byteLength)
 }
 
+// newBuffer creates a new buffer with the given data
 func newBuffer(rt *sobek.Runtime, this sobek.Value, data []byte) *sobek.Object {
 	u8 := rt.Get("Uint8Array")
 	if u8 == nil {
@@ -845,6 +905,7 @@ func newBuffer(rt *sobek.Runtime, this sobek.Value, data []byte) *sobek.Object {
 	return object
 }
 
+// toBuffer converts a value to a buffer
 func toBuffer(rt *sobek.Runtime, value sobek.Value) buffer {
 	if IsBuffer(rt, value) {
 		return value.Export().([]byte)
@@ -852,6 +913,7 @@ func toBuffer(rt *sobek.Runtime, value sobek.Value) buffer {
 	panic(rt.NewTypeError(`Value of "this" must be of type Buffer`))
 }
 
+// getByteLength returns the byte length
 func getByteLength(rt *sobek.Runtime, v sobek.Value) int64 {
 	var length int64
 	if types.IsNumber(v) {
@@ -866,6 +928,7 @@ func getByteLength(rt *sobek.Runtime, v sobek.Value) int64 {
 	return length
 }
 
+// decode decodes a string into a byte array
 func decode(rt *sobek.Runtime, src string, enc sobek.Value) []byte {
 	encoding := "utf8"
 	if !sobek.IsUndefined(enc) {
@@ -891,6 +954,7 @@ func decode(rt *sobek.Runtime, src string, enc sobek.Value) []byte {
 	}
 }
 
+// encode encodes a byte array into a string
 func encode(rt *sobek.Runtime, buf []byte, enc sobek.Value) string {
 	encoding := "utf8"
 	if !sobek.IsUndefined(enc) {
@@ -914,6 +978,7 @@ var (
 	maxBigUint = new(big.Int).SetUint64(math.MaxUint64)
 )
 
+// toBigInt converts a BigInt to an int
 func toBigInt(rt *sobek.Runtime, value sobek.Value) uint64 {
 	v, ok := value.Export().(*big.Int)
 	if !ok {
@@ -926,6 +991,7 @@ func toBigInt(rt *sobek.Runtime, value sobek.Value) uint64 {
 	panic(types.New(rt, "RangeError", rt.ToValue(msg)))
 }
 
+// toBigUint converts a BigInt to an uint
 func toBigUint(rt *sobek.Runtime, value sobek.Value) uint64 {
 	v, ok := value.Export().(*big.Int)
 	if !ok {
@@ -943,6 +1009,7 @@ type integer interface {
 		uint8 | uint16 | uint32 | uint64
 }
 
+// toInteger converts a value to an integer
 func toInteger[N integer](rt *sobek.Runtime, value sobek.Value) (ret N) {
 	v := value.ToInteger()
 	var minInt, maxInt int64
@@ -970,6 +1037,7 @@ func toInteger[N integer](rt *sobek.Runtime, value sobek.Value) (ret N) {
 	return N(v)
 }
 
+// checkInt checks the value is a valid int between byteLength
 func checkInt(rt *sobek.Runtime, v, byteLength int64) {
 	var minInt, maxInt int64
 	switch byteLength {
@@ -992,6 +1060,7 @@ func checkInt(rt *sobek.Runtime, v, byteLength int64) {
 	throwRangeError(rt, "value", minInt, maxInt, v)
 }
 
+// checkUint checks the value is a valid uint between byteLength
 func checkUint(rt *sobek.Runtime, v uint64, byteLength int64) {
 	var maxUint uint64
 	switch byteLength {
@@ -1018,6 +1087,7 @@ var symBuffer = sobek.NewSymbol("Symbol.__buffer__")
 
 type buffer []byte
 
+// offset returns the offset
 func (b buffer) offset(rt *sobek.Runtime, v sobek.Value, numBytes int64) int64 {
 	var offset int64
 	if types.IsNumber(v) {
@@ -1032,25 +1102,30 @@ func (b buffer) offset(rt *sobek.Runtime, v sobek.Value, numBytes int64) int64 {
 	return offset
 }
 
+// readOff reads data from the buffer with offset, numBytes
 func (b buffer) readOff(rt *sobek.Runtime, offset sobek.Value, numBytes int64) []byte {
 	data := make([]byte, numBytes)
 	b.readAt(data, b.offset(rt, offset, numBytes))
 	return data
 }
 
+// readAt reads data from the buffer
 func (b buffer) readAt(p []byte, offset int64) int64 {
 	return int64(copy(p, b[offset:]))
 }
 
+// writeOff writes data to the buffer with offset, numBytes
 func (b buffer) writeOff(rt *sobek.Runtime, off sobek.Value, numBytes int64, data []byte) int64 {
 	return b.writeAt(data, b.offset(rt, off, numBytes)) + numBytes
 }
 
+// writeAt writes data to the buffer
 func (b buffer) writeAt(data []byte, offset int64) int64 {
 	copy(b[offset:], data)
 	return offset
 }
 
+// fill fills the buffer with data
 func (b buffer) fill(rt *sobek.Runtime, offset, end int, buf []byte) {
 	if len(buf) > len(b) {
 		b.writeAt(buf[:len(b)], int64(offset))
@@ -1064,6 +1139,7 @@ func (b buffer) fill(rt *sobek.Runtime, offset, end int, buf []byte) {
 	}
 }
 
+// throwRangeError throws a RangeError
 func throwRangeError(rt *sobek.Runtime, field string, min, max, received any) {
 	msg := fmt.Sprintf(`The value of "%s" is out of range. It must be >= %d && <= %d. Received %d`, field, min, max, received)
 	panic(types.New(rt, "RangeError", rt.ToValue(msg)))

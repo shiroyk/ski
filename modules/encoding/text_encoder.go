@@ -28,6 +28,8 @@ func (*TextEncoder) encoding(_ sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return rt.ToValue("utf-8")
 }
 
+// encode takes a string as input, and returns a Uint8Array containing the text given in parameters encoded
+// with the specific method for that TextEncoder object.
 func (*TextEncoder) encode(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	var text string
 	if v := call.Argument(0); !sobek.IsUndefined(v) {
@@ -36,6 +38,8 @@ func (*TextEncoder) encode(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 	return types.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer([]byte(text))))
 }
 
+// encodeInto takes a string to encode and a destination Uint8Array to put resulting UTF-8 encoded text into,
+// and returns a dictionary object indicating the progress of the encoding.
 func (*TextEncoder) encodeInto(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if len(call.Arguments) < 2 {
 		panic(rt.NewTypeError("TextEncoder.encodeInto requires 2 arguments"))

@@ -53,16 +53,19 @@ func (f *File) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek
 	return obj
 }
 
+// name returns the name of the file
 func (*File) name(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFile(rt, call.This)
 	return rt.ToValue(this.name)
 }
 
+// lastModified returns the last modified timestamp
 func (*File) lastModified(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFile(rt, call.This)
 	return rt.ToValue(this.lastModified)
 }
 
+// webkitRelativePath returns the relative path
 func (*File) webkitRelativePath(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toFile(rt, call.This)
 	return rt.ToValue(this.webkitRelativePath)

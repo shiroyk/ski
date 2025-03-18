@@ -9,17 +9,30 @@ import (
 // Event defines the DOM Event interface
 // https://dom.spec.whatwg.org/#event
 type Event interface {
+	// Type returns the type of event, e.g. "click", "hashchange", or "submit".
 	Type() string
+	// Target returns the object to which event is dispatched (its target).
 	Target() EventTarget
+	// CurrentTarget returns the object whose event listener’s callback is currently being invoked.
 	CurrentTarget() EventTarget
+	// EventPhase returns the invocation target objects of event’s path.
 	EventPhase() EventPhase
+	// TimeStamp returns the event’s timestamp as the number of milliseconds measured relative to the occurrence.
 	TimeStamp() int64
+	// Bubbles returns true or false depending on how event was initialized.
 	Bubbles() bool
+	// Cancelable returns true or false depending on how event was initialized.
 	Cancelable() bool
+	// DefaultPrevented returns true if preventDefault() was invoked successfully to indicate cancelation; otherwise false.
 	DefaultPrevented() bool
 
+	// StopPropagation prevents event from reaching any objects other than the current object.
 	StopPropagation()
+	// StopImmediatePropagation prevents event from reaching any registered event listeners after
+	// the current one finishes running.
 	StopImmediatePropagation()
+	// PreventDefault If invoked when the cancelable attribute value is true,
+	// and while executing a listener for the event with passive set to false
 	PreventDefault()
 
 	toValue

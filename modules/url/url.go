@@ -299,6 +299,7 @@ func (*URL) searchParams(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	return this.searchParams
 }
 
+// parse returns a newly created URL object representing the URL defined by the parameters.
 func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if len(call.Arguments) == 0 {
 		panic(rt.NewTypeError("URL parse requires at least 1 argument"))
@@ -334,6 +335,8 @@ func (*URL) parse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return obj
 }
 
+// canParse returns a boolean indicating whether or not an absolute URL, or a relative URL combined with a base URL,
+// are parsable and valid.
 func (*URL) canParse(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if len(call.Arguments) == 0 {
 		panic(rt.NewTypeError("URL canParse requires at least 1 argument"))
