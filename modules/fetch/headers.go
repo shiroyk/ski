@@ -221,3 +221,10 @@ func getContentType(value sobek.Value) string {
 	}
 	return contentType
 }
+
+func setContentType(value sobek.Value, contentType string) {
+	h, _ := value.Export().(headers)
+	if _, ok := h["content-type"]; !ok {
+		h["content-type"] = []string{contentType}
+	}
+}

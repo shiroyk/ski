@@ -104,15 +104,11 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 			if err != nil {
 				js.Throw(rt, err)
 			}
-			if reader != nil {
-				res.body = reader
-				h := res.headers.Export().(headers)
-				h["content-type"] = []string{strings.ToLower(t)}
-			}
+			res.body = reader
+			setContentType(res.headers, normalizeHeaderValue(t))
 		case url.TypeURLSearchParams:
 			res.body = strings.NewReader(arg.String())
-			h := res.headers.Export().(headers)
-			h["content-type"] = []string{"application/x-www-form-urlencoded;charset=UTF-8"}
+			setContentType(res.headers, "application/x-www-form-urlencoded;charset=UTF-8")
 		default:
 			if v, t, ok := buffer.GetReader(arg); ok {
 				all, err := buffer.ReadAll(v)
@@ -121,19 +117,13 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 				}
 				res.body = bytes.NewReader(all)
 				if t != "" {
-					h := res.headers.Export().(headers)
-					if _, ok := h["content-type"]; !ok {
-						h["content-type"] = []string{strings.ToLower(t)}
-					}
+					setContentType(res.headers, t)
 				}
 			} else if v, ok := buffer.GetBuffer(rt, arg); ok {
 				res.body = bytes.NewReader(slices.Clone(v))
 			} else if !sobek.IsNull(arg) {
 				res.body = strings.NewReader(arg.String())
-				h := res.headers.Export().(headers)
-				if _, ok := h["content-type"]; !ok {
-					h["content-type"] = []string{"text/plain;charset=UTF-8"}
-				}
+				setContentType(res.headers, "text/plain;charset=UTF-8")
 			}
 		}
 	}

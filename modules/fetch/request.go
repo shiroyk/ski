@@ -424,34 +424,24 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 			if err != nil {
 				js.Throw(rt, err)
 			}
-			if reader != nil {
-				h := req.headers.Export().(headers)
-				h["content-type"] = []string{contentType}
-				body = reader
-			}
+			setContentType(req.headers, contentType)
+			body = reader
 		case url.TypeURLSearchParams:
-			h := req.headers.Export().(headers)
-			h["content-type"] = []string{"application/x-www-form-urlencoded;charset=UTF-8"}
 			body = strings.NewReader(b.String())
+			setContentType(req.headers, "application/x-www-form-urlencoded;charset=UTF-8")
 		case stream.TypeReadableStream:
 			body = stream.GetStreamSource(rt, b)
 		default:
 			if v, t, ok := buffer.GetReader(b); ok {
 				body = v
 				if t != "" {
-					h := req.headers.Export().(headers)
-					if _, ok := h["content-type"]; !ok {
-						h["content-type"] = []string{strings.ToLower(t)}
-					}
+					setContentType(req.headers, t)
 				}
 			} else if v, ok := buffer.GetBuffer(rt, b); ok {
 				body = bytes.NewReader(slices.Clone(v))
 			} else {
 				body = strings.NewReader(b.String())
-				h := req.headers.Export().(headers)
-				if _, ok := h["content-type"]; !ok {
-					h["content-type"] = []string{"text/plain;charset=UTF-8"}
-				}
+				setContentType(req.headers, "text/plain;charset=UTF-8")
 			}
 		}
 		req.bodyUsed.Store(false)
