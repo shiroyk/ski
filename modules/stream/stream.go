@@ -64,7 +64,7 @@ func (*ReadableStream) cancel(call sobek.FunctionCall, rt *sobek.Runtime) sobek.
 // getReader creates a reader and locks the stream to it.
 func (*ReadableStream) getReader(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toReadableStream(rt, call.This)
-	if this.closed.Load() {
+	if this.closed() {
 		panic(rt.NewTypeError("stream is already closed"))
 	}
 
@@ -111,22 +111,33 @@ func (*ReadableStream) pipeThrough(_ sobek.FunctionCall, rt *sobek.Runtime) sobe
 	panic(rt.NewTypeError("pipeThrough not implement"))
 }
 
+const (
+	readable int32 = iota
+	closed
+	errored
+)
+
 type readableStream struct {
-	source io.Reader
-	reader *streamReader
-	closed atomic.Bool
+	source      io.Reader
+	reader      *streamReader
+	disturbed   atomic.Bool
+	state       atomic.Int32
+	storedError any
 }
 
 func (r *readableStream) locked() bool { return r.reader != nil }
 
+func (r *readableStream) closed() bool { return r.state.Load() == closed }
+
 func (r *readableStream) close() (err error) {
-	if r.closed.Load() {
+	if r.closed() {
 		return nil
 	}
 	if closer, ok := r.source.(io.Closer); ok {
 		err = closer.Close()
 	}
-	r.closed.Store(true)
+	r.disturbed.Store(true)
+	r.state.Store(closed)
 	if r.reader == nil {
 		return
 	}
@@ -142,10 +153,10 @@ type streamReader struct {
 }
 
 func (r *streamReader) read(buf []byte) (int, error) {
-	if r.stream.closed.Load() || r.stream.source == nil {
+	if r.stream.closed() || r.stream.source == nil {
 		return 0, io.EOF
 	}
-
+	r.stream.disturbed.Store(true)
 	return r.stream.source.Read(buf)
 }
 

@@ -14,10 +14,10 @@ func IsLocked(value sobek.Value) bool {
 	return false
 }
 
-// IsClosed returns ReadableStream is closed.
-func IsClosed(value sobek.Value) bool {
+// IsDisturbed returns ReadableStream has been read from or canceled.
+func IsDisturbed(value sobek.Value) bool {
 	if value != nil && value.ExportType() == TypeReadableStream {
-		return value.Export().(*readableStream).closed.Load()
+		return value.Export().(*readableStream).disturbed.Load()
 	}
 	return false
 }

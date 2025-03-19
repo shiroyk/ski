@@ -54,7 +54,7 @@ func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 				for i := range length {
 					kv := obj.Get(strconv.Itoa(i)).ToObject(rt)
 					if v := kv.Get("length"); v == nil || v.ToInteger() != 2 {
-						panic(rt.NewTypeError("Invalid value"))
+						panic(rt.NewTypeError(" The provided value cannot be converted to a sequence"))
 					}
 					key := kv.Get("0").String()
 					value := kv.Get("1").String()

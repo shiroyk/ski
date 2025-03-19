@@ -447,7 +447,7 @@ func (r *response) read() ([]byte, error) {
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
-	if stream.IsClosed(r.bodyStream) {
+	if stream.IsDisturbed(r.bodyStream) {
 		return nil, errBodyStreamRead
 	}
 	if c, ok := r.body.(io.Closer); ok {

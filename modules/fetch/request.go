@@ -37,9 +37,12 @@ func (r *Request) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("mode", rt.ToValue(r.mode), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("credentials", rt.ToValue(r.credentials), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("cache", rt.ToValue(r.cache), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("destination", rt.ToValue(r.destination), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("redirect", rt.ToValue(r.redirect), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("referrer", rt.ToValue(r.referrer), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("referrerPolicy", rt.ToValue(r.referrerPolicy), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("integrity", rt.ToValue(r.integrity), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("isHistoryNavigation", rt.ToValue(r.isHistoryNavigation), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("signal", rt.ToValue(r.signal), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("keepalive", rt.ToValue(r.keepalive), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
@@ -55,28 +58,40 @@ func (r *Request) prototype(rt *sobek.Runtime) *sobek.Object {
 }
 
 func (r *Request) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
-	instance := &request{
-		method:      "GET",
-		mode:        "cors",
-		credentials: "same-origin",
-		cache:       "default",
-		redirect:    "follow",
-		referrer:    "",
-		integrity:   "",
-	}
+	var req request
 
 	if arg := call.Argument(0); !sobek.IsUndefined(arg) {
-		if req, ok := toRequest(arg); ok {
-			c := *req
-			instance = &c
+		if input, ok := toRequest(arg); ok {
+			req = *input
+			// copy headers
+			req.headers = types.New(rt, "Headers", input.headers)
 		} else {
-			instance.url = arg.String()
+			req = request{
+				url:         arg.String(),
+				method:      "GET",
+				mode:        "cors",
+				credentials: "same-origin",
+				cache:       "default",
+				redirect:    "follow",
+				referrer:    "about:client",
+				integrity:   "",
+			}
 		}
 	}
 
-	initRequest(rt, call.Argument(1), instance)
+	initRequest(rt, call.Argument(1), &req)
+
+	switch {
+	case req.bodyUsed.Load():
+		panic(rt.NewTypeError(errBodyAlreadyRead.Error()))
+	case stream.IsLocked(req.bodyStream):
+		panic(rt.NewTypeError(errBodyStreamLocked.Error()))
+	case stream.IsDisturbed(req.bodyStream):
+		panic(rt.NewTypeError(errBodyStreamRead.Error()))
+	}
+
 	obj := rt.NewObject()
-	_ = obj.SetSymbol(symRequest, instance)
+	_ = obj.SetSymbol(symRequest, &req)
 	_ = obj.SetPrototype(call.This.Prototype())
 	return obj
 }
@@ -125,8 +140,20 @@ func (*Request) referrer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 	return rt.ToValue(toThisRequest(rt, call.This).referrer)
 }
 
+func (*Request) referrerPolicy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(toThisRequest(rt, call.This).referrerPolicy)
+}
+
+func (*Request) destination(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(toThisRequest(rt, call.This).destination)
+}
+
 func (*Request) integrity(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(toThisRequest(rt, call.This).integrity)
+}
+
+func (*Request) isHistoryNavigation(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(toThisRequest(rt, call.This).isHistoryNavigation)
 }
 
 func (*Request) signal(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -154,19 +181,11 @@ func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		body = io.NopCloser(b2)
 	}
 
-	instance := &request{
-		method:      this.method,
-		url:         this.url,
-		headers:     this.headers,
-		body:        body,
-		bodyUsed:    this.bodyUsed,
-		mode:        this.mode,
-		credentials: this.credentials,
-		cache:       this.cache,
-		redirect:    this.redirect,
-		referrer:    this.referrer,
-		integrity:   this.integrity,
-	}
+	clone := *this
+	instance := &clone
+	instance.body = body
+	instance.bodyUsed = new(atomic.Bool)
+	instance.headers = types.New(rt, "Headers", this.headers)
 
 	obj := rt.NewObject()
 	_ = obj.SetSymbol(symRequest, instance)
@@ -280,25 +299,23 @@ func (r *Request) body(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 type request struct {
-	method                      string
-	url                         string
-	headers, signal, bodyStream sobek.Value
-	body                        io.Reader
-	bodyUsed                    atomic.Bool
-	mode                        string
-	credentials                 string
-	cache                       string
-	redirect                    string
-	referrer                    string
-	integrity                   string
-	keepalive                   bool
+	method                             string
+	url                                string
+	headers, signal, bodyStream        sobek.Value
+	body                               io.Reader
+	bodyUsed                           *atomic.Bool
+	credentials, cache, destination    string
+	redirect, referrer, referrerPolicy string
+	integrity                          string
+	mode                               string
+	keepalive, isHistoryNavigation     bool
 }
 
 func (r *request) form() (*multipart.Form, error) {
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
-	return parseFromData(r.body, &r.bodyUsed, getContentType(r.headers))
+	return parseFromData(r.body, r.bodyUsed, getContentType(r.headers))
 }
 
 func (r *request) read() ([]byte, error) {
@@ -311,18 +328,14 @@ func (r *request) read() ([]byte, error) {
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
-	if stream.IsClosed(r.bodyStream) {
+	if stream.IsDisturbed(r.bodyStream) {
 		return nil, errBodyAlreadyRead
 	}
 	r.bodyUsed.Store(true)
 	if c, ok := r.body.(io.Closer); ok {
 		defer c.Close()
 	}
-	data, err := io.ReadAll(r.body)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return io.ReadAll(r.body)
 }
 
 func (r *request) cancel() {
@@ -378,44 +391,58 @@ func toRequest(value sobek.Value) (*request, bool) {
 
 // initRequest builds a request from the RequestInit options
 func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
+	if req.bodyUsed == nil {
+		req.bodyUsed = new(atomic.Bool)
+	}
 	if sobek.IsUndefined(opt) {
-		req.headers = types.New(rt, "Headers")
+		if req.headers == nil {
+			req.headers = types.New(rt, "Headers")
+		}
 		return
 	}
 	init := opt.ToObject(rt)
-	if method := init.Get("method"); method != nil {
-		req.method = strings.ToUpper(method.String())
-		switch req.method {
-		case http.MethodConnect, http.MethodTrace, "TRACK":
-			panic(rt.NewTypeError("Invalid request method"))
+	if v := init.GetSymbol(symRequest); v != nil {
+		clone := *v.Export().(*request)
+		*req = clone
+		// copy headers
+		req.headers = types.New(rt, "Headers", clone.headers)
+		return
+	}
+	for _, key := range init.Keys() {
+		v := init.Get(key)
+		switch key {
+		case "method":
+			req.method = strings.ToUpper(v.String())
+			switch req.method {
+			case http.MethodConnect, http.MethodTrace, "TRACK":
+				panic(rt.NewTypeError("Invalid request method"))
+			}
+		case "mode":
+			req.mode = v.String()
+		case "credentials":
+			req.credentials = v.String()
+		case "cache":
+			req.cache = v.String()
+		case "redirect":
+			req.redirect = v.String()
+		case "referrer":
+			req.referrer = v.String()
+		case "referrerPolicy":
+			req.referrerPolicy = v.String()
+		case "integrity":
+			req.integrity = v.String()
+		case "destination":
+			req.destination = v.String()
+		case "keepalive":
+			req.keepalive = v.ToBoolean()
+		case "signal":
+			if v.ExportType() != signal.TypeAbortSignal {
+				js.Throw(rt, errors.New("options signal is not AbortSignal"))
+			}
+			req.signal = v
+		default:
+			continue
 		}
-	}
-	if mode := init.Get("mode"); mode != nil {
-		req.mode = mode.String()
-	}
-	if credentials := init.Get("credentials"); credentials != nil {
-		req.credentials = credentials.String()
-	}
-	if cache := init.Get("cache"); cache != nil {
-		req.cache = cache.String()
-	}
-	if redirect := init.Get("redirect"); redirect != nil {
-		req.redirect = redirect.String()
-	}
-	if referrer := init.Get("referrer"); referrer != nil {
-		req.referrer = referrer.String()
-	}
-	if integrity := init.Get("integrity"); integrity != nil {
-		req.integrity = integrity.String()
-	}
-	if keepalive := init.Get("keepalive"); keepalive != nil {
-		req.keepalive = keepalive.ToBoolean()
-	}
-	if v := init.Get("signal"); v != nil {
-		if v.ExportType() != signal.TypeAbortSignal {
-			js.Throw(rt, errors.New("options signal is not AbortSignal"))
-		}
-		req.signal = v
 	}
 	if header := init.Get("headers"); header != nil {
 		req.headers = types.New(rt, "Headers", header)
@@ -457,6 +484,7 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 		}
 		req.bodyUsed.Store(false)
 		req.body = body
+		req.bodyStream = nil
 	}
 }
 
@@ -466,6 +494,7 @@ func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
 		method:      req.Method,
 		url:         req.URL.String(),
 		body:        req.Body,
+		bodyUsed:    new(atomic.Bool),
 		headers:     types.New(rt, "Headers", rt.ToValue(map[string][]string(req.Header))),
 		referrer:    req.Referer(),
 		signal:      signal.New(rt, req.Context()),

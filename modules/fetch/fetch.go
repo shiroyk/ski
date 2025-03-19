@@ -1,9 +1,6 @@
 package fetch
 
 import (
-	"io"
-	"net/http"
-
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js/promise"
 	"github.com/shiroyk/ski/modules"
@@ -26,7 +23,6 @@ func Fetch(client Client) modules.ModuleFunc {
 				method: "GET",
 				cache:  "default",
 				url:    resource.String(),
-				body:   io.NopCloser(http.NoBody),
 			}
 			initRequest(rt, call.Argument(1), req)
 		}
