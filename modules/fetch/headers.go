@@ -2,7 +2,6 @@ package fetch
 
 import (
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -35,8 +34,8 @@ func (h *Headers) prototype(rt *sobek.Runtime) *sobek.Object {
 func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	var header headers
 	if init := call.Argument(0); !sobek.IsUndefined(init) {
-		switch {
-		case init.ExportType() == typeHeaders:
+		switch init.ExportType() {
+		case typeHeaders:
 			h2 := init.Export().(headers)
 			header = make(headers, len(h2))
 			for k, v := range h2 {
@@ -47,24 +46,31 @@ func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 			}
 		default:
 			obj := init.ToObject(rt)
-			if l := obj.Get("length"); l != nil {
-				length := int(l.ToInteger())
-				header = make(headers, length)
-
-				for i := range length {
-					kv := obj.Get(strconv.Itoa(i)).ToObject(rt)
-					if v := kv.Get("length"); v == nil || v.ToInteger() != 2 {
+			if obj.GetSymbol(sobek.SymIterator) != nil {
+				if v := obj.Get("length"); v != nil {
+					header = make(headers, v.ToInteger())
+				} else {
+					header = make(headers)
+				}
+				rt.ForOf(obj, func(v sobek.Value) bool {
+					item := v.ToObject(rt)
+					if length := item.Get("length"); length == nil || length.ToInteger() != 2 {
 						panic(rt.NewTypeError(" The provided value cannot be converted to a sequence"))
 					}
-					key := kv.Get("0").String()
-					value := kv.Get("1").String()
+					key := item.Get("0").String()
+					value := item.Get("1").String()
 					name := normalizeHeaderName(key)
 					value = normalizeHeaderValue(value)
 					header[name] = append(header[name], value)
-				}
+					return true
+				})
 			} else {
-				header = make(headers)
-				for _, key := range obj.Keys() {
+				if obj.ExportType().Kind() != reflect.Map {
+					panic(rt.NewTypeError("The provided value is not an object"))
+				}
+				keys := obj.Keys()
+				header = make(headers, len(keys))
+				for _, key := range keys {
 					name := normalizeHeaderName(key)
 					value := normalizeHeaderValue(obj.Get(key).String())
 					header[name] = append(header[name], value)
@@ -154,9 +160,17 @@ func (*Headers) forEach(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 func (*Headers) entries(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHeaders(rt, call.This)
 	return types.Iterator(rt, func(yield func(any) bool) {
-		for key, value := range this {
-			if !yield(rt.NewArray(key, strings.Join(value, ", "))) {
-				return
+		for key, values := range this {
+			if key == "set-cookie" {
+				for _, value := range values {
+					if !yield(rt.NewArray(key, value)) {
+						return
+					}
+				}
+			} else {
+				if !yield(rt.NewArray(key, strings.Join(values, ", "))) {
+					return
+				}
 			}
 		}
 	})

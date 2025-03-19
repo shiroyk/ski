@@ -182,13 +182,13 @@ func (*Request) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 
 	clone := *this
-	instance := &clone
-	instance.body = body
-	instance.bodyUsed = new(atomic.Bool)
-	instance.headers = types.New(rt, "Headers", this.headers)
+	req := &clone
+	req.body = body
+	req.bodyUsed = new(atomic.Bool)
+	req.headers = types.New(rt, "Headers", this.headers)
 
 	obj := rt.NewObject()
-	_ = obj.SetSymbol(symRequest, instance)
+	_ = obj.SetSymbol(symRequest, req)
 	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
 	return obj
 }
