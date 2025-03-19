@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	urlpkg "net/url"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -68,8 +69,9 @@ func unsafeReasonPhrase(r rune) bool {
 
 func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	res := &response{
-		status: http.StatusOK,
-		type_:  "default",
+		status:   http.StatusOK,
+		bodyUsed: new(atomic.Bool),
+		type_:    "default",
 	}
 
 	if opt := call.Argument(1); !sobek.IsUndefined(opt) {
@@ -187,9 +189,14 @@ func (*Response) redirected(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if call.This.ExportType() == types.TypeFunc {
 		u := call.Argument(0).String()
+		_, err := urlpkg.Parse(u)
+		if err != nil {
+			panic(rt.NewTypeError(err.Error()))
+		}
 		res := &response{
-			url:    u,
-			status: 302,
+			url:      u,
+			status:   http.StatusFound,
+			bodyUsed: new(atomic.Bool),
 			headers: types.New(rt, "Headers", rt.ToValue(headers{
 				"location": []string{u},
 			})),
@@ -198,6 +205,12 @@ func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 
 		if v := call.Argument(1); !sobek.IsUndefined(v) {
 			res.status = int(v.ToInteger())
+			switch res.status {
+			case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther,
+				http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+			default:
+				panic(types.New(rt, "RangeError", rt.ToValue("Invalid status code")))
+			}
 		}
 
 		obj := rt.NewObject()
@@ -211,8 +224,7 @@ func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 // clone returns a copy of the Response object
 func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toResponse(rt, call.This)
-	used := this.bodyUsed.Load()
-	if used {
+	if this.bodyUsed.Load() {
 		panic(rt.NewTypeError("Response body already used"))
 	}
 	body := this.body
@@ -229,14 +241,12 @@ func (*Response) clone(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		body = io.NopCloser(b2)
 	}
 	obj := rt.NewObject()
-	res := &response{
-		statusText: this.statusText,
-		status:     this.status,
-		headers:    this.headers,
-		body:       body,
-		url:        this.url,
-		type_:      this.type_,
-	}
+
+	clone := *this
+	res := &clone
+	res.body = body
+	res.bodyUsed = new(atomic.Bool)
+	res.headers = types.New(rt, "Headers", this.headers)
 	_ = obj.SetSymbol(symResponse, res)
 	_ = obj.SetPrototype(call.This.ToObject(rt).Prototype())
 	return obj
@@ -298,6 +308,7 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		res := &response{
 			statusText: "",
 			status:     200,
+			bodyUsed:   new(atomic.Bool),
 			body:       io.NopCloser(strings.NewReader(s)),
 			type_:      "default",
 		}
@@ -366,6 +377,7 @@ func (*Response) error(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		_ = res.SetSymbol(symResponse, &response{
 			statusText: "",
 			status:     0,
+			bodyUsed:   new(atomic.Bool),
 			headers:    types.New(rt, "Headers"),
 			type_:      "error",
 		})
@@ -425,7 +437,7 @@ type response struct {
 	statusText          string
 	headers, bodyStream sobek.Value
 	body                io.Reader
-	bodyUsed            atomic.Bool
+	bodyUsed            *atomic.Bool
 	redirected          bool
 	url, type_          string
 }
@@ -434,7 +446,7 @@ func (r *response) form() (*multipart.Form, error) {
 	if stream.IsLocked(r.bodyStream) {
 		return nil, errBodyStreamLocked
 	}
-	return parseFromData(r.body, &r.bodyUsed, getContentType(r.headers))
+	return parseFromData(r.body, r.bodyUsed, getContentType(r.headers))
 }
 
 func (r *response) read() ([]byte, error) {
@@ -484,6 +496,7 @@ func NewResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
 		statusText: res.Status,
 		headers:    types.New(rt, "Headers", rt.ToValue(headers(res.Header))),
 		body:       res.Body,
+		bodyUsed:   new(atomic.Bool),
 		type_:      "basic",
 	}
 	if res.Request != nil {
