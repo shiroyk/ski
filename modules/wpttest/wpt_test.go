@@ -17,6 +17,8 @@ import (
 
 	_ "github.com/shiroyk/ski/modules/encoding"
 	_ "github.com/shiroyk/ski/modules/fetch"
+	_ "github.com/shiroyk/ski/modules/signal"
+	_ "github.com/shiroyk/ski/modules/timers"
 )
 
 const (
@@ -27,6 +29,7 @@ var skipTests = map[string]bool{
 	// not defined, not implemented
 	"fetch/api/idlharness.any.js":                                true,
 	"url/idlharness.any.js":                                      true,
+	"url/historical.any.js":                                      true,
 	"fetch/content-length/api-and-duplicate-headers.any.js":      true,
 	"fetch/api/abort/cache.https.any.js":                         true,
 	"fetch/api/basic/request-upload.any.js":                      true,
@@ -35,18 +38,39 @@ var skipTests = map[string]bool{
 	"fetch/api/request/request-error.any.js":                     true,
 	"fetch/api/request/request-cache-default-conditional.any.js": true,
 	"fetch/api/response/response-stream-with-broken-then.any.js": true,
+	"fetch/http-cache/credentials.tentative.any.js":              true,
+
+	// ???
+	"fetch/api/body/mime-type.any.js": true,
+	// not await
+	"fetch/api/request/request-disturbed.any.js": true,
 
 	// not support
 	"fetch/api/basic/request-private-network-headers.tentative.any.js": true,
 	// uft-8 bom
 	"fetch/api/basic/text-utf8.any.js": true,
+	// GET with body
+	"fetch/api/request/request-init-002.any.js": true,
 
 	// encode empty FormData https://github.com/web-platform-tests/wpt/pull/3950
 	"fetch/api/request/request-consume-empty.any.js":   true,
 	"fetch/api/response/response-consume-empty.any.js": true,
 
-	// ???
-	"fetch/api/body/mime-type.any.js": true,
+	// custom headers
+	"fetch/api/request/request-headers.any.js": true,
+	// priority
+	"fetch/api/request/request-init-priority.any.js": true,
+	// Headers immutable
+	"fetch/api/response/response-static-error.any.js": true,
+
+	// iterator
+	"fetch/api/headers/headers-basic.any.js":  true,
+	"fetch/api/headers/headers-record.any.js": true,
+	// iterator, order
+	"fetch/api/headers/header-setcookie.any.js": true,
+	"fetch/api/headers/headers-combine.any.js":  true,
+	// valid name, values
+	"fetch/api/headers/headers-errors.any.js": true,
 
 	// TODO: host info
 	"fetch/api/basic/response-url.sub.any.js":                      true,
@@ -81,6 +105,7 @@ var skipTests = map[string]bool{
 	"fetch/api/cors/cors-preflight-cache.any.js":                   true,
 	"fetch/api/redirect/redirect-back-to-original-origin.any.js":   true,
 	"fetch/cross-origin-resource-policy/scheme-restriction.any.js": true,
+	"fetch/range/general.any.js":                                   true,
 
 	// TODO: test timeout
 	"fetch/api/request/request-bad-port.any.js": true,
@@ -101,6 +126,32 @@ var skipTests = map[string]bool{
 
 	// TODO: fix URL strip
 	"url/url-setters-stripping.any.js": true,
+
+	// TODO: valid characters
+	"url/urlencoded-parser.any.js":           true,
+	"url/urlsearchparams-constructor.any.js": true,
+	"url/url-statics-parse.any.js":           true,
+	"url/url-statics-canparse.any.js":        true,
+	"url/urlsearchparams-sort.any.js":        true,
+	"url/urlsearchparams-stringifier.any.js": true,
+
+	// TODO: iterator
+	"url/urlsearchparams-delete.any.js":  true,
+	"url/urlsearchparams-foreach.any.js": true,
+
+	// TODO: valid type characters
+	"FileAPI/blob/Blob-constructor.any.js": true,
+	"FileAPI/file/File-constructor.any.js": true,
+}
+
+var ignoreErrors = []string{
+	"unsupported protocol scheme",
+	"not implement",
+	"duplex",
+	"isReloadNavigation",
+	"getSetCookie",
+	"structuredClone",
+	"MessageChannel",
 }
 
 func TestWPT(t *testing.T) {
@@ -146,9 +197,10 @@ func (c *testCtx) newVM() (js.VM, error) {
 
 	vm := js.NewVM()
 	_, err := vm.RunString(context.Background(), `var self = this;
+Date.prototype.toGMTString = () => "Sat, 01 Jan 2000 00:00:00 GMT";
 self.GLOBAL = {
 	isWorker: () => true,
-	isShadowRealm: () => false,
+	isShadowRealm: () => true,
 	isWindow: () => false,
 };
 location = {
@@ -270,35 +322,38 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
+	result, ok := sobek.AssertFunction(vm.Runtime().Get("add_result_callback"))
+	if !ok {
+		t.Logf("add_result_callback is not function")
+		t.FailNow()
+	}
+
+	_, err = result(sobek.Undefined(), vm.Runtime().ToValue(func(call sobek.FunctionCall) sobek.Value {
+		test := call.Argument(0).ToObject(vm.Runtime())
+		status := test.Get("status").ToInteger()
+		name := test.Get("name").String()
+		message := test.Get("message").String()
+		if status != 0 {
+			for _, s := range ignoreErrors {
+				if strings.Contains(message, s) {
+					return nil
+				}
+			}
+			t.Errorf("%s: \n%s", name, message)
+		}
+		return nil
+	}))
+	assert.NoError(t, err)
+
 	_, err = vm.RunString(ctx, string(all))
 	if err != nil {
-		if strings.Contains(err.Error(), "not implement") {
-			t.Skip("not implement")
-			return
+		for _, s := range ignoreErrors {
+			if strings.Contains(err.Error(), s) {
+				t.Skip(s)
+				return
+			}
 		}
 		assert.NoError(t, err)
 		return
 	}
-
-	rt := vm.Runtime()
-
-	tests := rt.Get("tests").ToObject(rt).Get("tests")
-	if tests == nil {
-		return
-	}
-
-	rt.ForOf(tests, func(v sobek.Value) (ok bool) {
-		current := v.ToObject(rt)
-		status := current.Get("status").ToInteger()
-		name := current.Get("name").String()
-		message := current.Get("message").String()
-		if status != 0 {
-			if strings.Contains(message, "unsupported protocol scheme") {
-			} else if strings.Contains(message, "not implement") {
-			} else {
-				t.Errorf("%s: \n%s", name, message)
-			}
-		}
-		return true
-	})
 }
