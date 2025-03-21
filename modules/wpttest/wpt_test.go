@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	_ "github.com/shiroyk/ski/modules/encoding"
 	_ "github.com/shiroyk/ski/modules/fetch"
@@ -250,9 +251,7 @@ func (c *testCtx) runWPTTest(t *testing.T, dir string) {
 func (c *testCtx) testScript(t *testing.T, path string) {
 	t.Parallel()
 	file, err := os.Open(path)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	reader := bufio.NewReader(file)
 	meta := make(map[string][]string)
@@ -276,19 +275,8 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 		return
 	}
 
-	_, err = file.Seek(0, io.SeekStart)
-	if !assert.NoError(t, err) {
-		return
-	}
-	all, err := io.ReadAll(file)
-	if !assert.NoError(t, err) {
-		return
-	}
-
 	vm, err := c.newVM()
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	for _, v := range meta["script"] {
 		var script string
@@ -300,32 +288,26 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 		p, ok := c.cache.Load(script)
 		if !ok {
 			data, err := os.ReadFile(script)
-			if !assert.NoError(t, err) {
-				return
-			}
-			program, err := sobek.Compile(v, string(data), false)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
+			program, err := sobek.Compile(script, string(data), false)
+			require.NoError(t, err)
 			c.cache.Store(script, program)
 			p = program
 		}
 		_, err := vm.RunProgram(t.Context(), p.(*sobek.Program))
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 	}
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
-	result, ok := sobek.AssertFunction(vm.Runtime().Get("add_result_callback"))
+	resultCallback, ok := sobek.AssertFunction(vm.Runtime().Get("add_result_callback"))
 	if !ok {
 		t.Logf("add_result_callback is not function")
 		t.FailNow()
 	}
 
-	_, err = result(sobek.Undefined(), vm.Runtime().ToValue(func(call sobek.FunctionCall) sobek.Value {
+	_, err = resultCallback(sobek.Undefined(), vm.Runtime().ToValue(func(call sobek.FunctionCall) sobek.Value {
 		test := call.Argument(0).ToObject(vm.Runtime())
 		status := test.Get("status").ToInteger()
 		name := test.Get("name").String()
@@ -340,9 +322,16 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 		}
 		return nil
 	}))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	_, err = vm.RunString(ctx, string(all))
+	_, err = file.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	all, err := io.ReadAll(file)
+	require.NoError(t, err)
+	program, err := sobek.Compile(path, string(all), false)
+	require.NoError(t, err)
+
+	_, err = vm.RunProgram(ctx, program)
 	if err != nil {
 		for _, s := range ignoreErrors {
 			if strings.Contains(err.Error(), s) {
@@ -351,6 +340,5 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 			}
 		}
 		assert.NoError(t, err)
-		return
 	}
 }
