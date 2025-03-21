@@ -106,10 +106,7 @@ var skipTests = map[string]bool{
 	"fetch/api/redirect/redirect-back-to-original-origin.any.js":   true,
 	"fetch/cross-origin-resource-policy/scheme-restriction.any.js": true,
 	"fetch/range/general.any.js":                                   true,
-
-	// TODO: test timeout
-	"fetch/api/request/request-bad-port.any.js": true,
-	"fetch/api/basic/request-upload.h2.any.js":  true,
+	"fetch/api/request/request-bad-port.any.js":                    true,
 
 	// TODO: events
 	"fetch/api/abort/general.any.js": true,
