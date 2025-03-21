@@ -28,18 +28,12 @@ const (
 
 var skipTests = map[string]bool{
 	// not defined, not implemented
-	"fetch/api/idlharness.any.js":                                true,
-	"url/idlharness.any.js":                                      true,
-	"url/historical.any.js":                                      true,
-	"fetch/content-length/api-and-duplicate-headers.any.js":      true,
-	"fetch/api/abort/cache.https.any.js":                         true,
-	"fetch/api/basic/request-upload.any.js":                      true,
-	"fetch/api/basic/request-headers.any.js":                     true,
-	"fetch/api/headers/header-values.any.js":                     true,
-	"fetch/api/request/request-error.any.js":                     true,
-	"fetch/api/request/request-cache-default-conditional.any.js": true,
-	"fetch/api/response/response-stream-with-broken-then.any.js": true,
-	"fetch/http-cache/credentials.tentative.any.js":              true,
+	"fetch/api/idlharness.any.js":                   true,
+	"url/idlharness.any.js":                         true,
+	"url/historical.any.js":                         true,
+	"fetch/api/headers/header-values.any.js":        true,
+	"fetch/api/request/request-error.any.js":        true,
+	"fetch/http-cache/credentials.tentative.any.js": true,
 
 	// ???
 	"fetch/api/body/mime-type.any.js": true,
@@ -150,6 +144,10 @@ var ignoreErrors = []string{
 	"getSetCookie",
 	"structuredClone",
 	"MessageChannel",
+	"caches",
+	"Float16Array",
+	"WritableStream",
+	"XMLHttpRequest",
 }
 
 func TestWPT(t *testing.T) {
