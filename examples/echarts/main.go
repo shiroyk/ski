@@ -78,7 +78,11 @@ export default () => serve(3000, async (req) => {
         }]
       });
       const app = chart.renderToSVGString();
-      return new Response(html.replace("__APP__", app));
+      return new Response(html.replace("__APP__", app), {
+        headers: {
+          "content-type": "text/html",
+        }
+      });
     default:
       return new Response("Not Found: " + req.url, { status: 404, });
   }

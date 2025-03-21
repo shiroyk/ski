@@ -99,7 +99,11 @@ export default () => serve(3000, async (req) => {
       const start = now();
       const app = await renderToString(createSSRApp(App));
       const take = ((now() - start) / 1000).toFixed(2);
-      return new Response(html.replace("__APP__", app).replace("__TIME__", take));
+      return new Response(html.replace("__APP__", app).replace("__TIME__", take), {
+        headers: {
+          "content-type": "text/html",
+        }
+      });
     case "/client.js":
       return new Response(open("client.js"), {
         headers: {
