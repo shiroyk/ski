@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -40,6 +39,8 @@ type (
 		EnableRequire(*sobek.Runtime) Loader
 		// EnableImportModuleDynamically sobek runtime SetImportModuleDynamically
 		EnableImportModuleDynamically(*sobek.Runtime) Loader
+		// EnableImportMeta sobek runtime SetFinalImportMeta
+		EnableImportMeta(*sobek.Runtime) Loader
 		// InitGlobal instantiates global objects for the runtime. It creates a proxy around the global object
 		// to lazily load global modules when they are first accessed.
 		//
@@ -213,6 +214,26 @@ func (ml *loader) EnableImportModuleDynamically(rt *sobek.Runtime) Loader {
 	rt.SetImportModuleDynamically(func(scriptOrModule any, specifier sobek.Value, promiseCapability any) {
 		module, err := ml.ResolveModule(scriptOrModule, specifier.String())
 		rt.FinishLoadingImportModule(scriptOrModule, specifier, promiseCapability, module, err)
+	})
+	return ml
+}
+
+// EnableImportMeta sobek runtime SetFinalImportMeta
+func (ml *loader) EnableImportMeta(rt *sobek.Runtime) Loader {
+	rt.SetFinalImportMeta(func(object *sobek.Object, record sobek.ModuleRecord) {
+		_ = object.Set("resolve", func(specifier string) (string, error) {
+			u := ml.reversePath(record)
+			c := *u
+			if strings.HasPrefix(specifier, "/") {
+				c.Path = specifier[1:]
+			} else {
+				c.Path = filepath.Join(u.Path, specifier)
+			}
+			return c.String(), nil
+		})
+		_ = object.DefineAccessorProperty("url", rt.ToValue(func(call sobek.FunctionCall) sobek.Value {
+			return rt.ToValue(ml.reversePath(record).String())
+		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	})
 	return ml
 }
@@ -438,7 +459,7 @@ func (ml *loader) loadNodeModules(base *url.URL, specifier string) (mod sobek.Mo
 	nodeModules := &u
 	nodeModules.Path = ""
 	for {
-		if path.Base(start) != "node_modules" {
+		if filepath.Base(start) != "node_modules" {
 			nodeModules.Path = filepath.Join(start, "node_modules")
 		} else {
 			nodeModules.Path = start
@@ -452,7 +473,7 @@ func (ml *loader) loadNodeModules(base *url.URL, specifier string) (mod sobek.Mo
 		if start == ".." { // Dir('..') is '.'
 			break
 		}
-		parent := path.Dir(start)
+		parent := filepath.Dir(start)
 		if parent == start {
 			break
 		}
@@ -466,7 +487,7 @@ func (ml *loader) loadModule(base *url.URL, specifier string) (sobek.ModuleRecor
 	var absolute *url.URL
 	if strings.HasPrefix(specifier, "/") {
 		u := *base
-		u.Path = specifier
+		u.Path = specifier[1:]
 		absolute = &u
 	} else {
 		absolute = base.JoinPath(specifier)

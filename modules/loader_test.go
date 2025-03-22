@@ -90,6 +90,9 @@ func TestModuleLoader(t *testing.T) {
 		"node_modules/module7/index.js": &fstest.MapFile{
 			Data: []byte(`export default async () => "dynamic import " + (await import('module6')).msg;`),
 		},
+		"node_modules/meta/index.js": &fstest.MapFile{
+			Data: []byte(`const meta = import.meta; export default meta;`),
+		},
 		"node_modules/node:file/index.js": &fstest.MapFile{
 			Data: []byte(`export default () => "node file module"`),
 		},
@@ -272,6 +275,24 @@ func TestModuleLoader(t *testing.T) {
 
 	})
 
+	t.Run("import meta", func(t *testing.T) {
+		mod, err := ml.CompileModule("", `
+			import meta from "meta";
+			assert.equal(meta.url, "file://node_modules/meta");
+		`)
+		require.NoError(t, err)
+		require.NoError(t, mod.Link())
+		Result(vm.CyclicModuleRecordEvaluate(mod, ml.ResolveModule))
+
+		mod, err = ml.CompileModule("", `
+			import meta from "meta";
+			assert.equal(meta.resolve("/json1.json"), "file://json1.json");
+		`)
+		require.NoError(t, err)
+		require.NoError(t, mod.Link())
+		Result(vm.CyclicModuleRecordEvaluate(mod, ml.ResolveModule))
+	})
+
 	t.Run("error", func(t *testing.T) {
 		testCases := []struct {
 			name, script string
@@ -331,7 +352,7 @@ func TestModuleLoader(t *testing.T) {
 func NewTestVM(t *testing.T, ml Loader) *sobek.Runtime {
 	rt := sobek.New()
 	rt.SetFieldNameMapper(sobek.UncapFieldNameMapper())
-	ml.EnableRequire(rt).EnableImportModuleDynamically(rt).InitGlobal(rt)
+	ml.EnableRequire(rt).EnableImportModuleDynamically(rt).EnableImportMeta(rt).InitGlobal(rt)
 	p := rt.NewObject()
 	_ = p.Set("equal", func(call sobek.FunctionCall) sobek.Value {
 		assert.Equal(t, call.Argument(0).Export(), call.Argument(1).Export(), call.Argument(2).String())
