@@ -435,3 +435,11 @@ func newFormData(rt *sobek.Runtime, form *multipart.Form) *sobek.Object {
 	_ = obj.SetPrototype(f.ToObject(rt).Get("prototype").ToObject(rt))
 	return obj
 }
+
+// EncodeFormData encodes a FormData object.
+func EncodeFormData(value sobek.Value) (io.Reader, string, error) {
+	if value != nil && value.ExportType() == typeFormData {
+		return value.Export().(*formData).encode()
+	}
+	return nil, "", errors.New("value is not FormData")
+}
