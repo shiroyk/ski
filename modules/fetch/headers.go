@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"net/http"
 	"reflect"
 	"strings"
 
@@ -32,25 +33,25 @@ func (h *Headers) prototype(rt *sobek.Runtime) *sobek.Object {
 }
 
 func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
-	var header headers
+	var header Header
 	if init := call.Argument(0); !sobek.IsUndefined(init) {
 		switch init.ExportType() {
 		case typeHeaders:
-			h2 := init.Export().(headers)
-			header = make(headers, len(h2))
+			h2 := init.Export().(Header)
+			header = make(Header, len(h2))
 			for k, v := range h2 {
-				name := normalizeHeaderName(k)
+				name := NormalizeHeaderName(k)
 				for _, vv := range v {
-					header[name] = append(header[name], normalizeHeaderValue(vv))
+					header[name] = append(header[name], NormalizeHeaderValue(vv))
 				}
 			}
 		default:
 			obj := init.ToObject(rt)
 			if obj.GetSymbol(sobek.SymIterator) != nil {
 				if v := obj.Get("length"); v != nil {
-					header = make(headers, v.ToInteger())
+					header = make(Header, v.ToInteger())
 				} else {
-					header = make(headers)
+					header = make(Header)
 				}
 				rt.ForOf(obj, func(v sobek.Value) bool {
 					item := v.ToObject(rt)
@@ -59,8 +60,8 @@ func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 					}
 					key := item.Get("0").String()
 					value := item.Get("1").String()
-					name := normalizeHeaderName(key)
-					value = normalizeHeaderValue(value)
+					name := NormalizeHeaderName(key)
+					value = NormalizeHeaderValue(value)
 					header[name] = append(header[name], value)
 					return true
 				})
@@ -69,16 +70,16 @@ func (h *Headers) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *so
 					panic(rt.NewTypeError("The provided value is not an object"))
 				}
 				keys := obj.Keys()
-				header = make(headers, len(keys))
+				header = make(Header, len(keys))
 				for _, key := range keys {
-					name := normalizeHeaderName(key)
-					value := normalizeHeaderValue(obj.Get(key).String())
+					name := NormalizeHeaderName(key)
+					value := NormalizeHeaderValue(obj.Get(key).String())
 					header[name] = append(header[name], value)
 				}
 			}
 		}
 	} else {
-		header = make(headers)
+		header = make(Header)
 	}
 
 	obj := rt.ToValue(header).(*sobek.Object)
@@ -93,8 +94,8 @@ func (*Headers) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 
 	this := toHeaders(rt, call.This)
-	name := normalizeHeaderName(call.Argument(0).String())
-	value := normalizeHeaderValue(call.Argument(1).String())
+	name := NormalizeHeaderName(call.Argument(0).String())
+	value := NormalizeHeaderValue(call.Argument(1).String())
 	this[name] = append(this[name], value)
 	return sobek.Undefined()
 }
@@ -102,7 +103,7 @@ func (*Headers) append(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // delete deletes a header.
 func (*Headers) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHeaders(rt, call.This)
-	name := normalizeHeaderName(call.Argument(0).String())
+	name := NormalizeHeaderName(call.Argument(0).String())
 	delete(this, name)
 	return sobek.Undefined()
 }
@@ -110,7 +111,7 @@ func (*Headers) delete(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // get gets a header.
 func (*Headers) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHeaders(rt, call.This)
-	name := normalizeHeaderName(call.Argument(0).String())
+	name := NormalizeHeaderName(call.Argument(0).String())
 	if values := this[name]; len(values) > 0 {
 		return rt.ToValue(strings.Join(values, ", "))
 	}
@@ -120,7 +121,7 @@ func (*Headers) get(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // has checks if a header exists.
 func (*Headers) has(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHeaders(rt, call.This)
-	name := normalizeHeaderName(call.Argument(0).String())
+	name := NormalizeHeaderName(call.Argument(0).String())
 	_, ok := this[name]
 	return rt.ToValue(ok)
 }
@@ -132,8 +133,8 @@ func (*Headers) set(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 
 	this := toHeaders(rt, call.This)
-	name := normalizeHeaderName(call.Argument(0).String())
-	value := normalizeHeaderValue(call.Argument(1).String())
+	name := NormalizeHeaderName(call.Argument(0).String())
+	value := NormalizeHeaderValue(call.Argument(1).String())
 	this[name] = []string{value}
 	return sobek.Undefined()
 }
@@ -209,15 +210,15 @@ func (h *Headers) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	return ctor, nil
 }
 
-type headers map[string][]string
+type Header map[string][]string
 
-// normalizeHeaderName normalizes a header name.
-func normalizeHeaderName(name string) string {
+// NormalizeHeaderName normalizes a header name.
+func NormalizeHeaderName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-// normalizeHeaderValue LF(0x0A) CR(0x0D) TAB(0x09) SPACE(0x20)
-func normalizeHeaderValue(value string) string {
+// NormalizeHeaderValue LF(0x0A) CR(0x0D) TAB(0x09) SPACE(0x20)
+func NormalizeHeaderValue(value string) string {
 	return strings.TrimFunc(value, func(r rune) bool {
 		switch r {
 		case 0x0A, 0x0D, 0x09, 0x20:
@@ -229,18 +230,18 @@ func normalizeHeaderValue(value string) string {
 }
 
 // toHeaders converts a value to a Headers.
-func toHeaders(rt *sobek.Runtime, value sobek.Value) headers {
+func toHeaders(rt *sobek.Runtime, value sobek.Value) Header {
 	if value.ExportType() == typeHeaders {
-		return value.Export().(headers)
+		return value.Export().(Header)
 	}
 	panic(rt.NewTypeError(`Value of "this" must be of type Headers`))
 }
 
-var typeHeaders = reflect.TypeOf((headers)(nil))
+var typeHeaders = reflect.TypeOf((Header)(nil))
 
 // getContentType returns the Content-Type header.
 func getContentType(value sobek.Value) string {
-	h, _ := value.Export().(headers)
+	h, _ := value.Export().(Header)
 	var contentType string
 	if v := h["content-type"]; len(v) > 0 {
 		contentType = v[0]
@@ -250,8 +251,21 @@ func getContentType(value sobek.Value) string {
 
 // setContentType sets the Content-Type header if not set.
 func setContentType(value sobek.Value, contentType string) {
-	h, _ := value.Export().(headers)
+	h, _ := value.Export().(Header)
 	if _, ok := h["content-type"]; !ok {
 		h["content-type"] = []string{contentType}
 	}
+}
+
+// NewHeader creates a new Headers.
+func NewHeader(rt *sobek.Runtime, src http.Header) sobek.Value {
+	return types.New(rt, "Headers", rt.ToValue(Header(src)))
+}
+
+// ToHeader converts a value to a http.Header.
+func ToHeader(value sobek.Value) (http.Header, bool) {
+	if value.ExportType() == typeHeaders {
+		return http.Header(value.Export().(Header)), true
+	}
+	return nil, false
 }

@@ -107,7 +107,7 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 				js.Throw(rt, err)
 			}
 			res.body = reader
-			setContentType(res.headers, normalizeHeaderValue(t))
+			setContentType(res.headers, NormalizeHeaderValue(t))
 		case url.TypeURLSearchParams:
 			res.body = strings.NewReader(arg.String())
 			setContentType(res.headers, "application/x-www-form-urlencoded;charset=UTF-8")
@@ -197,7 +197,7 @@ func (*Response) redirect(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 			url:      u,
 			status:   http.StatusFound,
 			bodyUsed: new(atomic.Bool),
-			headers: types.New(rt, "Headers", rt.ToValue(headers{
+			headers: types.New(rt, "Headers", rt.ToValue(Header{
 				"location": []string{u},
 			})),
 			type_: "default",
@@ -329,9 +329,9 @@ func (*Response) json(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			}
 		}
 		if res.headers == nil {
-			res.headers = types.New(rt, "Headers", rt.ToValue(headers{"content-type": {"application/json"}}))
+			res.headers = types.New(rt, "Headers", rt.ToValue(Header{"content-type": {"application/json"}}))
 		} else {
-			h := res.headers.Export().(headers)
+			h := res.headers.Export().(Header)
 			if _, ok := h["content-type"]; !ok {
 				h["content-type"] = []string{"application/json"}
 			}
@@ -494,7 +494,7 @@ func NewResponse(rt *sobek.Runtime, res *http.Response) sobek.Value {
 	instance := &response{
 		status:     res.StatusCode,
 		statusText: res.Status,
-		headers:    types.New(rt, "Headers", rt.ToValue(headers(res.Header))),
+		headers:    types.New(rt, "Headers", rt.ToValue(Header(res.Header))),
 		body:       res.Body,
 		bodyUsed:   new(atomic.Bool),
 		type_:      "basic",
@@ -522,7 +522,7 @@ func ToResponse(value sobek.Value) (*http.Response, bool) {
 			return &http.Response{
 				StatusCode: res.status,
 				Status:     res.statusText,
-				Header:     http.Header(res.headers.Export().(headers)),
+				Header:     http.Header(res.headers.Export().(Header)),
 				Body:       body,
 			}, true
 		}

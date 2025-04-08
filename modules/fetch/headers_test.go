@@ -19,17 +19,17 @@ func TestHeaders(t *testing.T) {
 		tests := []struct {
 			name     string
 			input    string
-			expected headers
+			expected Header
 		}{
 			{
 				name:     "empty",
 				input:    "new Headers()",
-				expected: headers{},
+				expected: Header{},
 			},
 			{
 				name:  "object",
 				input: `new Headers({"Content-Type": "text/plain", "X-Custom": "value"})`,
-				expected: headers{
+				expected: Header{
 					"content-type": {"text/plain"},
 					"x-custom":     {"value"},
 				},
@@ -37,7 +37,7 @@ func TestHeaders(t *testing.T) {
 			{
 				name:  "from headers",
 				input: `new Headers(new Headers({"Content-Type": "text/plain"}))`,
-				expected: headers{
+				expected: Header{
 					"content-type": {"text/plain"},
 				},
 			},
@@ -47,7 +47,7 @@ func TestHeaders(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				result, err := vm.RunString(ctx, tt.input)
 				require.NoError(t, err)
-				headers := result.Export().(headers)
+				headers := result.Export().(Header)
 				assert.Equal(t, tt.expected, headers)
 			})
 		}

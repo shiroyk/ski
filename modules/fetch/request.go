@@ -359,7 +359,7 @@ func (r *request) toRequest(rt *sobek.Runtime) *http.Request {
 		js.Throw(rt, err)
 	}
 
-	req.Header = http.Header(r.headers.Export().(headers))
+	req.Header = http.Header(r.headers.Export().(Header))
 	if r.cache != "" {
 		req.Header.Set("Cache-Control", r.cache)
 		req.Header.Set("Pragma", r.cache)
@@ -518,7 +518,7 @@ func ToRequest(value sobek.Value) (*http.Request, bool) {
 				Method:     req.method,
 				URL:        u,
 				RequestURI: req.url,
-				Header:     http.Header(req.headers.Export().(headers)),
+				Header:     http.Header(req.headers.Export().(Header)),
 				Body:       io.NopCloser(req.body),
 			}, true
 		}
