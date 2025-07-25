@@ -484,13 +484,24 @@ func (ml *loader) loadNodeModules(base *url.URL, specifier string) (mod sobek.Mo
 }
 
 func (ml *loader) loadModule(base *url.URL, specifier string) (sobek.ModuleRecord, error) {
-	var absolute *url.URL
+	var (
+		absolute *url.URL
+		query    string
+	)
+
+	if path, raw, ok := strings.Cut(specifier, "?"); ok {
+		specifier = path
+		query = raw
+	}
+
 	if strings.HasPrefix(specifier, "/") {
 		u := *base
 		u.Path = specifier[1:]
+		u.RawQuery = query
 		absolute = &u
 	} else {
 		absolute = base.JoinPath(specifier)
+		absolute.RawQuery = query
 	}
 	filename := absolute.String()
 
