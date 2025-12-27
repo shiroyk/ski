@@ -8,7 +8,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	urlpkg "net/url"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -508,20 +507,21 @@ func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
 	return obj
 }
 
+// InitRequest builds a http.Request from the RequestInit option
+func InitRequest(rt *sobek.Runtime, url string, value sobek.Value) *http.Request {
+	req := &request{
+		method: "GET",
+		cache:  "default",
+		url:    url,
+	}
+	initRequest(rt, value, req)
+	return req.toRequest(rt)
+}
+
 // ToRequest converts a js Request object to an http.Request
-func ToRequest(value sobek.Value) (*http.Request, bool) {
-	if o, ok := value.(*sobek.Object); ok {
-		if v := o.GetSymbol(symRequest); v != nil {
-			req := v.Export().(*request)
-			u, _ := urlpkg.Parse(req.url)
-			return &http.Request{
-				Method:     req.method,
-				URL:        u,
-				RequestURI: req.url,
-				Header:     http.Header(req.headers.Export().(Header)),
-				Body:       io.NopCloser(req.body),
-			}, true
-		}
+func ToRequest(rt *sobek.Runtime, value sobek.Value) (*http.Request, bool) {
+	if req, ok := toRequest(value); ok {
+		return req.toRequest(rt), ok
 	}
 	return nil, false
 }
