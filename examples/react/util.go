@@ -55,6 +55,9 @@ func source(path, data string) {
 func fileLoader(specifier *urlpkg.URL, _ string) ([]byte, error) {
 	switch specifier.Scheme {
 	case "http", "https":
+		if specifier.Path == "node/process.mjs" {
+			return []byte(`export default { }`), nil
+		}
 		res, err := http.Get(specifier.String())
 		if err != nil {
 			return nil, err

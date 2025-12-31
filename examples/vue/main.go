@@ -18,8 +18,8 @@ func init() {
 	js.Loader().SetFileLoader(fileLoader)
 
 	// alias module from cdn
-	source("node_modules/vue", `export * from "https://esm.sh/vue@3";`)
-	source("node_modules/vue/server-renderer", `export * from "https://esm.sh/@vue/server-renderer@3";`)
+	source("node_modules/vue", `export * from "https://esm.sh/vue@3.5.14";`)
+	source("node_modules/vue/server-renderer", `export * from "https://esm.sh/@vue/server-renderer@3.5.14";`)
 	source("node_modules/canvas-confetti", `export { default } from "https://esm.sh/canvas-confetti@1.6.0";`)
 
 	source("index.html", `

@@ -21,7 +21,7 @@ var (
 	compiler = sync.OnceValue(func() func(bool, string, string) ([]byte, error) {
 		vm := js.NewVM()
 		module, err := js.CompileModule("compiler", `
-import {compileScript, parse} from "https://esm.sh/vue@3/compiler-sfc";
+import {compileScript, parse} from "https://esm.sh/vue@3.5.14/compiler-sfc";
 
 export default (ssr, name, code) => {
   const { descriptor, errors } = parse(code);
@@ -78,6 +78,9 @@ func source(path, data string) {
 func fileLoader(specifier *urlpkg.URL, _ string) ([]byte, error) {
 	switch specifier.Scheme {
 	case "http", "https":
+		if specifier.Path == "node/process.mjs" {
+			return []byte(`export default { }`), nil
+		}
 		res, err := http.Get(specifier.String())
 		if err != nil {
 			return nil, err
