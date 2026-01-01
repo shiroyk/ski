@@ -5,9 +5,9 @@ go 1.24.0
 require (
 	github.com/grafana/sobek v0.0.0-20251209155516-22d1085c20a8
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/crypto v0.45.0
-	golang.org/x/net v0.47.0
-	golang.org/x/text v0.31.0
+	golang.org/x/crypto v0.46.0
+	golang.org/x/net v0.48.0
+	golang.org/x/text v0.32.0
 )
 
 require (
