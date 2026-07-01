@@ -1,13 +1,13 @@
 module github.com/shiroyk/ski
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/grafana/sobek v0.0.0-20260401095808-49bce30ab84b
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/crypto v0.45.0
-	golang.org/x/net v0.47.0
-	golang.org/x/text v0.31.0
+	golang.org/x/crypto v0.53.0
+	golang.org/x/net v0.56.0
+	golang.org/x/text v0.38.0
 )
 
 require (
