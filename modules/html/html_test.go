@@ -1,6 +1,7 @@
 package html
 
 import (
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,10 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		_, err := Parse(``)
+		require.ErrorIs(t, err, io.EOF)
+	})
 	t.Run("fragment", func(t *testing.T) {
 		node, err := Parse(`<div id="n1">1</div><div>2</div>`)
 		require.NoError(t, err)

@@ -1,6 +1,7 @@
 package html
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -24,11 +25,8 @@ func Parse(str string) (*html.Node, error) {
 	reader := strings.NewReader(str)
 	z := html.NewTokenizer(reader)
 
-	for {
-		tt := z.Next()
-		switch tt {
-		case html.ErrorToken:
-			break
+	for t := z.Next(); t != html.ErrorToken; t = z.Next() {
+		switch t {
 		case html.TextToken, html.CommentToken:
 			continue
 		case html.StartTagToken:
@@ -47,6 +45,8 @@ func Parse(str string) (*html.Node, error) {
 			return html.Parse(reader)
 		}
 	}
+
+	return nil, fmt.Errorf("html parse fragment failed: %s", z.Err())
 }
 
 // CloneNode deep clone the node
