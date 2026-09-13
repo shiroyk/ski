@@ -107,3 +107,54 @@ func New(rt *sobek.Runtime, name string, args ...sobek.Value) *sobek.Object {
 	}
 	return o
 }
+
+// Iterate returns a sequence of the elements of the value and the number of
+// elements the sequence yields.
+// nil, null and undefined return an empty sequence.
+// Slice, array and typed array values (e.g. Array, Uint8Array) yield each
+// element following their own enumerable keys, so sparse arrays skip the
+// missing indexes.
+// Any other value yields itself once, which allows the caller to handle both
+// arrays and single values with one loop.
+func Iterate(value sobek.Value) (iter.Seq[sobek.Value], int) {
+	if IsNil(value) {
+		return func(yield func(sobek.Value) bool) {}, 0
+	}
+	switch value.ExportType().Kind() {
+	case reflect.Slice, reflect.Array:
+		object := value.(*sobek.Object)
+		idx := object.Keys()
+		return func(yield func(sobek.Value) bool) {
+			for _, i := range idx {
+				if !yield(object.Get(i)) {
+					return
+				}
+			}
+		}, len(idx)
+	default:
+		return func(yield func(sobek.Value) bool) { yield(value) }, 1
+	}
+}
+
+// Iterate2 returns a sequence of the key-value pairs of the value and the
+// number of pairs the sequence yields.
+// Only map values (e.g. a plain JavaScript object or a Go map) are iterated,
+// following their own enumerable keys, so array indexes and non-enumerable
+// properties are excluded.
+// nil, null, undefined and any non-map value return an empty sequence, use
+// Iterate if a non-map value should be yielded once instead of being skipped.
+func Iterate2(value sobek.Value) (iter.Seq2[string, sobek.Value], int) {
+	switch {
+	case IsNil(value), value.ExportType().Kind() != reflect.Map:
+		return func(yield func(string, sobek.Value) bool) {}, 0
+	}
+	object := value.(*sobek.Object)
+	keys := object.Keys()
+	return func(yield func(string, sobek.Value) bool) {
+		for _, key := range keys {
+			if !yield(key, object.Get(key)) {
+				return
+			}
+		}
+	}, len(keys)
+}
