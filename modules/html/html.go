@@ -46,7 +46,7 @@ func Parse(str string) (*html.Node, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("html parse fragment failed: %s", z.Err())
+	return nil, fmt.Errorf("html parse fragment failed: %w", z.Err())
 }
 
 // CloneNode deep clone the node

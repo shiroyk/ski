@@ -33,6 +33,11 @@ func IsFunc(value sobek.Value) bool {
 	return value.ExportType() == TypeFunc
 }
 
+// IsNil check value is nil or null or undefined.
+func IsNil(v sobek.Value) bool {
+	return v == nil || sobek.IsNull(v) || sobek.IsUndefined(v)
+}
+
 // IsPromise check value is sobek.Promise.
 func IsPromise(value sobek.Value) bool {
 	if value == nil {
@@ -80,6 +85,14 @@ func Iterator(rt *sobek.Runtime, seq iter.Seq[any]) *sobek.Object {
 		return ret
 	})
 	return p
+}
+
+// ToString returns the string of the value, empty string for nil, null or undefined
+func ToString(value sobek.Value) string {
+	if IsNil(value) {
+		return ""
+	}
+	return value.String()
 }
 
 // New create a new object from the constructor name

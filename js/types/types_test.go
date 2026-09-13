@@ -10,26 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsTypedArray(t *testing.T) {
-	vm := js.NewVM()
-
-	t.Run("typed array", func(t *testing.T) {
-		for _, typ := range typedArrayTypes {
-			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
-			require.NoError(t, err)
-			assert.True(t, IsTypedArray(vm.Runtime(), v))
-		}
-	})
-
-	t.Run("not typed array", func(t *testing.T) {
-		for _, typ := range []string{"Array", "ArrayBuffer"} {
-			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
-			require.NoError(t, err)
-			assert.False(t, IsTypedArray(vm.Runtime(), v))
-		}
-	})
-}
-
 func TestIterator(t *testing.T) {
 	vm := js.NewVM()
 	err := vm.Runtime().Set("iter", func() sobek.Value {
@@ -70,5 +50,75 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		_, err = vm.RunString(context.Background(), "test()")
 		assert.ErrorContains(t, err, "bar is not defined")
+	})
+}
+
+func TestCheck(t *testing.T) {
+	vm := js.NewVM()
+
+	t.Run("IsTypedArray", func(t *testing.T) {
+		for _, typ := range typedArrayTypes {
+			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
+			require.NoError(t, err)
+			assert.True(t, IsTypedArray(vm.Runtime(), v))
+		}
+
+		for _, typ := range []string{"Array", "ArrayBuffer"} {
+			v, err := vm.RunString(context.Background(), `new `+typ+`(1);`)
+			require.NoError(t, err)
+			assert.False(t, IsTypedArray(vm.Runtime(), v))
+		}
+	})
+
+	t.Run("IsFunc", func(t *testing.T) {
+		cases := []struct {
+			script string
+			result bool
+		}{
+			{`null`, false},
+			{`1`, false},
+			{`() => {}`, true},
+			{`function foo() {}; foo`, true},
+		}
+
+		for _, c := range cases {
+			value, err := vm.RunString(context.Background(), c.script)
+			require.NoError(t, err)
+			assert.Equal(t, c.result, IsFunc(value))
+		}
+	})
+
+	t.Run("IsNil", func(t *testing.T) {
+		cases := []struct {
+			script string
+			result bool
+		}{
+			{`null`, true},
+			{`undefined`, true},
+			{`1`, false},
+		}
+
+		for _, c := range cases {
+			value, err := vm.RunString(context.Background(), c.script)
+			require.NoError(t, err)
+			assert.Equal(t, c.result, IsNil(value))
+		}
+	})
+
+	t.Run("IsPromise", func(t *testing.T) {
+		cases := []struct {
+			script string
+			result bool
+		}{
+			{`Promise.resolve(1)`, true},
+			{`{}`, false},
+			{`null`, false},
+		}
+
+		for _, c := range cases {
+			value, err := vm.RunString(context.Background(), c.script)
+			require.NoError(t, err)
+			assert.Equal(t, c.result, IsPromise(value))
+		}
 	})
 }
