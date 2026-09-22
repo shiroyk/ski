@@ -69,13 +69,14 @@ func ReadAll(r io.Reader) ([]byte, error) {
 	for {
 		n, err := ra.ReadAt(s[len(s):cap(s)], off)
 		s = s[:len(s)+n]
+		off += int64(n)
+
 		if err != nil {
 			if err == io.EOF {
-				err = nil
+				return s, nil
 			}
 			return s, err
 		}
-		off = int64(n)
 
 		if len(s) == cap(s) {
 			// Add more capacity (let append pick how much).
