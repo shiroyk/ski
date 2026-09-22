@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	"io"
 	"reflect"
 	"time"
 
@@ -96,7 +97,7 @@ func (f *File) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 }
 
 // NewFile creates a new File object
-func NewFile(rt *sobek.Runtime, r Reader, size int64, type_, name string, lastModified int64) sobek.Value {
+func NewFile(rt *sobek.Runtime, r io.Reader, size int64, type_, name string, lastModified int64) sobek.Value {
 	f := rt.Get("File")
 	if f == nil {
 		panic(rt.NewTypeError("File is undefined"))

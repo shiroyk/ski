@@ -7,9 +7,9 @@ import (
 	"github.com/shiroyk/ski/js/types"
 )
 
-// GetReader extracts the underlying Reader and type from a Blob or File.
+// GetReader extracts the underlying io.Reader and type from a Blob or File.
 // false if value is not a Blob or File.
-func GetReader(value sobek.Value) (Reader, string, bool) {
+func GetReader(value sobek.Value) (io.Reader, string, bool) {
 	switch value.ExportType() {
 	case TypeBlob:
 		b := value.Export().(*blob)
@@ -58,12 +58,16 @@ func GetBuffer(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
 	return nil, false
 }
 
-// ReadAll reads all data from io.ReaderAt.
-func ReadAll(r io.ReaderAt) ([]byte, error) {
+// ReadAll reads all data from io.Reader.
+func ReadAll(r io.Reader) ([]byte, error) {
+	ra, ok := r.(io.ReaderAt)
+	if !ok {
+		return io.ReadAll(r)
+	}
 	s := make([]byte, 0, 512)
 	off := int64(0)
 	for {
-		n, err := r.ReadAt(s[len(s):cap(s)], off)
+		n, err := ra.ReadAt(s[len(s):cap(s)], off)
 		s = s[:len(s)+n]
 		if err != nil {
 			if err == io.EOF {

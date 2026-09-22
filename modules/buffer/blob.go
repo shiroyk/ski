@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"reflect"
 	"strings"
@@ -131,7 +132,7 @@ func (*Blob) slice(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 	if span > 0 {
 		data := make([]byte, span)
-		_, err := this.data.ReadAt(data, int64(start))
+		_, err := this.readAt(data, int64(start))
 		if err != nil && err != io.EOF {
 			js.Throw(rt, err)
 		}
@@ -196,15 +197,34 @@ func (*Blob) stream(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 }
 
 type blob struct {
-	data  Reader
+	data  io.Reader
 	size  int64
 	type_ string
 }
 
-type Reader interface {
-	io.Reader
-	io.ReaderAt
-	io.Seeker
+func (b *blob) readAt(p []byte, off int64) (int, error) {
+	if ra, ok := b.data.(io.ReaderAt); ok {
+		return ra.ReadAt(p, off)
+	}
+	if off < 0 {
+		return 0, errors.New("invalid offset")
+	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if c, ok := b.data.(io.Closer); ok {
+		defer c.Close()
+	}
+	data, err := io.ReadAll(b.data)
+	if err != nil {
+		return 0, err
+	}
+	b.data = bytes.NewReader(data)
+	n := copy(p, data[off:])
+	if n < len(p) {
+		return n, io.EOF
+	}
+	return n, nil
 }
 
 func (b *Blob) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
@@ -230,7 +250,7 @@ func toBlob(rt *sobek.Runtime, value sobek.Value) *blob {
 }
 
 // NewBlob returns a new Blob object.
-func NewBlob(rt *sobek.Runtime, data Reader, size int64, type_ string) sobek.Value {
+func NewBlob(rt *sobek.Runtime, data io.Reader, size int64, type_ string) sobek.Value {
 	b := rt.Get("Blob")
 	if b == nil {
 		panic(rt.NewTypeError("Blob is undefined"))
