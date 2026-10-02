@@ -219,13 +219,14 @@ func (vm *vmImpl) Run(ctx context.Context, task func() error) (err error) {
 	vm.runtime.ClearInterrupt()
 	vm.ctx = ctx
 
-	context.AfterFunc(ctx, func() {
+	stop := context.AfterFunc(ctx, func() {
 		// interrupt the running JavaScript.
 		err2 := ctx.Err()
 		vm.runtime.Interrupt(err2)
 		// stop the event loop.
 		vm.eventloop.Stop(err2)
 	})
+	defer stop()
 
 	return vm.eventloop.Start(task)
 }
