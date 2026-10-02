@@ -338,11 +338,8 @@ func (r *request) read() ([]byte, error) {
 }
 
 func (r *request) cancel() {
-	if r.signal != nil {
-		if c, ok := r.body.(io.Closer); ok {
-			defer c.Close()
-		}
-		signal.Abort(r.signal, signal.ErrAbort)
+	if c, ok := r.body.(io.Closer); ok {
+		_ = c.Close()
 	}
 }
 
@@ -435,7 +432,7 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 		case "keepalive":
 			req.keepalive = v.ToBoolean()
 		case "signal":
-			if v.ExportType() != signal.TypeAbortSignal {
+			if !signal.IsAbortSignal(v) {
 				js.Throw(rt, errors.New("options signal is not AbortSignal"))
 			}
 			req.signal = v
@@ -489,6 +486,7 @@ func initRequest(rt *sobek.Runtime, opt sobek.Value, req *request) {
 
 // NewRequest returns a new js Request
 func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
+	sig, _ := signal.New(rt, req.Context())
 	instance := &request{
 		method:      req.Method,
 		url:         req.URL.String(),
@@ -496,7 +494,7 @@ func NewRequest(rt *sobek.Runtime, req *http.Request) sobek.Value {
 		bodyUsed:    new(atomic.Bool),
 		headers:     types.New(rt, "Headers", rt.ToValue(map[string][]string(req.Header))),
 		referrer:    req.Referer(),
-		signal:      signal.New(rt, req.Context()),
+		signal:      sig,
 		mode:        "cors",
 		credentials: "same-origin",
 		cache:       "default",

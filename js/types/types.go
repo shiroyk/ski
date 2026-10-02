@@ -17,6 +17,7 @@ var (
 	TypeError       = reflect.TypeOf((*error)(nil)).Elem()
 	TypePromise     = reflect.TypeOf((*sobek.Promise)(nil))
 	TypeNil         = reflect.TypeOf(nil)
+	TypeBool        = reflect.TypeOf(false)
 )
 
 var (
@@ -106,6 +107,42 @@ func New(rt *sobek.Runtime, name string, args ...sobek.Value) *sobek.Object {
 		panic(err)
 	}
 	return o
+}
+
+// Prototype returns the prototype of a global constructor.
+func Prototype(rt *sobek.Runtime, name string) *sobek.Object {
+	ctor := rt.Get(name)
+	if ctor == nil {
+		panic(rt.NewTypeError("%s is not defined", name))
+	}
+	proto := ctor.ToObject(rt).Get("prototype")
+	if IsNil(proto) {
+		panic(rt.NewTypeError("%s is not defined", name))
+	}
+	obj, ok := proto.(*sobek.Object)
+	if !ok {
+		panic(rt.NewTypeError("%s is not defined", name))
+	}
+	return obj
+}
+
+// ValueType describes the JavaScript value type.
+func ValueType(value sobek.Value) string {
+	switch {
+	case value == nil || sobek.IsUndefined(value):
+		return "undefined"
+	case sobek.IsNull(value):
+		return "null"
+	case sobek.IsString(value):
+		return "string"
+	case sobek.IsNumber(value):
+		return "number"
+	case sobek.IsBigInt(value):
+		return "bigint"
+	case value.ExportType() == TypeBool:
+		return "boolean"
+	}
+	return "object"
 }
 
 // Iterate returns a sequence of the elements of the value and the number of

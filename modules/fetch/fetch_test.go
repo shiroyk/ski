@@ -376,6 +376,36 @@ func TestFetch(t *testing.T) {
 		assert.Contains(t, modulestest.PromiseResult(result).String(), "aborted")
 	})
 
+	t.Run("signal is not aborted", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("hello world"))
+		}))
+		defer server.Close()
+
+		// The request signal must survive the fetch, so the same controller can
+		// be reused, and fetching must not abort the caller's signal.
+		result, err := vm.RunModule(ctx, `
+		export default async (url) => {
+			const controller = new AbortController();
+			const request = new Request(url, { signal: controller.signal });
+			const first = await (await fetch(request)).text();
+			const second = await (await fetch(url, { signal: controller.signal })).text();
+			return {
+				first,
+				second,
+				controllerAborted: controller.signal.aborted,
+				requestAborted: request.signal.aborted,
+			};
+		}
+		`, server.URL)
+		require.NoError(t, err)
+		obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
+		assert.Equal(t, "hello world", obj.Get("first").String())
+		assert.Equal(t, "hello world", obj.Get("second").String())
+		assert.False(t, obj.Get("controllerAborted").ToBoolean())
+		assert.False(t, obj.Get("requestAborted").ToBoolean())
+	})
+
 	t.Run("type error", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
 		export default () => fetch()

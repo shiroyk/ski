@@ -11,6 +11,7 @@ type EventLoop struct {
 	queue   []func() error // queue to store the job to be executed
 	cleanup []func()       // job of cleanup
 	enqueue uint           // Count of job in the event loop
+	stopped bool           // whether the event loop has stopped
 	cond    *sync.Cond     // Condition variable for synchronization
 }
 
@@ -25,6 +26,7 @@ func NewEventLoop() *EventLoop {
 // Start the event loop and execute the provided function
 func (e *EventLoop) Start(task func() error) (err error) {
 	e.cond.L.Lock()
+	e.stopped = false
 	e.queue = []func() error{task}
 	e.cond.L.Unlock()
 	for {
@@ -54,6 +56,7 @@ func (e *EventLoop) Start(task func() error) (err error) {
 		}
 
 		if len(e.cleanup) > 0 {
+			e.stopped = true
 			cleanup := e.cleanup
 			e.cleanup = e.cleanup[:0]
 			e.cond.L.Unlock()
@@ -62,6 +65,7 @@ func (e *EventLoop) Start(task func() error) (err error) {
 				clean()
 			}
 		} else {
+			e.stopped = true
 			e.cond.L.Unlock()
 		}
 
@@ -69,10 +73,10 @@ func (e *EventLoop) Start(task func() error) (err error) {
 	}
 }
 
-// Enqueue add a job to the job queue.
-type Enqueue func(func() error)
+// Job add a job to the job queue.
+type Job func(func() error)
 
-// EnqueueJob return a function Enqueue to add a job to the job queue.
+// EnqueueJob return a function Job to add a job to the job queue.
 // Usage:
 //
 //		func main() {
@@ -137,7 +141,7 @@ type Enqueue func(func() error)
 //			fmt.Println(promise.Result().Export())
 //		}
 //	}
-func (e *EventLoop) EnqueueJob() Enqueue {
+func (e *EventLoop) EnqueueJob() Job {
 	e.cond.L.Lock()
 	called := false
 	e.enqueue++
@@ -155,6 +159,22 @@ func (e *EventLoop) EnqueueJob() Enqueue {
 		called = true
 		e.enqueue--
 		e.cond.Signal() // Signal the condition variable
+	}
+}
+
+// PostJob returns a Job that schedules a job on the event loop from any
+// goroutine. Unlike EnqueueJob it does not keep the event loop alive, and jobs
+// posted after the event loop stopped are dropped.
+func (e *EventLoop) PostJob() Job {
+	return func(job func() error) {
+		e.cond.L.Lock()
+		defer e.cond.L.Unlock()
+
+		if e.stopped {
+			return
+		}
+		e.queue = append(e.queue, job) // Add the job to the queue
+		e.cond.Signal()                // Signal the condition variable
 	}
 }
 
@@ -176,8 +196,13 @@ func (e *EventLoop) Cleanup(job ...func()) {
 	e.cleanup = append(e.cleanup, job...)
 }
 
-// EnqueueJob return a function Enqueue to add a job to the job queue.
-func EnqueueJob(rt *sobek.Runtime) Enqueue { return self(rt).eventloop.EnqueueJob() }
+// EnqueueJob return a function Job to add a job to the job queue.
+func EnqueueJob(rt *sobek.Runtime) Job { return self(rt).eventloop.EnqueueJob() }
+
+// PostJob return a function to add a Job to the job queue from any goroutine.
+// Unlike EnqueueJob it does not keep the event loop alive, and jobs posted
+// after the event loop stopped are dropped.
+func PostJob(rt *sobek.Runtime) Job { return self(rt).eventloop.PostJob() }
 
 // Cleanup add a function to execute when the VM has finished running.
 // eg: close resources...

@@ -98,7 +98,7 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 			serv.server.ReadTimeout = time.Duration(v.ToInteger()) * time.Millisecond
 		}
 		if v := opts.Get("signal"); v != nil {
-			if v.ExportType() != signal.TypeAbortSignal {
+			if !signal.IsAbortSignal(v) {
 				panic(rt.NewTypeError("signal must be an AbortSignal"))
 			}
 			serv.ctx = signal.Context(rt, v)
@@ -259,7 +259,7 @@ type httpServer struct {
 	ctx    context.Context
 	closed atomic.Bool
 
-	ref js.Enqueue
+	ref js.Job
 }
 
 func (s *httpServer) url() string {
