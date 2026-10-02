@@ -21,11 +21,7 @@ func init() {
 	})
 	// AbortSignal inherits EventTarget, the events package does not depend on signal.
 	events.SetSignalOptionHandler(func(rt *sobek.Runtime, value sobek.Value, onAbort func()) bool {
-		signal, ok := abortSignalOf(value)
-		if !ok {
-			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType, `The "signal" argument must be an instance of AbortSignal`))
-		}
-		return signal.onAbort(onAbort)
+		return OnAbort(rt, value, onAbort)
 	})
 }
 
@@ -205,6 +201,17 @@ func (s *abortSignal) onAbort(callback func()) bool {
 	}
 	s.callbacks = append(s.callbacks, callback)
 	return true
+}
+
+// OnAbort registers fn to be invoked when the signal aborts, it returns false
+// without registering when the signal is already aborted.
+func OnAbort(rt *sobek.Runtime, value sobek.Value, fn func()) bool {
+	signal, ok := abortSignalOf(value)
+	if !ok {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "signal" argument must be an instance of AbortSignal`))
+	}
+	return signal.onAbort(fn)
 }
 
 // abortFromContext schedules the abort steps when the signal context ends.

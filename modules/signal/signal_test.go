@@ -60,6 +60,62 @@ func TestSignalCancel(t *testing.T) {
 	assert.Equal(t, int64(20), obj.Get("code").ToInteger())
 }
 
+func TestOnAbort(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New(t)
+	ctx := context.Background()
+
+	var calls []string
+
+	// onAbort is a Go function the module uses to register callbacks on signals.
+	onAbort := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+		name := call.Argument(1).String()
+		registered := OnAbort(rt, call.Argument(0), func() { calls = append(calls, name) })
+		return rt.ToValue(registered)
+	}
+
+	result, err := vm.RunModule(ctx, `
+		export default (onAbort) => {
+			const out = {};
+
+			const controller = new AbortController();
+			out.registered = onAbort(controller.signal, 'first');
+			controller.abort();
+			out.afterAbort = onAbort(controller.signal, 'second');
+			out.aborted = controller.signal.aborted;
+
+			out.immediate = onAbort(AbortSignal.abort('immediate'), 'third');
+
+			const target = new EventTarget();
+			const other = new AbortController();
+			let fired = 0;
+			target.addEventListener('test', () => fired++, { signal: other.signal });
+			target.dispatchEvent(new Event('test'));
+			other.abort();
+			target.dispatchEvent(new Event('test'));
+			out.fired = fired;
+
+			try {
+				onAbort({}, 'nope');
+				out.nonSignal = 'ok';
+			} catch (err) {
+				out.nonSignal = err.code;
+			}
+			return out;
+		}
+	`, onAbort)
+	require.NoError(t, err)
+
+	obj := result.ToObject(vm.Runtime())
+	assert.True(t, obj.Get("registered").ToBoolean())
+	assert.False(t, obj.Get("afterAbort").ToBoolean())
+	assert.True(t, obj.Get("aborted").ToBoolean())
+	assert.False(t, obj.Get("immediate").ToBoolean())
+	assert.Equal(t, int64(1), obj.Get("fired").ToInteger())
+	assert.Equal(t, "ERR_INVALID_ARG_TYPE", obj.Get("nonSignal").String())
+	assert.Equal(t, []string{"first"}, calls)
+}
+
 func TestSignalTimeout(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New(t)
