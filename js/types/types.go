@@ -76,13 +76,20 @@ func IsUint8Array(rt *sobek.Runtime, value sobek.Value) bool {
 // Iterator returns a JavaScript iterator
 func Iterator(rt *sobek.Runtime, seq iter.Seq[any]) *sobek.Object {
 	p := rt.NewObject()
-	next, _ := iter.Pull(seq)
+	next, stop := iter.Pull(seq)
 	_ = p.SetSymbol(sobek.SymIterator, func(call sobek.FunctionCall) sobek.Value { return call.This })
 	_ = p.Set("next", func(call sobek.FunctionCall) sobek.Value {
 		ret := rt.NewObject()
 		value, ok := next()
 		_ = ret.Set("value", value)
 		_ = ret.Set("done", !ok)
+		return ret
+	})
+	_ = p.Set("return", func(call sobek.FunctionCall) sobek.Value {
+		stop()
+		ret := rt.NewObject()
+		_ = ret.Set("value", call.Argument(0))
+		_ = ret.Set("done", true)
 		return ret
 	})
 	return p

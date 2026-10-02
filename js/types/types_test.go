@@ -14,17 +14,30 @@ import (
 
 func TestIterator(t *testing.T) {
 	vm := js.NewVM()
+	var stop bool
 	err := vm.Runtime().Set("iter", func() sobek.Value {
 		return Iterator(vm.Runtime(), func(yield func(any) bool) {
 			for _, r := range "foo" {
-				yield(string(r))
+				if !yield(string(r)) {
+					stop = true
+					return
+				}
 			}
 		})
 	})
 	require.NoError(t, err)
-	v, err := vm.RunString(context.Background(), `[...iter()]`)
+	v, err := vm.RunString(context.Background(), `
+		const result = [];
+		let i = 0;
+		for (const s of iter()) {
+			result.push(s);
+			if (++i === 2) break;
+		}
+		result;
+	`)
 	require.NoError(t, err)
-	assert.EqualValues(t, []any{"f", "o", "o"}, v.Export())
+	assert.EqualValues(t, []any{"f", "o"}, v.Export())
+	assert.True(t, stop)
 }
 
 func TestNew(t *testing.T) {
