@@ -56,7 +56,7 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 		rt:       rt,
 		port:     8000,
 		hostname: "127.0.0.1",
-		ctx:      context.Background(),
+		done:     make(chan struct{}),
 		server:   &http.Server{Addr: "127.0.0.1:8000"},
 	}
 
@@ -70,8 +70,8 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 	switch {
 	case types.IsNumber(opt):
 		port := opt.ToInteger()
-		if port <= 0 {
-			panic(rt.NewTypeError("port must be a positive number"))
+		if port < 0 {
+			panic(rt.NewTypeError("port must not be negative"))
 		}
 		serv.port = int(port)
 		serv.server.Addr = fmt.Sprintf(":%d", serv.port)
@@ -101,8 +101,12 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 			if !signal.IsAbortSignal(v) {
 				panic(rt.NewTypeError("signal must be an AbortSignal"))
 			}
-			serv.ctx = signal.Context(rt, v)
-			context.AfterFunc(serv.ctx, func() { serv.shutdown() })
+			select {
+			case <-signal.Context(rt, v).Done():
+				serv.shutdown()
+			default:
+				signal.OnAbort(rt, v, func() { serv.shutdown() })
+			}
 		}
 		if v := opts.Get("onError"); v != nil {
 			var ok bool
@@ -165,24 +169,32 @@ func (s *Server) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 	}
 
 	serv.server.Handler = serv
-	serv.ref = js.EnqueueJob(rt)
-	ln := serv.listen()
-
-	go func() {
-		js.EnqueueJob(rt)(func() error {
-			if serv.onListen != nil {
-				_, _ = serv.onListen(sobek.Undefined(), serv.addr())
-			} else {
-				serv.logger().Info(fmt.Sprintf("listening on %s", serv.url()),
-					slog.String("source", "server"))
-			}
-			return nil
-		})
-		err := serv.server.Serve(ln)
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			js.EnqueueJob(rt)(func() error { return err })
+	// The server may already be shut down, e.g. its AbortSignal was aborted
+	// before it was created, in that case do not listen at all.
+	if !serv.closed.Load() {
+		serv.ref()
+		ln := serv.listen()
+		if addr, ok := ln.Addr().(*net.TCPAddr); ok {
+			serv.port = addr.Port
+			serv.server.Addr = fmt.Sprintf("%s:%d", serv.hostname, serv.port)
 		}
-	}()
+
+		go func() {
+			js.EnqueueJob(rt)(func() error {
+				if serv.onListen != nil {
+					_, _ = serv.onListen(sobek.Undefined(), serv.addr())
+				} else {
+					serv.logger().Info(fmt.Sprintf("listening on %s", serv.url()),
+						slog.String("source", "server"))
+				}
+				return nil
+			})
+			err := serv.server.Serve(ln)
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				js.EnqueueJob(rt)(func() error { return err })
+			}
+		}()
+	}
 
 	obj := rt.NewObject()
 	_ = obj.SetSymbol(symHttpServer, rt.ToValue(serv))
@@ -209,7 +221,7 @@ func (s *Server) url(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 func (s *Server) finished(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
 	return promise.New(rt, func(callback promise.Callback) {
-		<-this.ctx.Done()
+		<-this.done
 		callback(func() (any, error) { return nil, nil })
 	})
 }
@@ -217,16 +229,14 @@ func (s *Server) finished(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 // ref make the server block the event loop from finishing.
 func (s *Server) ref(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
-	if this.ref == nil {
-		this.ref = js.EnqueueJob(rt)
-	}
+	this.ref()
 	return call.This
 }
 
 // unref make the server not block the event loop from finishing.
 func (s *Server) unref(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toHttpServer(rt, call.This)
-	this.ref(func() error { this.ref = nil; return nil })
+	this.unref()
 	return call.This
 }
 
@@ -256,10 +266,11 @@ type httpServer struct {
 
 	handler, onError, onListen sobek.Callable
 
-	ctx    context.Context
+	done   chan struct{}
+	once   sync.Once
 	closed atomic.Bool
 
-	ref js.Job
+	job js.Job
 }
 
 func (s *httpServer) url() string {
@@ -285,24 +296,39 @@ func (s *httpServer) listen() net.Listener {
 }
 
 func (s *httpServer) close() error {
-	s.closed.Store(true)
-	err := s.server.Close()
-	if s.ref != nil {
-		s.ref(func() error { s.ref = nil; return nil })
+	if s.closed.Swap(true) {
+		return nil
 	}
-	return err
+	defer s.clean()
+	return s.server.Close()
 }
 
 func (s *httpServer) shutdown() error {
-	s.closed.Store(true)
-	err := s.server.Shutdown(s.ctx)
-	if s.ref != nil {
-		s.ref(func() error { s.ref = nil; return nil })
-	}
-	if errors.Is(err, context.Canceled) {
+	if s.closed.Swap(true) {
 		return nil
 	}
-	return err
+	defer s.clean()
+	return s.server.Shutdown(context.Background())
+}
+
+func (s *httpServer) clean() {
+	s.unref()
+	s.once.Do(func() { close(s.done) })
+}
+
+// ref makes the server block the event loop from finishing.
+func (s *httpServer) ref() {
+	if s.job == nil && !s.closed.Load() {
+		s.job = js.EnqueueJob(s.rt)
+	}
+}
+
+// unref makes the server not block the event loop from finishing.
+func (s *httpServer) unref() {
+	if ref := s.job; ref != nil {
+		s.job = nil
+		ref(func() error { return nil })
+	}
 }
 
 // ServeHTTP implements http.Handler
