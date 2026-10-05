@@ -181,8 +181,8 @@ func (*_event) defaultPrevented(call sobek.FunctionCall, rt *sobek.Runtime) sobe
 	return rt.ToValue(toEvent(rt, call.This).defaultPrevented)
 }
 
-func (*_event) isTrusted(_ sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(false)
+func (*_event) isTrusted(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(toEvent(rt, call.This).trusted)
 }
 
 func (*_event) stopPropagation(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
@@ -264,6 +264,7 @@ type event struct {
 	composed   bool
 
 	defaultPrevented bool
+	trusted          bool
 
 	dispatching                 bool
 	propagationStopped          bool

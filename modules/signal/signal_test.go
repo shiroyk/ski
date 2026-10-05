@@ -116,6 +116,105 @@ func TestOnAbort(t *testing.T) {
 	assert.Equal(t, []string{"first"}, calls)
 }
 
+func TestAbortSignalAny(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New(t)
+	ctx := context.Background()
+
+	_, err := vm.RunModule(ctx, `
+		const message = (fn) => {
+			try { fn(); return null; } catch (err) { return err.message; }
+		};
+
+		// An empty sequence returns a signal which never aborts.
+		const empty = AbortSignal.any([]);
+		assert.true(empty instanceof AbortSignal);
+		assert.equal(empty.aborted, false);
+		assert.true(empty.reason === undefined);
+
+		// The result is a new signal, aborted with the reason of the source.
+		const controller = new AbortController();
+		const result = AbortSignal.any([controller.signal]);
+		assert.true(result !== controller.signal);
+		assert.equal(result.aborted, false);
+		const reason = {detail: 1};
+		controller.abort(reason);
+		assert.true(result.aborted, 'aborted');
+		assert.true(result.reason === reason);
+
+		// An already aborted signal aborts the result with its reason.
+		const aborted = new AbortController();
+		aborted.abort('first');
+		const other = new AbortController();
+		const pre = AbortSignal.any([other.signal, aborted.signal]);
+		assert.true(pre.aborted);
+		assert.equal(pre.reason, 'first');
+		other.abort('late');
+		assert.equal(pre.reason, 'first');
+
+		// The signal which aborts first wins, the result aborts only once.
+		const a = new AbortController();
+		const b = new AbortController();
+		const first = AbortSignal.any([a.signal, b.signal]);
+		let events = 0;
+		first.addEventListener('abort', () => events++);
+		b.abort('b');
+		a.abort('a');
+		assert.equal(first.reason, 'b');
+		assert.equal(events, 1);
+
+		// Any iterable works.
+		assert.true(AbortSignal.any(new Set([aborted.signal])).aborted);
+		function* generate() { yield aborted.signal; }
+		assert.true(AbortSignal.any(generate()).aborted);
+
+		// The result can be used as the signal option of addEventListener.
+		const s1 = new AbortController();
+		const s2 = new AbortController();
+		const combined = AbortSignal.any([s1.signal, s2.signal]);
+		const target = new EventTarget();
+		let count = 0;
+		target.addEventListener('test', () => count++, { signal: combined });
+		target.dispatchEvent(new Event('test'));
+		s2.abort();
+		target.dispatchEvent(new Event('test'));
+		assert.equal(count, 1);
+
+		// The originating signal fires first, then the dependents in the order
+		// they were added.
+		const origin = new AbortController();
+		const seq = [];
+		seq.push(origin.signal);
+		seq.push(AbortSignal.any([origin.signal]));
+		seq.push(AbortSignal.any([origin.signal]));
+		seq.push(AbortSignal.any([seq[0]]));
+		seq.push(AbortSignal.any([seq[1]]));
+		let fired = "";
+		for (let i = 0; i < seq.length; i++) {
+			seq[i].addEventListener('abort', () => { fired += i; });
+		}
+		origin.abort();
+		assert.equal(fired, "01234");
+
+		// Dependent signals are marked aborted before the abort events fire.
+		const source = new AbortController();
+		const level1 = AbortSignal.any([source.signal]);
+		const level2 = AbortSignal.any([level1]);
+		let marked = false;
+		source.signal.addEventListener('abort', () => {
+			marked = source.signal.aborted && level1.aborted && level2.aborted &&
+				AbortSignal.any([level2]).aborted;
+		});
+		source.abort();
+		assert.true(marked);
+
+		// The whole sequence is validated before the signals are observed.
+		assert.equal(message(() => AbortSignal.any(1)), 'object is not iterable');
+		assert.equal(message(() => AbortSignal.any([1])), 'signals[0] is not of type AbortSignal.');
+	`)
+	assert.NoError(t, err)
+}
+
 func TestSignalTimeout(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New(t)
@@ -183,20 +282,23 @@ func TestAbortSignal(t *testing.T) {
 
 	t.Run("timeout signal", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
-			export default () => {
+			export default () => new Promise((resolve) => {
 				const signal = AbortSignal.timeout(0);
-				return {
-					aborted: signal.aborted,
-					reason: signal.reason
-				};
-			}
+				// The signal is not aborted synchronously.
+				const aborted = signal.aborted;
+				signal.addEventListener('abort', () => resolve({
+					aborted,
+					name: signal.reason.name,
+					code: signal.reason.code,
+				}));
+				setTimeout(() => resolve({aborted, name: 'not aborted'}), 100);
+			})
 		`)
 		require.NoError(t, err)
-		obj := result.ToObject(vm.Runtime())
-		assert.True(t, obj.Get("aborted").ToBoolean())
-		reason := obj.Get("reason")
-		assert.Equal(t, "TimeoutError", reason.ToObject(vm.Runtime()).Get("name").String())
-		assert.Equal(t, int64(23), reason.ToObject(vm.Runtime()).Get("code").ToInteger())
+		obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
+		assert.False(t, obj.Get("aborted").ToBoolean())
+		assert.Equal(t, "TimeoutError", obj.Get("name").String())
+		assert.Equal(t, int64(23), obj.Get("code").ToInteger())
 	})
 
 	t.Run("default abort reason", func(t *testing.T) {
@@ -235,6 +337,7 @@ func TestAbortSignal(t *testing.T) {
 				order.push('first');
 				assert.true(event.target === signal);
 				assert.true(event.currentTarget === signal);
+				assert.true(event.isTrusted);
 				assert.equal(event.type, 'abort');
 				assert.true(signal.aborted);
 			});

@@ -415,6 +415,17 @@ func TestEventTarget(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("isTrusted", func(t *testing.T) {
+		_, err := vm.RunModule(ctx, `
+			const target = new EventTarget();
+			let trusted = null;
+			target.addEventListener('test', (event) => { trusted = event.isTrusted; });
+			target.dispatchEvent(new Event('test'));
+			assert.equal(trusted, false);
+		`)
+		assert.NoError(t, err)
+	})
+
 	t.Run("plain object", func(t *testing.T) {
 		_, err := vm.RunModule(ctx, `
 			const event = new Event('test');

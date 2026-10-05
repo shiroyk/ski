@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/shiroyk/ski/modules/encoding"
+	_ "github.com/shiroyk/ski/modules/events"
 	_ "github.com/shiroyk/ski/modules/fetch"
 	_ "github.com/shiroyk/ski/modules/signal"
 	_ "github.com/shiroyk/ski/modules/timers"
@@ -166,6 +167,8 @@ func TestWPT(t *testing.T) {
 		ctx.runWPTTest(t, "url")
 		ctx.runWPTTest(t, "FileAPI/blob")
 		ctx.runWPTTest(t, "FileAPI/file")
+		ctx.runWPTTest(t, "dom/events")
+		ctx.runWPTTest(t, "dom/abort")
 	})
 }
 

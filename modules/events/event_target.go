@@ -59,14 +59,19 @@ func NewEventTargetOf[E EventTarget](rt *sobek.Runtime, proto *sobek.Object) *E 
 }
 
 // DispatchEvent dispatches the event to the target and returns false when the
-// event is canceled.
+// event is canceled. The event is trusted because it is dispatched by the host.
 // https://dom.spec.whatwg.org/#concept-event-dispatch
 func DispatchEvent(rt *sobek.Runtime, target EventTarget, event Event) bool {
+	return dispatch(rt, target, event, true)
+}
+
+func dispatch(rt *sobek.Runtime, target EventTarget, event Event, trusted bool) bool {
 	evt := event.base()
 	if evt.dispatching {
 		panic(common.NewErrorf(rt, ErrEventRecursion, "The event is already being dispatched"))
 	}
 
+	evt.trusted = trusted
 	evt.dispatching = true
 	evt.target = target
 	evt.currentTarget = target
@@ -208,7 +213,8 @@ func (*_eventTarget) dispatchEvent(call sobek.FunctionCall, rt *sobek.Runtime) s
 	if !ok {
 		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType, `The "event" argument must be an instance of Event. Received type %s`, call.Argument(0)))
 	}
-	return rt.ToValue(DispatchEvent(rt, target, evt))
+	// An event dispatched from JavaScript is not trusted.
+	return rt.ToValue(dispatch(rt, target, evt, false))
 }
 
 func newEventTarget(rt *sobek.Runtime, proto *sobek.Object) *eventTarget {

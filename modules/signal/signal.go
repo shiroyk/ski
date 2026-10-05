@@ -3,6 +3,7 @@ package signal
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -83,6 +84,7 @@ func (a *AbortSignal) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("onabort", rt.ToValue(a.onabort), rt.ToValue(a.setOnabort), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.Set("throwIfAborted", a.throwIfAborted)
 	_ = p.Set("abort", a.abort)
+	_ = p.Set("any", a.any)
 	_ = p.Set("timeout", a.timeout)
 	_ = p.SetSymbol(sobek.SymToStringTag, rt.ToValue("AbortSignal"))
 	return p
@@ -155,29 +157,61 @@ func (*AbortSignal) abort(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	return signal.ValueOf()
 }
 
+// any returns an AbortSignal which is aborted when any of the given signals aborts.
+func (*AbortSignal) any(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	// The sequence is converted and validated before the signals are observed.
+	var (
+		signals []*abortSignal
+		index   int
+	)
+	rt.ForOf(call.Argument(0), func(value sobek.Value) (ok bool) {
+		signal, ok := abortSignalOf(value)
+		if !ok {
+			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+				"signals[%d] is not of type AbortSignal.", index))
+		}
+		index++
+		signals = append(signals, signal)
+		return true
+	})
+
+	result := newAbortSignal(rt, js.Context(rt))
+	for _, signal := range signals {
+		if signal.aborted {
+			// The signal is already aborted, the result aborts with its reason
+			// and the remaining signals are not observed.
+			result.abort(signal.reason)
+			return result.ValueOf()
+		}
+		if slices.Contains(signal.dependents, result) {
+			continue
+		}
+		signal.dependents = append(signal.dependents, result)
+	}
+	return result.ValueOf()
+}
+
 // timeout returns an AbortSignal which will be aborted after the given milliseconds.
 func (*AbortSignal) timeout(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	timeout := time.Duration(call.Argument(0).ToInteger()) * time.Millisecond
 	ctx, cancel := context.WithTimeout(js.Context(rt), timeout)
 	signal := newAbortSignalWith(rt, ctx, func(error) { cancel() })
-	if timeout <= 0 {
-		// The context is already expired, abort synchronously.
-		signal.abort(newTimeoutError(rt))
-	}
 	return signal.ValueOf()
 }
 
 type abortSignal struct {
 	events.EventTarget
-	rt        *sobek.Runtime
-	post      js.Job
-	ctx       context.Context
-	cancel    context.CancelCauseFunc
-	stop      func() bool
-	once      sync.Once
-	aborted   bool
-	reason    sobek.Value
-	callbacks []func()
+	rt      *sobek.Runtime
+	post    js.Job
+	ctx     context.Context
+	cancel  context.CancelCauseFunc
+	stop    func() bool
+	once    sync.Once
+	aborted bool
+	reason  sobek.Value
+	// dependents are the signals aborted together with this one, they are
+	// aborted in the order they were added.
+	dependents []*abortSignal
 }
 
 func newAbortSignalWith(rt *sobek.Runtime, ctx context.Context, cancel func(error)) *abortSignal {
@@ -193,25 +227,18 @@ func newAbortSignalWith(rt *sobek.Runtime, ctx context.Context, cancel func(erro
 	return signal
 }
 
-// onAbort registers a callback invoked synchronously when the signal aborts.
-// It returns false without registering when the signal is already aborted.
-func (s *abortSignal) onAbort(callback func()) bool {
-	if s.aborted {
-		return false
-	}
-	s.callbacks = append(s.callbacks, callback)
-	return true
-}
-
-// OnAbort registers fn to be invoked when the signal aborts, it returns false
-// without registering when the signal is already aborted.
-func OnAbort(rt *sobek.Runtime, value sobek.Value, fn func()) bool {
+// OnAbort sets the event handler registered for the abort event.
+func OnAbort(rt *sobek.Runtime, value sobek.Value, callback func()) bool {
 	signal, ok := abortSignalOf(value)
 	if !ok {
 		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
 			`The "signal" argument must be an instance of AbortSignal`))
 	}
-	return signal.onAbort(fn)
+	if signal.aborted {
+		return false
+	}
+	signal.SetEventHandler("abort", rt.ToValue(callback))
+	return true
 }
 
 // abortFromContext schedules the abort steps when the signal context ends.
@@ -222,26 +249,50 @@ func (s *abortSignal) abortFromContext() {
 // abort runs the abort steps on the runtime goroutine, so they are visible
 // synchronously to the caller.
 func (s *abortSignal) abort(reason sobek.Value) {
-	s.once.Do(func() {
-		if s.stop != nil {
-			s.stop()
-		}
-		if reason == nil || sobek.IsUndefined(reason) {
-			reason = newAbortError(s.rt)
-		}
-		s.aborted = true
-		s.reason = reason
-		s.cancel(errors.New(reason.String()))
+	if s.aborted {
+		return
+	}
+	if reason == nil || sobek.IsUndefined(reason) {
+		reason = newAbortError(s.rt)
+	}
 
-		// Run the abort steps: remove listeners registered with this signal.
-		callbacks := s.callbacks
-		s.callbacks = nil
-		for _, callback := range callbacks {
-			callback()
+	// Collect the dependent signals, the signal aborts first and its dependents
+	// follow in the order they were created.
+	dependents := make([]*abortSignal, 0, 4)
+	visited := map[*abortSignal]bool{s: true}
+	for queue := []*abortSignal{s}; len(queue) > 0; {
+		signal := queue[0]
+		queue = queue[1:]
+		for _, dependent := range signal.dependents {
+			if visited[dependent] {
+				continue
+			}
+			visited[dependent] = true
+			dependents = append(dependents, dependent)
+			queue = append(queue, dependent)
 		}
+		signal.dependents = nil
+	}
 
-		events.DispatchEvent(s.rt, s, events.NewEvent(s.rt, "abort", events.EventInit{}))
-	})
+	// The signal and every dependent signal are marked aborted before any abort
+	// event is dispatched.
+	order := make([]*abortSignal, 0, len(dependents)+1)
+	for _, signal := range append([]*abortSignal{s}, dependents...) {
+		if signal.aborted {
+			continue
+		}
+		signal.aborted = true
+		signal.reason = reason
+		if signal.stop != nil {
+			signal.stop()
+		}
+		signal.cancel(errors.New(reason.String()))
+		order = append(order, signal)
+	}
+
+	for _, signal := range order {
+		events.DispatchEvent(signal.rt, signal, events.NewEvent(signal.rt, "abort", events.EventInit{}))
+	}
 }
 
 // reasonFromContext maps the signal context cause to the abort reason.
