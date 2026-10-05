@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -19,10 +18,6 @@ func init() {
 	modules.Register("signal", modules.Global{
 		"AbortController": new(AbortController),
 		"AbortSignal":     new(AbortSignal),
-	})
-	// AbortSignal inherits EventTarget, the events package does not depend on signal.
-	events.SetSignalOptionHandler(func(rt *sobek.Runtime, value sobek.Value, onAbort func()) bool {
-		return OnAbort(rt, value, onAbort)
 	})
 }
 
@@ -206,7 +201,6 @@ type abortSignal struct {
 	ctx     context.Context
 	cancel  context.CancelCauseFunc
 	stop    func() bool
-	once    sync.Once
 	aborted bool
 	reason  sobek.Value
 	// dependents are the signals aborted together with this one, they are

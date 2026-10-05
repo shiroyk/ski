@@ -127,12 +127,16 @@ func (e *_event) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.DefineAccessorProperty("composed", rt.ToValue(e.composed), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("defaultPrevented", rt.ToValue(e.defaultPrevented), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	_ = p.DefineAccessorProperty("isTrusted", rt.ToValue(e.isTrusted), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("srcElement", rt.ToValue(e.srcElement), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("returnValue", rt.ToValue(e.returnValue), rt.ToValue(e.setReturnValue), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+	_ = p.DefineAccessorProperty("cancelBubble", rt.ToValue(e.cancelBubble), rt.ToValue(e.setCancelBubble), sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 
 	// Methods
 	_ = p.Set("stopPropagation", e.stopPropagation)
 	_ = p.Set("stopImmediatePropagation", e.stopImmediatePropagation)
 	_ = p.Set("preventDefault", e.preventDefault)
 	_ = p.Set("composedPath", e.composedPath)
+	_ = p.Set("initEvent", e.initEvent)
 
 	return p
 }
@@ -183,6 +187,59 @@ func (*_event) defaultPrevented(call sobek.FunctionCall, rt *sobek.Runtime) sobe
 
 func (*_event) isTrusted(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(toEvent(rt, call.This).trusted)
+}
+
+// srcElement is the legacy alias of target.
+func (*_event) srcElement(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	evt := toEvent(rt, call.This)
+	if evt.target == nil {
+		return sobek.Null()
+	}
+	return evt.target.ValueOf()
+}
+
+// returnValue is the legacy accessor of defaultPrevented.
+func (*_event) returnValue(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(!toEvent(rt, call.This).defaultPrevented)
+}
+
+func (*_event) setReturnValue(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	evt := toEvent(rt, call.This)
+	if value := call.Argument(0); !value.ToBoolean() {
+		// Setting returnValue to false cancels the event.
+		if evt.cancelable && !evt.inPassiveListener {
+			evt.defaultPrevented = true
+		}
+	}
+	return sobek.Undefined()
+}
+
+// cancelBubble is the legacy accessor of stopPropagation.
+func (*_event) cancelBubble(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(toEvent(rt, call.This).propagationStopped)
+}
+
+func (*_event) setCancelBubble(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	evt := toEvent(rt, call.This)
+	if call.Argument(0).ToBoolean() {
+		evt.propagationStopped = true
+	}
+	return sobek.Undefined()
+}
+
+// initEvent initializes the event, the legacy replacement of the constructor.
+func (*_event) initEvent(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	evt := toEvent(rt, call.This)
+	if evt.dispatching {
+		panic(rt.NewTypeError("Failed to execute 'initEvent' on 'Event': The event is already being dispatched."))
+	}
+	evt._type = call.Argument(0).String()
+	evt.bubbles = call.Argument(1).ToBoolean()
+	evt.cancelable = call.Argument(2).ToBoolean()
+	evt.defaultPrevented = false
+	evt.propagationStopped = false
+	evt.immediatePropagationStopped = false
+	return sobek.Undefined()
 }
 
 func (*_event) stopPropagation(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {

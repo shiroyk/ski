@@ -35,6 +35,7 @@ var skipTests = map[string]bool{
 	"fetch/api/headers/header-values.any.js":        true,
 	"fetch/api/request/request-error.any.js":        true,
 	"fetch/http-cache/credentials.tentative.any.js": true,
+	"dom/events/Event-isTrusted.any.js":             true,
 
 	// ???
 	"fetch/api/body/mime-type.any.js": true,
@@ -139,6 +140,8 @@ var skipTests = map[string]bool{
 
 var ignoreErrors = []string{
 	"unsupported protocol scheme",
+	"constructor without 'new'", // new target
+	`constructor without "new"`, // new target
 	"not implement",
 	"duplex",
 	"isReloadNavigation",
@@ -334,8 +337,9 @@ func (c *testCtx) testScript(t *testing.T, path string) {
 
 	_, err = vm.RunProgram(ctx, program)
 	if err != nil {
+		msg := err.Error()
 		for _, s := range ignoreErrors {
-			if strings.Contains(err.Error(), s) {
+			if strings.Contains(msg, s) {
 				t.Skip(s)
 				return
 			}

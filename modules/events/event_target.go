@@ -96,22 +96,6 @@ func dispatch(rt *sobek.Runtime, target EventTarget, event Event, trusted bool) 
 	return !evt.defaultPrevented
 }
 
-// SignalOptionHandler handles the `signal` option of addEventListener.
-// It is installed by the signal module through SetSignalOptionHandler.
-//
-// It must panic with a TypeError when signal is not an AbortSignal. onAbort is
-// invoked synchronously when the signal aborts, and events uses it to remove the
-// listener. Returning false means the signal was already aborted, in which case
-// the listener must not be registered at all.
-type SignalOptionHandler func(rt *sobek.Runtime, signal sobek.Value, onAbort func()) bool
-
-var signalOptionHandler SignalOptionHandler
-
-// SetSignalOptionHandler installs the handler for the `signal` option of addEventListener.
-func SetSignalOptionHandler(handler SignalOptionHandler) {
-	signalOptionHandler = handler
-}
-
 const ErrEventRecursion common.ErrCode = "ERR_EVENT_RECURSION"
 
 // listener is an _event listener record.
@@ -144,6 +128,21 @@ func (e *_eventTarget) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	_ = ctor.SetPrototype(proto)
 	_ = ctor.Set("prototype", proto)
 	_ = proto.SetSymbol(sobek.SymToStringTag, rt.ToValue("EventTarget"))
+
+	// makes the global object an EventTarget.
+	global := rt.GlobalObject()
+	if target, ok := EventTargetOf[EventTarget](global); !ok {
+		target = &eventTarget{
+			rt:        rt,
+			this:      global,
+			listeners: make(map[string][]*listener),
+			handlers:  make(map[string]handler),
+		}
+		_ = global.SetSymbol(symEventTarget, target)
+		_ = global.Set("addEventListener", e.addEventListener)
+		_ = global.Set("removeEventListener", e.removeEventListener)
+		_ = global.Set("dispatchEvent", e.dispatchEvent)
+	}
 	return ctor, nil
 }
 
@@ -168,20 +167,28 @@ func (*_eventTarget) addEventListener(call sobek.FunctionCall, rt *sobek.Runtime
 	target := toEventTarget(rt, call.This)
 	typ := call.Argument(0).String()
 	opts := parseListenerOptions(call.Argument(2), false)
-	l := newListener(rt, call.Argument(1), opts)
+	var l *listener
+	if opts.signal != nil && !sobek.IsUndefined(opts.signal) {
+		et, ok := EventTargetOf[EventTarget](opts.signal)
+		if !ok || !rt.InstanceOf(opts.signal, rt.Get("AbortSignal").ToObject(rt)) {
+			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType, `The "signal" argument must be an instance of AbortSignal`))
+		}
+		if et.ValueOf().Get("aborted").ToBoolean() {
+			return sobek.Undefined()
+		}
+		et.add("abort", newListener(rt, rt.ToValue(func(sobek.FunctionCall) sobek.Value {
+			if l != nil {
+				target.remove(typ, l)
+			}
+			return sobek.Undefined()
+		}), listenerOptions{once: true}))
+	}
+	l = newListener(rt, call.Argument(1), opts)
 	if l == nil {
 		return sobek.Undefined()
 	}
 	if target.contains(typ, l) {
 		return sobek.Undefined()
-	}
-	if opts.signal != nil {
-		if signalOptionHandler == nil {
-			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType, `The "signal" argument must be an instance of AbortSignal`))
-		}
-		if !signalOptionHandler(rt, opts.signal, func() { target.remove(typ, l) }) {
-			return sobek.Undefined()
-		}
 	}
 	target.add(typ, l)
 	return sobek.Undefined()
@@ -397,9 +404,7 @@ func parseListenerOptions(options sobek.Value, remove bool) listenerOptions {
 	if v := obj.Get("passive"); v != nil {
 		opts.passive = v.ToBoolean()
 	}
-	if v := obj.Get("signal"); !types.IsNil(v) {
-		opts.signal = v
-	}
+	opts.signal = obj.Get("signal")
 	return opts
 }
 
