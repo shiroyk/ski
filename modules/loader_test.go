@@ -230,7 +230,7 @@ func TestModuleLoader(t *testing.T) {
 					return rt.ToValue("some value")
 				}),
 			})
-			ml.(*loader).collectGlobals()
+			ml.InitGlobal(vm)
 
 			mod, err := ml.CompileModule("", `
 			assert.true(Reflect.has(globalThis, "globalMod"), "before init");
@@ -249,7 +249,7 @@ func TestModuleLoader(t *testing.T) {
 			Register("node:url", Global{
 				"URL": n,
 			})
-			ml.(*loader).collectGlobals()
+			ml.InitGlobal(vm)
 
 			mod, err := ml.CompileModule("", `
 			import {URL as NODE_URL} from "node:url";

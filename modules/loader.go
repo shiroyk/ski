@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -126,9 +127,6 @@ type (
 		goModules    sync.Map
 		cacheModules sync.Map
 
-		globalOnce sync.Once
-		globals    map[string]string
-
 		fileLoader FileLoader
 
 		base         *url.URL
@@ -155,13 +153,22 @@ func (ml *loader) EnableRequire(rt *sobek.Runtime) Loader {
 	return ml
 }
 
+var typeProxy = reflect.TypeFor[sobek.Proxy]()
+
 // InitGlobal instantiates global objects for the runtime. It creates a proxy around the global object
 // to lazily load global modules when they are first accessed.
 //
 // This allows for automatic loading of global modules like fetch, TextEncoder, etc.
 // when they are referenced in code.
 func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
-	ml.globalOnce.Do(ml.collectGlobals)
+	globals := make(map[string]string)
+	for namespace, m := range All() {
+		if global, ok := m.(Global); ok {
+			for name := range global {
+				globals[name] = namespace
+			}
+		}
+	}
 
 	// Create proxy to handle global property access
 	handler := &sobek.ProxyTrapConfig{}
@@ -170,7 +177,7 @@ func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
 			return value
 		}
 
-		namespace, ok := ml.globals[property]
+		namespace, ok := globals[property]
 		if !ok {
 			return nil
 		}
@@ -186,7 +193,7 @@ func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
 			return true
 		}
 
-		_, ok := ml.globals[property]
+		_, ok := globals[property]
 		if ok {
 			return true
 		}
@@ -194,18 +201,22 @@ func (ml *loader) InitGlobal(rt *sobek.Runtime) Loader {
 	}
 	handler.OwnKeys = func(target *sobek.Object) (object *sobek.Object) {
 		keys := target.GetOwnPropertyNames()
-		ret := make([]string, 0, len(keys)+len(ml.globals))
+		ret := make([]string, 0, len(keys)+len(globals))
 		for _, name := range keys {
-			if _, ok := ml.globals[name]; !ok {
+			if _, ok := globals[name]; !ok {
 				ret = append(ret, name)
 			}
 		}
-		for name := range ml.globals {
+		for name := range globals {
 			ret = append(ret, name)
 		}
 		return rt.ToValue(ret).(*sobek.Object)
 	}
-	rt.SetGlobalObject(rt.ToValue(rt.NewProxy(rt.GlobalObject(), handler)).(*sobek.Object))
+	globalThis := rt.GlobalObject()
+	if globalThis.ExportType() == typeProxy {
+		globalThis = globalThis.Export().(sobek.Proxy).Target()
+	}
+	rt.SetGlobalObject(rt.ToValue(rt.NewProxy(globalThis, handler)).(*sobek.Object))
 	return ml
 }
 
@@ -236,18 +247,6 @@ func (ml *loader) EnableImportMeta(rt *sobek.Runtime) Loader {
 		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	})
 	return ml
-}
-
-// collect all global module names and their namespaces
-func (ml *loader) collectGlobals() {
-	ml.globals = make(map[string]string)
-	for namespace, m := range All() {
-		if globals, ok := m.(Global); ok {
-			for name := range globals {
-				ml.globals[name] = namespace
-			}
-		}
-	}
 }
 
 func (ml *loader) createInstance(rt *sobek.Runtime, namespace, name string) sobek.Value {
