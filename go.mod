@@ -6,7 +6,6 @@ require (
 	github.com/grafana/sobek v0.0.0-20261005111419-f56574604191
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/crypto v0.57.0
-	golang.org/x/net v0.59.0
 	golang.org/x/text v0.42.0
 )
 
