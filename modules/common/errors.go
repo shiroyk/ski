@@ -10,9 +10,14 @@ type ErrCode string
 
 // Node.js error codes, see https://nodejs.org/api/errors.html
 const (
-	ErrInvalidArgType ErrCode = "ERR_INVALID_ARG_TYPE"
-	ErrMissingArgs    ErrCode = "ERR_MISSING_ARGS"
-	ErrInvalidThis    ErrCode = "ERR_INVALID_THIS"
+	ErrInvalidArgType    ErrCode = "ERR_INVALID_ARG_TYPE"
+	ErrInvalidArgValue   ErrCode = "ERR_INVALID_ARG_VALUE"
+	ErrOutOfRange        ErrCode = "ERR_OUT_OF_RANGE"
+	ErrUnknownEncoding   ErrCode = "ERR_UNKNOWN_ENCODING"
+	ErrBufferOutOfBounds ErrCode = "ERR_BUFFER_OUT_OF_BOUNDS"
+	ErrStringTooLong     ErrCode = "ERR_STRING_TOO_LONG"
+	ErrMissingArgs       ErrCode = "ERR_MISSING_ARGS"
+	ErrInvalidThis       ErrCode = "ERR_INVALID_THIS"
 )
 
 // newErrorf creates an Error with a Node.js style code property.
@@ -39,4 +44,9 @@ func NewErrorf(rt *sobek.Runtime, code ErrCode, format string, args ...any) *sob
 // NewTypeErrorf creates a TypeError with a Node.js style code property.
 func NewTypeErrorf(rt *sobek.Runtime, code ErrCode, format string, args ...any) *sobek.Object {
 	return newErrorf(rt, "TypeError", code, format, args...)
+}
+
+// NewRangeErrorf creates a RangeError with a Node.js style code property.
+func NewRangeErrorf(rt *sobek.Runtime, code ErrCode, format string, args ...any) *sobek.Object {
+	return newErrorf(rt, "RangeError", code, format, args...)
 }

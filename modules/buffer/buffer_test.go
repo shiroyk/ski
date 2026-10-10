@@ -13,6 +13,79 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBufferErrors(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New()
+	ctx := context.Background()
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name: "name property",
+			input: `
+				assert.strictEqual(Buffer.name, "Buffer");
+				assert.strictEqual(Buffer.allocUnsafe(4).length, 4);
+				assert.strictEqual(Buffer.allocUnsafeSlow(4).length, 4);
+			`,
+		},
+		{
+			name: "allocation",
+			input: `
+				const range = { code: "ERR_OUT_OF_RANGE", name: "RangeError" };
+				assert.throws(() => Buffer(-1), range);
+				assert.throws(() => Buffer(NaN), range);
+				assert.throws(() => Buffer.alloc(-1), range);
+				assert.throws(() => Buffer.allocUnsafe(NaN), range);
+				assert.throws(() => Buffer.alloc(9007199254740992), range);
+				assert.throws(() => Buffer.alloc("a"), { code: "ERR_INVALID_ARG_TYPE" });
+			`,
+		},
+		{
+			name: "arguments",
+			input: `
+				const buf = Buffer.alloc(4);
+				assert.throws(() => buf.readInt8("0"), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => buf.readInt8(null), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => buf.readInt8(-1), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => buf.readInt8(NaN), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => buf.readIntBE(0, undefined), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => buf.readIntBE(0, 7), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => buf.readIntBE(0, Infinity), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => buf.write("foo", 5), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => buf.write("foo", 1.5), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => buf.fill(0, 5), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => buf.copy("target"), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => Buffer.compare("a", Buffer.alloc(1)), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => Buffer.alloc(1).equals("abc"), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => Buffer.concat([1]), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => Buffer.concat([Buffer.alloc(1)], 3.5), { code: "ERR_OUT_OF_RANGE" });
+				assert.throws(() => new Buffer(42, "utf8"), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => Buffer.byteLength({}), { code: "ERR_INVALID_ARG_TYPE" });
+				assert.throws(() => buf.toString("nope"), { code: "ERR_UNKNOWN_ENCODING" });
+			`,
+		},
+		{
+			name: "write returns the byte count",
+			input: `
+				const writeBuf = Buffer.alloc(9);
+				assert.strictEqual(writeBuf.write("foo"), 3);
+				assert.strictEqual(writeBuf.write("foobar", 0, 1), 1);
+				assert.strictEqual(writeBuf.write("bar", "utf8"), 3);
+				assert.strictEqual(writeBuf.toString(), "bar\u0000\u0000\u0000\u0000\u0000\u0000");
+			`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := vm.RunString(ctx, tt.input)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestBufferObjectBounds(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New()

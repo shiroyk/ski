@@ -12,6 +12,9 @@ import (
 	"github.com/shiroyk/ski/js/types"
 )
 
+// throwMatch is match error message
+var throwMatch bool
+
 // Assert returns the assert implementation used by the module tests, it is a
 // callable object like the node `assert` module with the node methods, the go
 // side helpers (equal, contains, regexp and true) are attached as well.
@@ -250,11 +253,28 @@ func checkThrown(rt *sobek.Runtime, actual, expected sobek.Value, fail func(stri
 			fail(fmt.Sprintf(`The error message "%s" does not match %s`, actual.String(), object.String()),
 				actual, expected, "throws")
 		}
-		for _, key := range object.Keys() {
-			validated := errorProperty(actual, key)
-			if !DeepEqual(rt, validated, object.Get(key), true, make(map[*sobek.Object]map[*sobek.Object]bool)) {
-				fail(fmt.Sprintf(`The error "%s" property does not match`, key),
-					validated, object.Get(key), "throws")
+		if throwMatch {
+			for _, key := range object.Keys() {
+				validated := errorProperty(actual, key)
+				expected := object.Get(key)
+				// a regexp value matches the property, like node's assert.throws()
+				if regexp, ok := expected.(*sobek.Object); ok && rt.InstanceOf(regexp, rt.Get("RegExp").ToObject(rt)) {
+					test, ok := sobek.AssertFunction(regexp.Get("test"))
+					if ok {
+						result, err := test(regexp, rt.ToValue(validated.String()))
+						if err != nil {
+							js.Throw(rt, err)
+						}
+						if result.ToBoolean() {
+							continue
+						}
+					}
+				}
+				if !DeepEqual(rt, validated, expected, true, make(map[*sobek.Object]map[*sobek.Object]bool)) {
+					fail(fmt.Sprintf(`The error "%s" property does not match: %s != %s`,
+						key, InspectValue(validated), InspectValue(expected)),
+						validated, expected, "throws")
+				}
 			}
 		}
 		return

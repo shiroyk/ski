@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
 	"github.com/shiroyk/ski/js/types"
+	"github.com/shiroyk/ski/modules/common"
 )
 
 // Buffer used to represent a fixed-length sequence of bytes.
@@ -21,6 +21,7 @@ type Buffer struct{}
 
 func (b *Buffer) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	ctor := rt.ToValue(b.constructor).ToObject(rt)
+	_ = ctor.DefineDataProperty("name", rt.ToValue("Buffer"), sobek.FLAG_FALSE, sobek.FLAG_TRUE, sobek.FLAG_FALSE)
 	proto := b.prototype(rt)
 	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_TRUE, sobek.FLAG_TRUE, sobek.FLAG_FALSE)
 	_ = ctor.SetPrototype(rt.Get("Uint8Array").ToObject(rt))
@@ -28,6 +29,8 @@ func (b *Buffer) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 
 	// Static methods
 	_ = ctor.Set("alloc", b.alloc)
+	_ = ctor.Set("allocUnsafe", b.allocUnsafe)
+	_ = ctor.Set("allocUnsafeSlow", b.allocUnsafeSlow)
 	_ = ctor.Set("byteLength", b.byteLength)
 	_ = ctor.Set("compare", b.compare)
 	_ = ctor.Set("concat", b.concat)
@@ -41,6 +44,12 @@ func (b *Buffer) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 	p := rt.NewObject()
 	_ = p.SetPrototype(types.Prototype(rt, "Uint8Array"))
+
+	setAlias := func(name, alias string, method any) {
+		value := rt.ToValue(method)
+		_ = p.Set(name, value)
+		_ = p.Set(alias, value)
+	}
 
 	_ = p.Set("toString", b.toString)
 	_ = p.Set("toJSON", b.toJSON)
@@ -56,10 +65,8 @@ func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("readBigInt64BE", b.readBigInt64BE)
 	_ = p.Set("readBigInt64LE", b.readBigInt64LE)
 
-	_ = p.Set("readBigUInt64BE", b.readBigUInt64BE)
-	_ = p.Set("readBigUint64BE", b.readBigUInt64BE)
-	_ = p.Set("readBigUInt64LE", b.readBigUInt64LE)
-	_ = p.Set("readBigUint64LE", b.readBigUInt64LE)
+	setAlias("readBigUInt64BE", "readBigUint64BE", b.readBigUInt64BE)
+	setAlias("readBigUInt64LE", "readBigUint64LE", b.readBigUInt64LE)
 
 	_ = p.Set("readDoubleBE", b.readDoubleBE)
 	_ = p.Set("readDoubleLE", b.readDoubleLE)
@@ -75,30 +82,21 @@ func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("readIntBE", b.readIntBE)
 	_ = p.Set("readIntLE", b.readIntLE)
 
-	_ = p.Set("readUInt8", b.readUInt8)
-	_ = p.Set("readUint8", b.readUInt8)
-	_ = p.Set("readUInt16BE", b.readUInt16BE)
-	_ = p.Set("readUint16BE", b.readUInt16BE)
-	_ = p.Set("readUInt16LE", b.readUInt16LE)
-	_ = p.Set("readUint16LE", b.readUInt16LE)
-	_ = p.Set("readUInt32BE", b.readUInt32BE)
-	_ = p.Set("readUint32BE", b.readUInt32BE)
-	_ = p.Set("readUInt32LE", b.readUInt32LE)
-	_ = p.Set("readUint32LE", b.readUInt32LE)
+	setAlias("readUInt8", "readUint8", b.readUInt8)
+	setAlias("readUInt16BE", "readUint16BE", b.readUInt16BE)
+	setAlias("readUInt16LE", "readUint16LE", b.readUInt16LE)
+	setAlias("readUInt32BE", "readUint32BE", b.readUInt32BE)
+	setAlias("readUInt32LE", "readUint32LE", b.readUInt32LE)
 
-	_ = p.Set("readUIntBE", b.readUIntBE)
-	_ = p.Set("readUintBE", b.readUIntBE)
-	_ = p.Set("readUIntLE", b.readUIntLE)
-	_ = p.Set("readUintLE", b.readUIntLE)
+	setAlias("readUIntBE", "readUintBE", b.readUIntBE)
+	setAlias("readUIntLE", "readUintLE", b.readUIntLE)
 
 	// Write methods
 	_ = p.Set("writeBigInt64BE", b.writeBigInt64BE)
 	_ = p.Set("writeBigInt64LE", b.writeBigInt64LE)
 
-	_ = p.Set("writeBigUInt64BE", b.writeBigUInt64BE)
-	_ = p.Set("writeBigUint64BE", b.writeBigUInt64BE)
-	_ = p.Set("writeBigUInt64LE", b.writeBigUInt64LE)
-	_ = p.Set("writeBigUint64LE", b.writeBigUInt64LE)
+	setAlias("writeBigUInt64BE", "writeBigUint64BE", b.writeBigUInt64BE)
+	setAlias("writeBigUInt64LE", "writeBigUint64LE", b.writeBigUInt64LE)
 
 	_ = p.Set("writeDoubleBE", b.writeDoubleBE)
 	_ = p.Set("writeDoubleLE", b.writeDoubleLE)
@@ -114,21 +112,14 @@ func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 	_ = p.Set("writeIntBE", b.writeIntBE)
 	_ = p.Set("writeIntLE", b.writeIntLE)
 
-	_ = p.Set("writeUInt8", b.writeUInt8)
-	_ = p.Set("writeUint8", b.writeUInt8)
-	_ = p.Set("writeUInt16BE", b.writeUInt16BE)
-	_ = p.Set("writeUint16BE", b.writeUInt16BE)
-	_ = p.Set("writeUInt16LE", b.writeUInt16LE)
-	_ = p.Set("writeUint16LE", b.writeUInt16LE)
-	_ = p.Set("writeUInt32BE", b.writeUInt32BE)
-	_ = p.Set("writeUint32BE", b.writeUInt32BE)
-	_ = p.Set("writeUInt32LE", b.writeUInt32LE)
-	_ = p.Set("writeUint32LE", b.writeUInt32LE)
+	setAlias("writeUInt8", "writeUint8", b.writeUInt8)
+	setAlias("writeUInt16BE", "writeUint16BE", b.writeUInt16BE)
+	setAlias("writeUInt16LE", "writeUint16LE", b.writeUInt16LE)
+	setAlias("writeUInt32BE", "writeUint32BE", b.writeUInt32BE)
+	setAlias("writeUInt32LE", "writeUint32LE", b.writeUInt32LE)
 
-	_ = p.Set("writeUIntBE", b.writeUIntBE)
-	_ = p.Set("writeUintBE", b.writeUIntBE)
-	_ = p.Set("writeUIntLE", b.writeUIntLE)
-	_ = p.Set("writeUintLE", b.writeUIntLE)
+	setAlias("writeUIntBE", "writeUintBE", b.writeUIntBE)
+	setAlias("writeUIntLE", "writeUintLE", b.writeUIntLE)
 
 	return p
 }
@@ -136,7 +127,11 @@ func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 func (b *Buffer) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	arg := call.Argument(0)
 	if types.IsNumber(arg) {
-		return newBuffer(rt, allocBytes(rt, arg.ToInteger()))
+		if !sobek.IsUndefined(call.Argument(1)) {
+			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+				`The "string" argument must be of type string. Received type %s`, types.ValueType(arg)))
+		}
+		return newBuffer(rt, allocBytes(rt, bufferSize(rt, arg)))
 	} else {
 		return b.from(sobek.FunctionCall{This: call.This, Arguments: call.Arguments}, rt).(*sobek.Object)
 	}
@@ -170,12 +165,14 @@ func (*Buffer) from(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			}
 		}
 	}
-	panic(rt.NewTypeError("First argument must be a string, Buffer, ArrayBuffer or Array or Array-like object."))
+	panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+		`The first argument must be of type string or an instance of Buffer,`+
+			`ArrayBuffer, or Array or an Array-like Object. Received type %s`, types.ValueType(arg)))
 }
 
 // alloc a new Buffer of size bytes. If fill is undefined, the Buffer will be zero-filled.
 func (*Buffer) alloc(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	buf := newBuffer(rt, allocBytes(rt, call.Argument(0).ToInteger()))
+	buf := newBuffer(rt, allocBytes(rt, bufferSize(rt, call.Argument(0))))
 
 	if fill := call.Argument(1); !sobek.IsUndefined(fill) {
 		fn, ok := sobek.AssertFunction(buf.Get("fill"))
@@ -191,6 +188,18 @@ func (*Buffer) alloc(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return buf
 }
 
+// allocUnsafe allocates a new Buffer of size bytes, the ski implementation
+// always returns a zero-filled buffer.
+func (b *Buffer) allocUnsafe(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return b.alloc(call, rt)
+}
+
+// allocUnsafeSlow allocates a new Buffer of size bytes, the ski implementation
+// always returns a zero-filled buffer.
+func (b *Buffer) allocUnsafeSlow(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return b.alloc(call, rt)
+}
+
 // isBuffer returns true if the value is a buffer
 func (*Buffer) isBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	return rt.ToValue(IsBuffer(rt, call.Argument(0)))
@@ -202,7 +211,12 @@ func (*Buffer) byteLength(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	if data, ok := GetBuffer(rt, value); ok {
 		return rt.ToValue(len(data))
 	}
-	return rt.ToValue(len(decode(rt, value.String(), call.Argument(1))))
+	if types.IsString(value) {
+		return rt.ToValue(len(decode(rt, value.String(), call.Argument(1))))
+	}
+	panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+		`The "string" argument must be of type string or an instance of Buffer or ArrayBuffer.`+
+			` Received type %s`, types.ValueType(value)))
 }
 
 // concat returns a new Buffer which is the result of concatenating all the Buffer instances in the list together.
@@ -210,18 +224,21 @@ func (*Buffer) concat(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	list := call.Argument(0)
 
 	obj, ok := list.(*sobek.Object)
-	if !ok {
-		panic(rt.NewTypeError(`The "list" argument must be an instance of Array.`))
+	// node requires an array, a Buffer is array-like but is not a valid list
+	if !ok || obj.ClassName() != "Array" {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "list" argument must be an instance of Array. Received type %s`, types.ValueType(list)))
 	}
 	l := obj.Get("length")
-	if l == nil {
-		panic(rt.NewTypeError(`The "list" argument must be an instance of Array.`))
-	}
 
 	length := int(l.ToInteger())
+	if length == 0 {
+		// node returns an empty buffer for an empty list
+		return newBuffer(rt, nil)
+	}
 
 	data := new(bytes.Buffer)
-	for i := 0; i < length; i++ {
+	for i := range length {
 		item := obj.Get(strconv.Itoa(i))
 		if item != nil {
 			if buf, ok := bytesOf(rt, item); ok {
@@ -231,18 +248,28 @@ func (*Buffer) concat(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 			} else if types.IsUint8Array(rt, item) {
 				buf, ok := item.Export().([]byte)
 				if !ok {
-					panic(rt.NewTypeError(`The "list[%s]" argument must be an instance of Buffer or Uint8Array`, i))
+					panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+						`The "list[%d]" argument must be an instance of Buffer or Uint8Array. Received type %s`, i, types.ValueType(item)))
 				}
 				data.Write(buf)
 				continue
 			}
 		}
 
-		panic(rt.NewTypeError(`The "list[%s]" argument must be an instance of Buffer or Uint8Array`, i))
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "list[%d]" argument must be an instance of Buffer or Uint8Array. Received type %s`, i, types.ValueType(item)))
 	}
 
 	totalLength := int64(data.Len())
 	if v := call.Argument(1); !sobek.IsUndefined(v) {
+		if !types.IsNumber(v) {
+			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+				`The "length" argument must be of type number. Received type %s`, types.ValueType(v)))
+		}
+		if number := v.ToFloat(); math.IsNaN(number) || number != math.Trunc(number) {
+			panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+				`The value of "length" is out of range. It must be an integer. Received %s`, v.String()))
+		}
 		totalLength = v.ToInteger()
 		if totalLength < 0 || totalLength > maxLength {
 			throwRangeError(rt, "length", 0, maxLength, totalLength)
@@ -277,9 +304,11 @@ func (*Buffer) toJSON(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // equals returns true if both buf and otherBuffer have exactly the same bytes
 func (*Buffer) equals(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	buf1 := toBuffer(rt, call.This)
-	buf2, ok := bytesOf(rt, call.Argument(0))
+	buf2, ok := viewBytes(rt, call.Argument(0))
 	if !ok {
-		return rt.ToValue(false)
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "otherBuffer" argument must be an instance of Buffer or Uint8Array. Received type %s`,
+			types.ValueType(call.Argument(0))))
 	}
 
 	return rt.ToValue(bytes.Equal(buf1, buf2))
@@ -288,32 +317,48 @@ func (*Buffer) equals(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // compare compares buf with target and returns a number indicating whether buf comes before, after,
 // or is the same as target in sort order
 func (*Buffer) compare(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	b1, b2 := call.Argument(0), call.Argument(1)
+	// node accepts a Uint8Array as the target of the prototype method
 	if IsBuffer(rt, call.This) {
-		b1, b2 = call.This, call.Argument(0)
+		target, ok := viewBytes(rt, call.Argument(0))
+		if !ok {
+			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+				`The "target" argument must be an instance of Buffer or Uint8Array. Received type %s`,
+				types.ValueType(call.Argument(0))))
+		}
+		return rt.ToValue(bytes.Compare(toBuffer(rt, call.This), target))
 	}
-	if !IsBuffer(rt, b1) || !IsBuffer(rt, b2) {
-		panic(rt.NewTypeError("Argument must be a Buffer"))
-	}
-	bytes1, ok := bytesOf(rt, b1)
+
+	bytes1, ok := bytesOf(rt, call.Argument(0))
 	if !ok {
-		panic(rt.NewTypeError("Argument must be a Buffer"))
+		bytes1, ok = viewBytes(rt, call.Argument(0))
 	}
-	bytes2, ok := bytesOf(rt, b2)
 	if !ok {
-		panic(rt.NewTypeError("Argument must be a Buffer"))
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "buf1" argument must be an instance of Buffer or Uint8Array. Received type %s`,
+			types.ValueType(call.Argument(0))))
+	}
+	bytes2, ok := viewBytes(rt, call.Argument(1))
+	if !ok {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "buf2" argument must be an instance of Buffer or Uint8Array. Received type %s`,
+			types.ValueType(call.Argument(1))))
 	}
 	return rt.ToValue(bytes.Compare(bytes1, bytes2))
 }
 
 // copy copies data from a region of buf to a region in target, even if the target memory region overlaps with buf.
 func (*Buffer) copy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toBuffer(rt, call.This)
-	var target buffer
-	if v, ok := bytesOf(rt, call.Argument(0)); ok {
-		target = v
-	} else {
-		panic(rt.NewTypeError("Argument must be a Buffer"))
+	// node accepts a Uint8Array as the source and as the target
+	this, ok := viewBytes(rt, call.This)
+	if !ok {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`Value of "this" must be of type Buffer or Uint8Array. Received type %s`, types.ValueType(call.This)))
+	}
+	target, ok := viewBytes(rt, call.Argument(0))
+	if !ok {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "target" argument must be an instance of Buffer or Uint8Array. Received type %s`,
+			types.ValueType(call.Argument(0))))
 	}
 
 	targetStart := 0
@@ -330,32 +375,71 @@ func (*Buffer) copy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		sourceEnd = int(v.ToInteger())
 	}
 
-	if sourceStart < 0 || sourceEnd < sourceStart || sourceEnd > len(this) {
+	if sourceStart < 0 || sourceStart > len(this) {
 		throwRangeError(rt, "sourceStart", 0, len(this), sourceStart)
 	}
-	if targetStart < 0 || targetStart > len(target) {
-		throwRangeError(rt, "targetStart", 0, len(target), targetStart)
+	// node clamps a sourceEnd that is out of the source bounds
+	if sourceEnd < 0 {
+		panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+			`The value of "sourceEnd" is out of range. It must be >= 0. Received %d`, sourceEnd))
+	}
+	if sourceEnd > len(this) {
+		sourceEnd = len(this)
+	}
+	if sourceEnd < sourceStart {
+		sourceEnd = sourceStart
+	}
+	if targetStart < 0 {
+		panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+			`The value of "targetStart" is out of range. It must be >= 0. Received %d`, targetStart))
 	}
 
 	data := make([]byte, sourceEnd-sourceStart)
-	this.readAt(data, int64(sourceStart))
-	target.writeAt(data, int64(targetStart))
+	buffer(this).readAt(data, int64(sourceStart))
 
-	return rt.ToValue(len(data))
+	// node returns the number of bytes copied
+	return rt.ToValue(copy(target[targetStart:], data))
 }
 
 // write writes string to buf at offset according to the character encoding in encoding.
 func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	offset := call.Argument(1).ToInteger()
+	offsetArg, lengthArg, encodingArg := call.Argument(1), call.Argument(2), call.Argument(3)
+	// node treats a string in the offset or length position as the encoding
+	switch {
+	case types.IsString(offsetArg):
+		encodingArg, offsetArg, lengthArg = offsetArg, rt.ToValue(0), sobek.Undefined()
+	case types.IsString(lengthArg):
+		encodingArg, lengthArg = lengthArg, sobek.Undefined()
+	}
+
+	argument := offsetArg
+	if value := argument.ToFloat(); !sobek.IsUndefined(argument) &&
+		(!types.IsNumber(argument) || math.IsNaN(value) || value != math.Trunc(value)) {
+		if !types.IsNumber(argument) {
+			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+				`The "offset" argument must be of type number. Received type %s`, types.ValueType(argument)))
+		}
+		panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+			`The value of "offset" is out of range. It must be an integer. Received %s`, argument.String()))
+	}
+	offset := argument.ToInteger()
 	if offset < 0 || offset > int64(len(this)) {
 		throwRangeError(rt, "offset", 0, len(this), offset)
 	}
 
-	buf := decode(rt, call.Argument(0).String(), call.Argument(3))
+	buf := decode(rt, call.Argument(0).String(), encodingArg)
 	length := int64(len(this)) - offset
 
-	if v := call.Argument(2); !sobek.IsUndefined(v) {
+	if v := lengthArg; !sobek.IsUndefined(v) {
+		if !types.IsNumber(v) {
+			panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+				`The "length" argument must be of type number. Received type %s`, types.ValueType(v)))
+		}
+		if number := v.ToFloat(); math.IsNaN(number) || number != math.Trunc(number) {
+			panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+				`The value of "length" is out of range. It must be an integer. Received %s`, v.String()))
+		}
 		length = v.ToInteger()
 		if length < 0 || length > int64(len(buf)) {
 			throwRangeError(rt, "length", 0, len(buf), length)
@@ -365,9 +449,10 @@ func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if length > int64(len(buf)) {
 		length = int64(len(buf))
 	}
-	this.writeAt(buf[:length], offset)
+	written := copy(this[offset:], buf[:length])
 
-	return call.This
+	// node returns the number of bytes written
+	return rt.ToValue(written)
 }
 
 // fill fills buf with the specified value.
@@ -520,8 +605,8 @@ func (*Buffer) readInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 // readIntBE reads an int64 value in big-endian byte order
 func (*Buffer) readIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	offset := this.offset(rt, call.Argument(0), 1)
 	byteLength := getByteLength(rt, call.Argument(1))
+	offset := this.offsetStrict(rt, call.Argument(0), byteLength)
 
 	data := make([]byte, byteLength)
 	this.readAt(data, offset)
@@ -538,8 +623,8 @@ func (*Buffer) readIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 // readIntLE reads an int64 value in little-endian byte order
 func (*Buffer) readIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	offset := this.offset(rt, call.Argument(0), 1)
 	byteLength := getByteLength(rt, call.Argument(1))
+	offset := this.offsetStrict(rt, call.Argument(0), byteLength)
 
 	data := make([]byte, byteLength)
 	this.readAt(data, offset)
@@ -591,8 +676,8 @@ func (*Buffer) readUInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 // readUIntBE reads an uint64 value in big-endian byte order
 func (*Buffer) readUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	offset := this.offset(rt, call.Argument(0), 1)
 	byteLength := getByteLength(rt, call.Argument(1))
+	offset := this.offsetStrict(rt, call.Argument(0), byteLength)
 
 	data := make([]byte, byteLength)
 	this.readAt(data, offset)
@@ -608,8 +693,8 @@ func (*Buffer) readUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 // readUIntLE reads an uint64 value in little-endian byte order
 func (*Buffer) readUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	offset := this.offset(rt, call.Argument(0), 1)
 	byteLength := getByteLength(rt, call.Argument(1))
+	offset := this.offsetStrict(rt, call.Argument(0), byteLength)
 
 	data := make([]byte, byteLength)
 	this.readAt(data, offset)
@@ -662,12 +747,29 @@ func (*Buffer) writeBigUInt64LE(call sobek.FunctionCall, rt *sobek.Runtime) sobe
 	return rt.ToValue(result)
 }
 
+// float64Bits returns the IEEE 754 bits of the value, node writes the platform
+// independent quiet NaN while go uses a payload bit.
+func float64Bits(value float64) uint64 {
+	if math.IsNaN(value) {
+		return 0x7ff8000000000000
+	}
+	return math.Float64bits(value)
+}
+
+// float32Bits returns the IEEE 754 bits of the value.
+func float32Bits(value float32) uint32 {
+	if math.IsNaN(float64(value)) {
+		return 0x7fc00000
+	}
+	return math.Float32bits(value)
+}
+
 // writeDoubleBE writes a float64 value in big-endian byte order
 func (*Buffer) writeDoubleBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
 	data := make([]byte, 8)
-	binary.BigEndian.PutUint64(data, math.Float64bits(value))
+	binary.BigEndian.PutUint64(data, float64Bits(value))
 	result := this.writeOff(rt, call.Argument(1), 8, data)
 	return rt.ToValue(result)
 }
@@ -677,7 +779,7 @@ func (*Buffer) writeDoubleLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.V
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
 	data := make([]byte, 8)
-	binary.LittleEndian.PutUint64(data, math.Float64bits(value))
+	binary.LittleEndian.PutUint64(data, float64Bits(value))
 	result := this.writeOff(rt, call.Argument(1), 8, data)
 	return rt.ToValue(result)
 }
@@ -687,7 +789,7 @@ func (*Buffer) writeFloatBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
 	data := make([]byte, 4)
-	binary.BigEndian.PutUint32(data, math.Float32bits(float32(value)))
+	binary.BigEndian.PutUint32(data, float32Bits(float32(value)))
 	result := this.writeOff(rt, call.Argument(1), 4, data)
 	return rt.ToValue(result)
 }
@@ -697,7 +799,7 @@ func (*Buffer) writeFloatLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Va
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToFloat()
 	data := make([]byte, 4)
-	binary.LittleEndian.PutUint32(data, math.Float32bits(float32(value)))
+	binary.LittleEndian.PutUint32(data, float32Bits(float32(value)))
 	result := this.writeOff(rt, call.Argument(1), 4, data)
 	return rt.ToValue(result)
 }
@@ -754,10 +856,10 @@ func (*Buffer) writeInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value
 func (*Buffer) writeIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToInteger()
-	offset := this.offset(rt, call.Argument(1), 1)
 	byteLength := getByteLength(rt, call.Argument(2))
+	offset := this.offsetStrict(rt, call.Argument(1), byteLength)
 
-	checkInt(rt, value, byteLength)
+	checkIntBytes(rt, value, byteLength)
 	data := make([]byte, byteLength)
 
 	if value < 0 {
@@ -780,10 +882,10 @@ func (*Buffer) writeIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 func (*Buffer) writeIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
 	value := call.Argument(0).ToInteger()
-	offset := this.offset(rt, call.Argument(1), 1)
 	byteLength := getByteLength(rt, call.Argument(2))
+	offset := this.offsetStrict(rt, call.Argument(1), byteLength)
 
-	checkInt(rt, value, byteLength)
+	checkIntBytes(rt, value, byteLength)
 	data := make([]byte, byteLength)
 
 	if value < 0 {
@@ -853,11 +955,12 @@ func (*Buffer) writeUInt8(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 // writeUIntBE writes an unsigned integer in big-endian byte order
 func (*Buffer) writeUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	value := uint64(call.Argument(0).ToInteger())
-	offset := this.offset(rt, call.Argument(1), 1)
+	number := call.Argument(0).ToInteger()
 	byteLength := getByteLength(rt, call.Argument(2))
+	offset := this.offsetStrict(rt, call.Argument(1), byteLength)
 
-	checkUint(rt, value, byteLength)
+	checkUintBytes(rt, number, byteLength)
+	value := uint64(number)
 	data := make([]byte, byteLength)
 
 	for i := byteLength - 1; i >= 0; i-- {
@@ -873,11 +976,12 @@ func (*Buffer) writeUIntBE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 // writeUIntLE writes an unsigned integer in little-endian byte order
 func (*Buffer) writeUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	value := uint64(call.Argument(0).ToInteger())
-	offset := this.offset(rt, call.Argument(1), 1)
+	number := call.Argument(0).ToInteger()
 	byteLength := getByteLength(rt, call.Argument(2))
+	offset := this.offsetStrict(rt, call.Argument(1), byteLength)
 
-	checkUint(rt, value, byteLength)
+	checkUintBytes(rt, number, byteLength)
+	value := uint64(number)
 	data := make([]byte, byteLength)
 
 	for i := range byteLength {
@@ -893,11 +997,25 @@ func (*Buffer) writeUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 // maxLength is buffer.kMaxLength, the maximum length of a Buffer.
 const maxLength = int64(1<<53 - 1)
 
+// bufferSize returns the size argument of the allocation methods, it follows
+// the node validation: the value must be a non-negative safe integer.
+func bufferSize(rt *sobek.Runtime, value sobek.Value) int64 {
+	if !types.IsNumber(value) {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "size" argument must be of type number. Received type %s`, types.ValueType(value)))
+	}
+	size := value.ToFloat()
+	if math.IsNaN(size) || size != math.Trunc(size) || size < 0 || size > float64(maxLength) {
+		throwRangeError(rt, "size", 0, maxLength, size)
+	}
+	return int64(size)
+}
+
 // allocBytes allocates the storage of a buffer, it throws a RangeError when the
 // size is out of range or the allocation fails.
 func allocBytes(rt *sobek.Runtime, size int64) (data []byte) {
 	if size < 0 {
-		panic(rt.NewTypeError("Buffer size must be a non-negative integer"))
+		throwRangeError(rt, "size", 0, maxLength, size)
 	}
 	if size > maxLength {
 		throwRangeError(rt, "size", 0, maxLength, size)
@@ -915,6 +1033,16 @@ func bytesOf(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
 	return data, ok
 }
 
+// viewBytes returns the underlying bytes of a Buffer or a Uint8Array, node
+// accepts a Uint8Array where a Buffer argument is expected.
+func viewBytes(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
+	if data, ok := bytesOf(rt, value); ok {
+		return data, true
+	}
+	// node accepts any ArrayBufferView, e.g. a Uint16Array target of copy()
+	return GetBuffer(rt, value)
+}
+
 // newBuffer creates a new buffer with the given data
 func newBuffer(rt *sobek.Runtime, data []byte) *sobek.Object {
 	buf := types.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data)))
@@ -927,22 +1055,25 @@ func toBuffer(rt *sobek.Runtime, value sobek.Value) buffer {
 	if data, ok := bytesOf(rt, value); ok {
 		return data
 	}
-	panic(rt.NewTypeError(`Value of "this" must be of type Buffer`))
+	panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+		`Value of "this" must be of type Buffer. Received type %s`, types.ValueType(value)))
 }
 
 // getByteLength returns the byte length
 func getByteLength(rt *sobek.Runtime, v sobek.Value) int64 {
-	var length int64
-	if types.IsNumber(v) {
-		length = v.ToInteger()
-	} else {
-		panic(rt.NewTypeError(`The value of "byteLength" must be of type number`))
+	if !types.IsNumber(v) {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "byteLength" argument must be of type number. Received type %s`, types.ValueType(v)))
 	}
-
+	length := v.ToFloat()
+	if math.IsNaN(length) || length != math.Trunc(length) {
+		panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+			`The value of "byteLength" is out of range. It must be an integer. Received %s`, v.String()))
+	}
 	if length < 1 || length > 6 {
-		throwRangeError(rt, "byteLength", 1, 6, length)
+		throwRangeError(rt, "byteLength", 1, 6, v.String())
 	}
-	return length
+	return int64(length)
 }
 
 // decode decodes a string into a byte array
@@ -955,11 +1086,7 @@ func decode(rt *sobek.Runtime, src string, enc sobek.Value) []byte {
 	case "utf8", "utf-8":
 		return []byte(src)
 	case "hex":
-		decoded, err := hex.DecodeString(src)
-		if err != nil {
-			panic(rt.NewTypeError("Invalid hex string"))
-		}
-		return decoded
+		return decodeHex(src)
 	case "base64":
 		decoded, err := base64.StdEncoding.DecodeString(src)
 		if err != nil {
@@ -967,8 +1094,42 @@ func decode(rt *sobek.Runtime, src string, enc sobek.Value) []byte {
 		}
 		return decoded
 	default:
-		panic(rt.NewTypeError(fmt.Sprintf("Unknown encoding: %s", encoding)))
+		panic(common.NewTypeErrorf(rt, common.ErrUnknownEncoding, "Unknown encoding: %s", encoding))
 	}
+}
+
+// decodeHex decodes the hex string like node does, the decoding stops at the
+// first pair that is not a valid hexadecimal, an odd trailing nibble is dropped.
+func decodeHex(src string) []byte {
+	if len(src)%2 == 1 {
+		src = src[:len(src)-1]
+	}
+	decoded := make([]byte, 0, len(src)/2)
+	for i := 0; i+1 < len(src); i += 2 {
+		high, ok := hexValue(src[i])
+		if !ok {
+			break
+		}
+		low, ok := hexValue(src[i+1])
+		if !ok {
+			break
+		}
+		decoded = append(decoded, high<<4|low)
+	}
+	return decoded
+}
+
+// hexValue returns the value of a hexadecimal digit.
+func hexValue(char byte) (byte, bool) {
+	switch {
+	case char >= '0' && char <= '9':
+		return char - '0', true
+	case char >= 'a' && char <= 'f':
+		return char - 'a' + 10, true
+	case char >= 'A' && char <= 'F':
+		return char - 'A' + 10, true
+	}
+	return 0, false
 }
 
 // encode encodes a byte array into a string
@@ -985,7 +1146,7 @@ func encode(rt *sobek.Runtime, buf []byte, enc sobek.Value) string {
 	case "base64":
 		return base64.StdEncoding.EncodeToString(buf)
 	default:
-		panic(rt.NewTypeError(fmt.Sprintf("Unknown encoding: %s", encoding)))
+		panic(common.NewTypeErrorf(rt, common.ErrUnknownEncoding, "Unknown encoding: %s", encoding))
 	}
 }
 
@@ -1004,8 +1165,8 @@ func toBigInt(rt *sobek.Runtime, value sobek.Value) uint64 {
 	if v.Cmp(maxBigint) <= 0 && v.Cmp(minBigint) >= 0 {
 		return uint64(v.Int64())
 	}
-	msg := fmt.Sprintf(`The value of "value" is out of range. It must be >= -(2n ** 63n) and < 2n ** 63. Received %sn`, v.String())
-	panic(types.New(rt, "RangeError", rt.ToValue(msg)))
+	panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+		`The value of "value" is out of range. It must be >= -(2n ** 63n) and < 2n ** 63. Received %sn`, v))
 }
 
 // toBigUint converts a BigInt to an uint
@@ -1017,8 +1178,8 @@ func toBigUint(rt *sobek.Runtime, value sobek.Value) uint64 {
 	if v.Cmp(maxBigUint) <= 0 && v.Cmp(big.NewInt(0)) >= 0 {
 		return v.Uint64()
 	}
-	msg := fmt.Sprintf(`The value of "value" is out of range. It must be >= 0n and < 2n ** 64n. Received %sn`, v.String())
-	panic(types.New(rt, "RangeError", rt.ToValue(msg)))
+	panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+		`The value of "value" is out of range. It must be >= 0n and < 2n ** 64n. Received %sn`, v))
 }
 
 type integer interface {
@@ -1054,67 +1215,73 @@ func toInteger[N integer](rt *sobek.Runtime, value sobek.Value) (ret N) {
 	return N(v)
 }
 
-// checkInt checks the value is a valid int between byteLength
-func checkInt(rt *sobek.Runtime, v, byteLength int64) {
-	var minInt, maxInt int64
-	switch byteLength {
-	case 1:
-		minInt, maxInt = -0x80, 0x7f
-	case 2:
-		minInt, maxInt = -0x8000, 0x7fff
-	case 3:
-		minInt, maxInt = -0x800000, 0x7fffff
-	case 4:
-		minInt, maxInt = -0x80000000, 0x7fffffff
-	case 5:
-		minInt, maxInt = -0x8000000000, 0x7fffffffff
-	case 6:
-		minInt, maxInt = -0x800000000000, 0x7fffffffffff
-	}
-	if v <= maxInt && v >= minInt {
+// checkIntBytes checks the value of the write methods that take a byteLength,
+// node prints the range as a power of two when the byteLength is larger than 4.
+func checkIntBytes(rt *sobek.Runtime, value, byteLength int64) {
+	bits := byteLength*8 - 1
+	min, max := -(int64(1) << bits), int64(1)<<bits-1
+	if value >= min && value <= max {
 		return
 	}
-	throwRangeError(rt, "value", minInt, maxInt, v)
+	if bits > 32 {
+		panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+			`The value of "value" is out of range. It must be >= -(2 ** %d) and < 2 ** %d. Received %d`,
+			bits, bits, value))
+	}
+	throwRangeError(rt, "value", min, max, value)
 }
 
-// checkUint checks the value is a valid uint between byteLength
-func checkUint(rt *sobek.Runtime, v uint64, byteLength int64) {
-	var maxUint uint64
-	switch byteLength {
-	case 1:
-		maxUint = 0xff
-	case 2:
-		maxUint = 0xffff
-	case 3:
-		maxUint = 0xffffff
-	case 4:
-		maxUint = 0xffffffff
-	case 5:
-		maxUint = 0xffffffffff
-	case 6:
-		maxUint = 0xffffffffffff
-	}
-	if v <= maxUint && v >= 0 {
+// checkUintBytes checks the value of the unsigned write methods that take a
+// byteLength, node prints the range as a power of two when the byteLength is
+// larger than 4.
+func checkUintBytes(rt *sobek.Runtime, value, byteLength int64) {
+	bits := byteLength * 8
+	max := int64(1)<<bits - 1
+	if value >= 0 && value <= max {
 		return
 	}
-	throwRangeError(rt, "value", 0, maxUint, v)
+	if bits > 32 {
+		panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+			`The value of "value" is out of range. It must be >= 0 and < 2 ** %d. Received %d`,
+			bits, value))
+	}
+	throwRangeError(rt, "value", 0, max, value)
 }
 
 type buffer []byte
 
 // offset returns the offset
 func (b buffer) offset(rt *sobek.Runtime, v sobek.Value, numBytes int64) int64 {
-	var offset int64
-	if types.IsNumber(v) {
-		offset = v.ToInteger()
-	} else {
-		panic(rt.NewTypeError(`The value of "offset" must be of type number`))
+	if sobek.IsUndefined(v) {
+		v = rt.ToValue(0)
 	}
-
-	if offset < 0 || offset+numBytes > int64(len(b)) {
-		throwRangeError(rt, "offset", 0, int64(len(b)), offset)
+	if !types.IsNumber(v) {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "offset" argument must be of type number. Received type %s`, types.ValueType(v)))
+	}
+	value := v.ToFloat()
+	offset := int64(value)
+	switch {
+	case math.IsNaN(value) || value != math.Trunc(value):
+		panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+			`The value of "offset" is out of range. It must be an integer. Received %s`, v.String()))
+	case math.IsInf(value, 0):
+		throwBoundsError(rt, "offset", v.String(), int64(len(b))-numBytes)
+	}
+	if offset < 0 || offset > int64(len(b))-numBytes {
+		throwBoundsError(rt, "offset", offset, int64(len(b))-numBytes)
 	}
 	return offset
+}
+
+// offsetStrict returns the offset of the methods that require it, the byteLength
+// methods of node do not default an undefined offset to zero.
+func (b buffer) offsetStrict(rt *sobek.Runtime, v sobek.Value, numBytes int64) int64 {
+	if sobek.IsUndefined(v) {
+		panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
+			`The "offset" argument must be of type number. Received undefined`))
+	}
+	return b.offset(rt, v, numBytes)
 }
 
 // readOff reads data from the buffer with offset, numBytes
@@ -1162,6 +1329,17 @@ func (b buffer) fill(rt *sobek.Runtime, offset, end int, buf []byte) {
 
 // throwRangeError throws a RangeError
 func throwRangeError(rt *sobek.Runtime, field string, min, max, received any) {
-	msg := fmt.Sprintf(`The value of "%s" is out of range. It must be >= %d && <= %d. Received %d`, field, min, max, received)
-	panic(types.New(rt, "RangeError", rt.ToValue(msg)))
+	panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+		`The value of "%s" is out of range. It must be >= %v && <= %v. Received %v`, field, min, max, received))
+}
+
+// throwBoundsError throws the node bounds error of an offset, the error code is
+// ERR_BUFFER_OUT_OF_BOUNDS when the requested size does not fit at all.
+func throwBoundsError(rt *sobek.Runtime, field string, offset any, max int64) {
+	if max < 0 {
+		panic(common.NewRangeErrorf(rt, common.ErrBufferOutOfBounds,
+			"Attempt to access memory outside buffer bounds"))
+	}
+	panic(common.NewRangeErrorf(rt, common.ErrOutOfRange,
+		`The value of "%s" is out of range. It must be >= 0 and <= %d. Received %v`, field, max, offset))
 }

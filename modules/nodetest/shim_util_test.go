@@ -2,6 +2,7 @@ package nodetest
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 
@@ -106,21 +107,22 @@ func inspectValue(rt *sobek.Runtime, value sobek.Value, depth int, seen map[*sob
 }
 
 func inspectBuffer(rt *sobek.Runtime, value *sobek.Object, depth int, seen map[*sobek.Object]bool) string {
-	max := int64(50)
+	length := value.Get("length").ToInteger()
+	limit := length
 	if ctor, ok := rt.Get("Buffer").(*sobek.Object); ok {
 		if defined := ctor.Get("INSPECT_MAX_BYTES"); defined != nil && !sobek.IsUndefined(defined) {
-			max = defined.ToInteger()
+			if max := defined.ToFloat(); !math.IsNaN(max) && max < float64(limit) {
+				limit = int64(max)
+			}
 		}
 	}
-	length := value.Get("length").ToInteger()
-	limit := min(length, max)
 	bytes := make([]string, 0, limit)
 	for i := range limit {
 		bytes = append(bytes, fmt.Sprintf("%02x", value.Get(fmt.Sprint(i)).ToInteger()&0xff))
 	}
 	body := strings.Join(bytes, " ")
-	if length > max {
-		more := length - max
+	if length > limit {
+		more := length - limit
 		noun := "bytes"
 		if more == 1 {
 			noun = "byte"

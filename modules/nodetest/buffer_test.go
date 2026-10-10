@@ -37,68 +37,37 @@ var bufferSkipTests = map[string]string{
 var bufferKnownFailures = map[string]string{
 	// numeric encodings
 	"test-buffer-ascii.js":          "ascii encoding is not implemented",
+	"test-buffer-bytelength.js":     "ascii encoding is not implemented",
 	"test-buffer-slice.js":          "utf16le encoding is not implemented",
 	"test-buffer-tostring-range.js": "ascii encoding is not implemented",
 	"test-buffer-tostring.js":       "encoding names are case insensitive in node, UTF8 is not supported",
-
-	// node write() returns the number of bytes written, the ski write() returns
-	// the buffer itself
-	"test-buffer-write-utf8-two-byte.js": "node write() returns the number of bytes written",
+	"test-buffer-write.js":          "the ascii, ucs2 and utf16le encodings are not implemented",
 
 	// static methods
-	"test-buffer-bigint64.js":                  "Buffer.allocUnsafe is not implemented",
-	"test-buffer-copy.js":                      "Buffer.allocUnsafe is not implemented",
-	"test-buffer-failed-alloc-typed-arrays.js": "Buffer.allocUnsafe and Buffer.allocUnsafeSlow are not implemented",
-	"test-buffer-inspect.js":                   "Buffer.allocUnsafe and Buffer.allocUnsafeSlow are not implemented",
-	"test-buffer-readdouble.js":                "Buffer.allocUnsafe is not implemented",
-	"test-buffer-safe-unsafe.js":               "Buffer.allocUnsafe is not implemented",
-	"test-buffer-slow.js":                      "Buffer.allocUnsafeSlow is not implemented",
-	"test-buffer-writedouble.js":               "Buffer.allocUnsafe is not implemented",
-	"test-buffer-writefloat.js":                "Buffer.allocUnsafe is not implemented",
-	"test-buffer-zero-fill-cli.js":             "Buffer.allocUnsafe is not implemented",
-	"test-buffer-isencoding.js":                "Buffer.isEncoding is not implemented",
-	"test-buffer-isascii.js":                   "Buffer.isAscii is not implemented",
-	"test-buffer-isutf8.js":                    "Buffer.isUtf8 is not implemented",
-	"test-buffer-swap.js":                      "Buffer.prototype.swap16, swap32 and swap64 are not implemented",
-	"test-buffer-parent-property.js":           "Buffer.prototype.parent is not implemented",
-	"test-buffer-arraybuffer.js":               "Buffer.prototype.parent is not implemented",
+	"test-buffer-isencoding.js":      "Buffer.isEncoding is not implemented",
+	"test-buffer-isascii.js":         "Buffer.isAscii is not implemented",
+	"test-buffer-isutf8.js":          "Buffer.isUtf8 is not implemented",
+	"test-buffer-swap.js":            "Buffer.prototype.swap16, swap32 and swap64 are not implemented",
+	"test-buffer-parent-property.js": "Buffer.prototype.parent is not implemented",
+	"test-buffer-arraybuffer.js":     "Buffer.prototype.parent is not implemented",
 
-	// node error objects carry a code, the ski errors do not
-	"test-buffer-alloc.js":                  "node error codes and messages are not implemented",
-	"test-buffer-bytelength.js":             "node error codes and messages are not implemented",
-	"test-buffer-concat.js":                 "node error codes and messages are not implemented",
-	"test-buffer-compare-offset.js":         "node error codes and messages are not implemented",
-	"test-buffer-new.js":                    "node error codes and messages are not implemented",
-	"test-buffer-no-negative-allocation.js": "node error codes and messages are not implemented",
-	"test-buffer-read.js":                   "node error codes and messages are not implemented",
-	"test-buffer-readfloat.js":              "node error codes and messages are not implemented",
-	"test-buffer-readint.js":                "node error codes and messages are not implemented",
-	"test-buffer-readuint.js":               "node error codes and messages are not implemented",
-	"test-buffer-set-inspect-max-bytes.js":  "node error codes and messages are not implemented",
-	"test-buffer-tostring-rangeerror.js":    "node error codes and messages are not implemented",
-	"test-buffer-writeuint.js":              "node error codes and messages are not implemented",
-
-	// arguments
-	"test-buffer-compare.js":  "node accepts Uint8Array arguments, the ski Buffer does not",
-	"test-buffer-equals.js":   "node accepts Uint8Array arguments, the ski Buffer does not",
-	"test-buffer-includes.js": "node accepts string and Uint8Array arguments, the ski Buffer does not",
-	"test-buffer-indexof.js":  "node accepts string and Uint8Array arguments, the ski Buffer does not",
-	"test-buffer-writeint.js": "node accepts Uint8Array arguments, the ski Buffer does not",
-
-	// conversions and generic methods
+	// arguments and conversions
+	"test-buffer-compare-offset.js":  "Buffer.prototype.compare does not support the offset arguments",
+	"test-buffer-includes.js":        "node accepts string and Uint8Array arguments, the ski Buffer does not",
+	"test-buffer-indexof.js":         "node accepts string and Uint8Array arguments, the ski Buffer does not",
 	"test-buffer-from.js":            "Buffer.from does not convert String objects",
 	"test-buffer-tojson.js":          `Buffer.from does not support { type: "Buffer", data: [] } objects`,
-	"test-buffer-badhex.js":          "Buffer.prototype.write hex parsing differs from node",
 	"test-buffer-generic-methods.js": "Buffer generic methods on Uint8Array and ArrayBuffer differ from node",
 
 	// deprecations
 	"test-buffer-constructor-deprecation-error.js": "node deprecation warnings are not implemented",
 	"test-buffer-pending-deprecation.js":           "node deprecation warnings are not implemented",
 
-	// node error codes are not implemented, the write test also needs the
-	// ascii, ucs2 and utf16le encodings
-	"test-buffer-write.js":           "node error codes, the write() return value and the ascii, ucs2 and utf16le encodings are not implemented",
-	"test-buffer-over-max-length.js": "node error codes and Buffer.allocUnsafe are not implemented",
+	// runtime features
+	"test-buffer-alloc.js":               "the engine typed array length error message differs",
+	"test-buffer-copy.js":                "requires SharedArrayBuffer",
+	"test-buffer-tostring-rangeerror.js": "requires the V8 string length limit",
+	"test-buffer-write-utf8-two-byte.js": "Buffer.prototype.subarray returns a Uint8Array",
 }
 
 // TestNodeBuffer runs the upstream node buffer test suite.
