@@ -35,27 +35,20 @@ var bufferSkipTests = map[string]string{
 // reason so the suite stays green, see the node modules for the missing
 // features.
 var bufferKnownFailures = map[string]string{
-	// static methods
+	// static and prototype methods
 	"test-buffer-isascii.js":         "Buffer.isAscii is not implemented",
 	"test-buffer-isutf8.js":          "Buffer.isUtf8 is not implemented",
 	"test-buffer-swap.js":            "Buffer.prototype.swap16, swap32 and swap64 are not implemented",
 	"test-buffer-parent-property.js": "Buffer.prototype.parent is not implemented",
 	"test-buffer-arraybuffer.js":     "Buffer.prototype.parent is not implemented",
-
-	// arguments and conversions
-	"test-buffer-compare-offset.js":  "Buffer.prototype.compare does not support the offset arguments",
-	"test-buffer-includes.js":        "node accepts string and Uint8Array arguments, the ski Buffer does not",
-	"test-buffer-indexof.js":         "node accepts string and Uint8Array arguments, the ski Buffer does not",
-	"test-buffer-from.js":            "Buffer.from does not convert String objects",
-	"test-buffer-tojson.js":          `Buffer.from does not support { type: "Buffer", data: [] } objects`,
-	"test-buffer-generic-methods.js": "Buffer generic methods on Uint8Array and ArrayBuffer differ from node",
+	"test-buffer-generic-methods.js": "the Buffer.prototype method set differs from node",
 
 	// deprecations
 	"test-buffer-constructor-deprecation-error.js": "node deprecation warnings are not implemented",
 	"test-buffer-pending-deprecation.js":           "node deprecation warnings are not implemented",
 
 	// runtime features
-	"test-buffer-alloc.js":               "requires the engine limits and Buffer.allocUnsafe pool",
+	"test-buffer-alloc.js":               "requires the engine typed array limits and the allocUnsafe pool",
 	"test-buffer-copy.js":                "requires SharedArrayBuffer",
 	"test-buffer-tostring-rangeerror.js": "requires the V8 string length limit",
 	"test-buffer-write.js":               "the internal asciiWrite, latin1Write and utf8Write methods are not implemented",

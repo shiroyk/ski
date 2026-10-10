@@ -13,6 +13,120 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBufferSearch(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New()
+	ctx := context.Background()
+
+	_, err := vm.RunString(ctx, `
+		const b = Buffer.from("abcdef");
+		// strings, numbers, Buffers and Uint8Arrays are valid values
+		assert.strictEqual(b.indexOf("a"), 0);
+		assert.strictEqual(b.indexOf("bc"), 1);
+		assert.strictEqual(b.indexOf(0x61), 0);
+		assert.strictEqual(b.indexOf(Buffer.from("bc")), 1);
+		assert.strictEqual(b.indexOf(new Uint8Array([0x62, 0x63])), 1);
+		assert.strictEqual(b.indexOf("z"), -1);
+		// the offset counts from the end when it is negative
+		assert.strictEqual(b.indexOf("a", 1), -1);
+		assert.strictEqual(b.indexOf("bc", -5), 1);
+		assert.strictEqual(b.indexOf("bc", -4), -1);
+		assert.strictEqual(b.indexOf("bc", -3), -1);
+		assert.strictEqual(b.indexOf("a", NaN), 0);
+		assert.strictEqual(b.indexOf("a", -Infinity), 0);
+		assert.strictEqual(b.indexOf("bc", Infinity), -1);
+		// an empty value matches at the offset
+		assert.strictEqual(b.indexOf(""), 0);
+		assert.strictEqual(b.indexOf("", 2), 2);
+		assert.strictEqual(b.indexOf("", Infinity), 6);
+		// the third argument is the encoding or the end of the range
+		assert.strictEqual(Buffer.from("616263", "hex").indexOf("61", 0, "hex"), 0);
+		assert.strictEqual(b.indexOf("c", 0, 3), 2);
+		assert.strictEqual(b.indexOf("c", 0, 2), -1);
+		// includes is indexOf !== -1
+		assert.strictEqual(b.includes("bc"), true);
+		assert.strictEqual(b.includes("bc", 2), false);
+		assert.strictEqual(b.includes(""), true);
+		assert.throws(() => b.indexOf({}), { code: "ERR_INVALID_ARG_TYPE" });
+		// utf16le only matches whole code units
+		assert.strictEqual(Buffer.from("ff").indexOf(Buffer.from("f"), 1, "ucs2"), -1);
+		assert.strictEqual(Buffer.from("ff").includes(Buffer.from("f"), 1, "ucs2"), false);
+		assert.strictEqual(Buffer.from("a\u0000").indexOf("a", 0, "ucs2"), 0);
+		// lastIndexOf searches backwards
+		assert.strictEqual(b.lastIndexOf("a"), 0);
+		assert.strictEqual(b.lastIndexOf("a", 1), 0);
+		assert.strictEqual(b.lastIndexOf("c", 1), -1);
+		assert.strictEqual(b.lastIndexOf("a", -1), 0);
+		assert.strictEqual(b.lastIndexOf("a", -b.length - 1), -1);
+		assert.strictEqual(b.lastIndexOf("", 1), 1);
+		assert.strictEqual(b.lastIndexOf("", Infinity), 6);
+		assert.strictEqual(Buffer.from("abcabc").lastIndexOf("a", 5, 3), 0);
+		assert.strictEqual(Buffer.from("abcabc").lastIndexOf("c", 5, 3), 2);
+	`)
+	require.NoError(t, err)
+}
+
+func TestBufferFrom(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New()
+	ctx := context.Background()
+
+	_, err := vm.RunString(ctx, `
+		const check = Buffer.from("test");
+		// valueOf() and Symbol.toPrimitive conversions
+		assert.deepStrictEqual(Buffer.from(new String("test")), check);
+		assert.deepStrictEqual(Buffer.from({ valueOf() { return "test"; } }), check);
+		assert.deepStrictEqual(Buffer.from({ [Symbol.toPrimitive]() { return "test"; } }), check);
+		// the json representation of a buffer
+		assert.deepStrictEqual(
+			Buffer.from({ type: "Buffer", data: [116, 101, 115, 116] }), check);
+		assert.deepStrictEqual(Buffer.from(JSON.parse(JSON.stringify(check))), check);
+		// the invalid values
+		for (const input of [{}, new Boolean(true), { valueOf() { return null; } },
+			Object.create(null), new Number(1), Symbol(), 5n, (a, b, c) => {}, undefined, null]) {
+			assert.throws(() => Buffer.from(input), { code: "ERR_INVALID_ARG_TYPE" });
+		}
+		// copyBytesFrom copies the elements of a typed array
+		const u16 = new Uint16Array([0xffff]);
+		const b16 = Buffer.copyBytesFrom(u16);
+		u16[0] = 0;
+		assert.strictEqual(b16.toString("hex"), "ffff");
+		assert.strictEqual(Buffer.copyBytesFrom(new Uint32Array([0xffffffff])).toString("hex"), "ffffffff");
+		assert.strictEqual(Buffer.copyBytesFrom(new Uint8Array([1, 2, 3, 4]), 2, 100).toString("hex"), "0304");
+		assert.strictEqual(Buffer.copyBytesFrom(new Uint8Array([])).length, 0);
+		assert.throws(() => Buffer.copyBytesFrom(), { code: "ERR_INVALID_ARG_TYPE" });
+		assert.throws(() => Buffer.copyBytesFrom(new Uint8Array(1), -1), { code: "ERR_OUT_OF_RANGE" });
+		assert.throws(() => Buffer.copyBytesFrom(new Uint8Array(1), "", 1), { code: "ERR_INVALID_ARG_TYPE" });
+	`)
+	require.NoError(t, err)
+}
+
+func TestBufferCompareRanges(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New()
+	ctx := context.Background()
+
+	_, err := vm.RunString(ctx, `
+		const a = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+		const b = Buffer.from([5, 6, 7, 8, 9, 0, 1, 2, 3, 4]);
+		assert.strictEqual(a.compare(b), -1);
+		assert.strictEqual(a.compare(b, 0), -1);
+		assert.strictEqual(a.compare(b, 0, 0, 0), 1);
+		assert.strictEqual(a.compare(b, 6, 10), 1);
+		assert.strictEqual(a.compare(b, 6, 10, 0, 0), -1);
+		assert.strictEqual(a.compare(b, 0, 0, 0, 0), 0);
+		assert.strictEqual(a.compare(b, 0, 5, 4), 1);
+		assert.strictEqual(a.compare(b, 0xff), 1);
+		assert.throws(() => a.compare(b, "0"), { code: "ERR_INVALID_ARG_TYPE" });
+		assert.throws(() => a.compare(b, 0, null), { code: "ERR_INVALID_ARG_TYPE" });
+		assert.throws(() => a.compare(b, 0, 100, 0), { code: "ERR_OUT_OF_RANGE" });
+		assert.throws(() => a.compare(b, 0, 1, 0, 100), { code: "ERR_OUT_OF_RANGE" });
+		assert.throws(() => a.compare(b, Infinity, -Infinity), { code: "ERR_OUT_OF_RANGE" });
+		assert.throws(() => a.compare(b, -1), { code: "ERR_OUT_OF_RANGE" });
+	`)
+	require.NoError(t, err)
+}
+
 func TestBufferEncodings(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New()
