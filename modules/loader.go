@@ -145,9 +145,8 @@ type (
 
 // SetFileLoader set the FileLoader.
 func (ml *loader) SetFileLoader(fl FileLoader) {
-	if fl == nil {
-		return
-	}
+	ml.mu.Lock()
+	defer ml.mu.Unlock()
 	ml.fileLoader = fl
 }
 
