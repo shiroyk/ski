@@ -512,24 +512,33 @@ func (b *Buffer) search(rt *sobek.Runtime, call sobek.FunctionCall, backwards bo
 // alignedIndex returns the index of the first match on a code unit boundary,
 // -1 when the value is not found, utf16le only matches the whole code units.
 func alignedIndex(data, value []byte) int {
-	for i := 0; i+len(value) <= len(data); i += 2 {
-		if bytes.Equal(data[i:i+len(value)], value) {
-			return i
+	for offset := 0; offset+len(value) <= len(data); {
+		index := bytes.Index(data[offset:], value)
+		if index < 0 {
+			return -1
 		}
+		index += offset
+		if index%2 == 0 {
+			return index
+		}
+		offset = index + 1
 	}
 	return -1
 }
 
 // alignedLastIndex returns the index of the last match on a code unit boundary.
 func alignedLastIndex(data, value []byte) int {
-	last := len(data) - len(value)
-	if last%2 != 0 {
-		last--
-	}
-	for i := last; i >= 0; i -= 2 {
-		if bytes.Equal(data[i:i+len(value)], value) {
-			return i
+	end := len(data)
+	for end-len(value) >= 0 {
+		index := bytes.LastIndex(data[:end], value)
+		if index < 0 {
+			return -1
 		}
+		if index%2 == 0 {
+			return index
+		}
+		// skip the match to find an earlier one
+		end = index + len(value) - 1
 	}
 	return -1
 }

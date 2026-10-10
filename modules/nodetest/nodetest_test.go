@@ -24,6 +24,11 @@ const nodeBASE = "testdata/node"
 // testsDir is the directory of the upstream suites to run.
 const testsDir = "test/parallel"
 
+// testTimeout is the timeout of a single test file, the upstream tests include
+// cpu heavy cases, e.g. test-buffer-indexof takes about 35s under the race
+// detector.
+const testTimeout = 2 * time.Minute
+
 // suite describes an upstream node test suite.
 type suite struct {
 	// pattern is the file glob of the suite relative to nodeBASE.
@@ -73,7 +78,7 @@ func runNodeTest(t *testing.T, path string) {
 	// every VM owns its loader, no global state is shared between the tests
 	vm := modulestest.New(js.WithInitial(initShims))
 	vm.SetFileLoader(fileLoader)
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	// the process global is required by most test files
