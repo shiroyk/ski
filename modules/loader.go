@@ -291,6 +291,8 @@ func (ml *loader) require(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 	switch mod.(type) {
 	case *cjsModule:
 		return instance.(*cjsModuleInstance).exports
+	case *goModule:
+		return instance.(*goModuleInstance).Object
 	default:
 		return rt.NamespaceObjectFor(mod)
 	}
