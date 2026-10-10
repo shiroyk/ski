@@ -6,41 +6,38 @@ import (
 	"github.com/shiroyk/ski/js/types"
 )
 
-// newVMShim implements vm.runInNewContext() by compiling the code as a function
-// with the sandbox keys as parameters, like `new Function(...keys, code)`.
+// newVMShim implements vm.runInNewContext() by running the script with the
+// sandbox properties shadowing the globals, node returns the completion value
+// of the script, e.g. the value of the last expression.
 func newVMShim(rt *sobek.Runtime) *sobek.Object {
 	runInNewContext := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		code := call.Argument(0).String()
-		var args []sobek.Value
-		var names []string
+		global := rt.GlobalObject()
+		var restore []func()
+		defer func() {
+			for i := len(restore) - 1; i >= 0; i-- {
+				restore[i]()
+			}
+		}()
 		if sandbox := call.Argument(1); !types.IsNil(sandbox) {
 			object := sandbox.ToObject(rt)
 			for _, key := range object.Keys() {
 				if !isIdentifier(key) {
 					continue
 				}
-				names = append(names, key)
-				args = append(args, object.Get(key))
+				if previous := global.Get(key); previous != nil {
+					restore = append(restore, func() { _ = global.Set(key, previous) })
+				} else {
+					restore = append(restore, func() { _ = global.Delete(key) })
+				}
+				_ = global.Set(key, object.Get(key))
 			}
 		}
-		parameters := make([]sobek.Value, 0, len(names)+1)
-		for _, name := range names {
-			parameters = append(parameters, rt.ToValue(name))
-		}
-		parameters = append(parameters, rt.ToValue(code))
-		function, err := rt.New(rt.Get("Function"), parameters...)
+		value, err := rt.RunString(code)
 		if err != nil {
 			js.Throw(rt, err)
 		}
-		callable, ok := sobek.AssertFunction(function)
-		if !ok {
-			panic(rt.NewTypeError("vm.runInNewContext: code is not a function"))
-		}
-		result, err := callable(sobek.Undefined(), args...)
-		if err != nil {
-			js.Throw(rt, err)
-		}
-		return result
+		return value
 	}
 
 	module := rt.NewObject()

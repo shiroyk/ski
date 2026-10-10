@@ -13,6 +13,64 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBufferEncodings(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New()
+	ctx := context.Background()
+
+	_, err := vm.RunString(ctx, `
+		// ascii encodes like latin1 and masks the high bit when decoding
+		assert.strictEqual(Buffer.from("\u00E9\u0100", "ascii").toString("hex"), "e900");
+		assert.strictEqual(Buffer.from([0xE9, 0x41]).toString("ascii"), "iA");
+		assert.strictEqual(Buffer.from([0xE9, 0x41]).toString("latin1"), "\u00E9A");
+		assert.strictEqual(Buffer.from([0xE9, 0x41]).toString("binary"), "\u00E9A");
+
+		// utf16le and the ucs2 aliases
+		assert.strictEqual(Buffer.from("日", "utf16le").toString("hex"), "e565");
+		assert.strictEqual(Buffer.from("日", "ucs2").toString("hex"), "e565");
+		assert.strictEqual(Buffer.from([0xE5, 0x65]).toString("utf16le"), "日");
+		assert.strictEqual(Buffer.from([0x65, 0xE5]).toString("utf16le"), "\uE565");
+		assert.strictEqual(Buffer.from([0x41]).toString("utf16le"), "");
+		assert.strictEqual(Buffer.byteLength("日", "ucs2"), 2);
+
+		// the names are case insensitive, byteLength assumes utf8 for the
+		// unknown ones while the other methods reject them
+		assert.strictEqual(Buffer.from("abcdef").toString("UTF8"), "abcdef");
+		assert.strictEqual(Buffer.byteLength("hello", "abc"), 5);
+		assert.throws(() => Buffer.from("x", "nope"), { code: "ERR_UNKNOWN_ENCODING" });
+
+		// base64 decoding ignores the invalid characters and the padding, the
+		// byte length is estimated from the string
+		assert.strictEqual(Buffer.from("aGVsbG8=", "base64").toString(), "hello");
+		assert.strictEqual(Buffer.from("aGVs bG8", "base64").toString(), "hello");
+		assert.strictEqual(Buffer.from("!!", "base64").length, 0);
+		assert.strictEqual(Buffer.byteLength("!!", "base64"), 1);
+		assert.strictEqual(Buffer.from("aGVsbG8", "base64url").toString(), "hello");
+		assert.strictEqual(Buffer.from("hello").toString("base64url"), "aGVsbG8");
+
+		for (const name of ["utf8", "UTF8", "utf-8", "ucs2", "UCS-2", "utf16le",
+			"utf-16le", "latin1", "binary", "ascii", "hex", "base64", "base64url"]) {
+			assert.strictEqual(Buffer.isEncoding(name), true, name);
+		}
+		assert.strictEqual(Buffer.isEncoding("utf9"), false);
+
+		// toString() takes the start and the end of the range
+		const range = Buffer.from("abc");
+		assert.strictEqual(range.toString("ascii", 1), "bc");
+		assert.strictEqual(range.toString("ascii", -1, 3), "abc");
+		assert.strictEqual(range.toString("ascii", 3), "");
+		assert.strictEqual(range.toString("ascii", 1, 0), "");
+		assert.strictEqual(range.toString("ascii", {}), "abc");
+
+		// write does not split a character
+		const ucs2 = Buffer.alloc(4);
+		assert.strictEqual(ucs2.write("ыыыыыы", 3, "ucs2"), 0);
+		assert.strictEqual(Buffer.compare(ucs2, Buffer.alloc(4)), 0);
+		assert.strictEqual(Buffer.alloc(8).write("ыы", 1, "utf16le"), 4);
+	`)
+	require.NoError(t, err)
+}
+
 func TestBufferErrors(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New()

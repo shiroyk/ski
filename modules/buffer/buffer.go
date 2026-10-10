@@ -8,6 +8,8 @@ import (
 	"math"
 	"math/big"
 	"strconv"
+	"strings"
+	"unicode/utf16"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
@@ -36,6 +38,7 @@ func (b *Buffer) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	_ = ctor.Set("concat", b.concat)
 	_ = ctor.Set("from", b.from)
 	_ = ctor.Set("isBuffer", b.isBuffer)
+	_ = ctor.Set("isEncoding", b.isEncoding)
 	_ = ctor.Set("poolSize", 8192)
 
 	return ctor, nil
@@ -205,6 +208,11 @@ func (*Buffer) isBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 	return rt.ToValue(IsBuffer(rt, call.Argument(0)))
 }
 
+// isEncoding returns true if the encoding is supported
+func (*Buffer) isEncoding(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
+	return rt.ToValue(normalizeEncoding(call.Argument(0).String()) != "")
+}
+
 // byteLength returns the byte length of a string when encoded using encoding.
 func (*Buffer) byteLength(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	value := call.Argument(0)
@@ -212,7 +220,18 @@ func (*Buffer) byteLength(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Valu
 		return rt.ToValue(len(data))
 	}
 	if types.IsString(value) {
-		return rt.ToValue(len(decode(rt, value.String(), call.Argument(1))))
+		encoding := call.Argument(1)
+		// node assumes utf8 for an unrecognized encoding
+		if !sobek.IsUndefined(encoding) {
+			switch name := normalizeEncoding(encoding.String()); name {
+			case "base64", "base64url":
+				// node estimates the length of the base64 string
+				return rt.ToValue(len(strings.TrimRight(value.String(), "=")) * 3 / 4)
+			case "":
+				encoding = rt.ToValue("utf8")
+			}
+		}
+		return rt.ToValue(len(decode(rt, value.String(), encoding)))
 	}
 	panic(common.NewTypeErrorf(rt, common.ErrInvalidArgType,
 		`The "string" argument must be of type string or an instance of Buffer or ArrayBuffer.`+
@@ -285,7 +304,35 @@ func (*Buffer) concat(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // toString decodes buf to a string according to the specified character encoding in encoding.
 func (*Buffer) toString(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	this := toBuffer(rt, call.This)
-	return rt.ToValue(encode(rt, this, call.Argument(0)))
+	return rt.ToValue(encode(rt, this.slice(call.Argument(1), call.Argument(2)), call.Argument(0)))
+}
+
+// slice returns the range of the buffer, node clamps the start and the end.
+func (b buffer) slice(start, end sobek.Value) buffer {
+	from := int64(0)
+	to := int64(len(b))
+	if !sobek.IsUndefined(start) {
+		from = clampOffset(start.ToFloat(), int64(len(b)))
+	}
+	if !sobek.IsUndefined(end) {
+		to = clampOffset(end.ToFloat(), int64(len(b)))
+	}
+	if from >= to {
+		return nil
+	}
+	return b[from:to]
+}
+
+// clampOffset converts the value to a buffer offset, node clamps the values
+// that are out of the buffer bounds and treats NaN as zero.
+func clampOffset(value float64, length int64) int64 {
+	switch {
+	case math.IsNaN(value) || value < 0:
+		return 0
+	case value > float64(length):
+		return length
+	}
+	return int64(value)
 }
 
 // toJSON returns a JSON representation of buffer.
@@ -429,6 +476,10 @@ func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	}
 
 	buf := decode(rt, call.Argument(0).String(), encodingArg)
+	name := "utf8"
+	if !sobek.IsUndefined(encodingArg) {
+		name = normalizeEncoding(encodingArg.String())
+	}
 	length := int64(len(this)) - offset
 
 	if v := lengthArg; !sobek.IsUndefined(v) {
@@ -449,10 +500,52 @@ func (*Buffer) write(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	if length > int64(len(buf)) {
 		length = int64(len(buf))
 	}
+	// node does not write a partial character
+	length = writeLength(name, buf, length)
 	written := copy(this[offset:], buf[:length])
 
 	// node returns the number of bytes written
 	return rt.ToValue(written)
+}
+
+// writeLength returns the number of bytes to write, node never writes a partial
+// character: utf16le stops at an odd byte and utf8 stops before the character
+// that does not fit into the buffer.
+func writeLength(encoding string, data []byte, length int64) int64 {
+	if length >= int64(len(data)) {
+		return int64(len(data))
+	}
+	switch encoding {
+	case "utf16le":
+		return length - length%2
+	case "utf8":
+		for length > 0 {
+			start := length - 1
+			for start > 0 && data[start]&0xc0 == 0x80 {
+				start--
+			}
+			if start+int64(utf8Size(data[start])) <= length {
+				return length
+			}
+			length = start
+		}
+	}
+	return length
+}
+
+// utf8Size returns the byte count of the utf8 sequence that starts with char.
+func utf8Size(char byte) int {
+	switch {
+	case char&0x80 == 0:
+		return 1
+	case char&0xe0 == 0xc0:
+		return 2
+	case char&0xf0 == 0xe0:
+		return 3
+	case char&0xf8 == 0xf0:
+		return 4
+	}
+	return 1
 }
 
 // fill fills buf with the specified value.
@@ -1082,20 +1175,96 @@ func decode(rt *sobek.Runtime, src string, enc sobek.Value) []byte {
 	if !sobek.IsUndefined(enc) {
 		encoding = enc.String()
 	}
-	switch encoding {
-	case "utf8", "utf-8":
+	switch normalizeEncoding(encoding) {
+	case "utf8":
 		return []byte(src)
 	case "hex":
 		return decodeHex(src)
 	case "base64":
-		decoded, err := base64.StdEncoding.DecodeString(src)
-		if err != nil {
-			panic(rt.NewTypeError("Invalid base64 string"))
+		return decodeBase64(src, false)
+	case "base64url":
+		return decodeBase64(src, true)
+	case "latin1":
+		// node writes the code unit truncated to 8 bits
+		decoded := make([]byte, 0, len(src))
+		for _, char := range src {
+			decoded = append(decoded, byte(char))
+		}
+		return decoded
+	case "ascii":
+		// node encodes ascii like latin1
+		return decode(rt, src, rt.ToValue("latin1"))
+	case "utf16le":
+		units := utf16.Encode([]rune(src))
+		decoded := make([]byte, 0, len(units)*2)
+		for _, unit := range units {
+			decoded = append(decoded, byte(unit), byte(unit>>8))
 		}
 		return decoded
 	default:
 		panic(common.NewTypeErrorf(rt, common.ErrUnknownEncoding, "Unknown encoding: %s", encoding))
 	}
+}
+
+// encodingNames maps the node encoding aliases to the canonical name, the
+// lookup is case insensitive.
+var encodingNames = map[string]string{
+	"utf8":      "utf8",
+	"utf-8":     "utf8",
+	"utf16le":   "utf16le",
+	"utf-16le":  "utf16le",
+	"ucs2":      "utf16le",
+	"ucs-2":     "utf16le",
+	"latin1":    "latin1",
+	"binary":    "latin1",
+	"ascii":     "ascii",
+	"base64":    "base64",
+	"base64url": "base64url",
+	"hex":       "hex",
+}
+
+// normalizeEncoding returns the canonical name of the encoding, the empty
+// string means that the encoding is not supported.
+func normalizeEncoding(name string) string {
+	return encodingNames[strings.ToLower(name)]
+}
+
+// decodeBase64 decodes the base64 string like node, the characters that are
+// not part of the alphabet and the padding are ignored.
+func decodeBase64(src string, url bool) []byte {
+	decoded := make([]byte, 0, len(src)*3/4)
+	var buf uint32
+	bits := 0
+	for i := 0; i < len(src); i++ {
+		value, ok := base64Value(src[i], url)
+		if !ok {
+			continue
+		}
+		buf = buf<<6 | uint32(value)
+		bits += 6
+		if bits >= 8 {
+			bits -= 8
+			decoded = append(decoded, byte(buf>>bits))
+		}
+	}
+	return decoded
+}
+
+// base64Value returns the value of a base64 digit.
+func base64Value(char byte, url bool) (byte, bool) {
+	switch {
+	case char >= 'A' && char <= 'Z':
+		return char - 'A', true
+	case char >= 'a' && char <= 'z':
+		return char - 'a' + 26, true
+	case char >= '0' && char <= '9':
+		return char - '0' + 52, true
+	case char == '+' || (url && char == '-'):
+		return 62, true
+	case char == '/' || (url && char == '_'):
+		return 63, true
+	}
+	return 0, false
 }
 
 // decodeHex decodes the hex string like node does, the decoding stops at the
@@ -1138,13 +1307,36 @@ func encode(rt *sobek.Runtime, buf []byte, enc sobek.Value) string {
 	if !sobek.IsUndefined(enc) {
 		encoding = enc.String()
 	}
-	switch encoding {
-	case "utf8", "utf-8":
+	switch normalizeEncoding(encoding) {
+	case "utf8":
 		return string(buf)
 	case "hex":
 		return hex.EncodeToString(buf)
 	case "base64":
 		return base64.StdEncoding.EncodeToString(buf)
+	case "base64url":
+		return base64.RawURLEncoding.EncodeToString(buf)
+	case "latin1":
+		var builder strings.Builder
+		builder.Grow(len(buf))
+		for _, b := range buf {
+			builder.WriteRune(rune(b))
+		}
+		return builder.String()
+	case "ascii":
+		// node masks the high bit when decoding ascii
+		var builder strings.Builder
+		builder.Grow(len(buf))
+		for _, b := range buf {
+			builder.WriteRune(rune(b & 0x7f))
+		}
+		return builder.String()
+	case "utf16le":
+		units := make([]uint16, 0, len(buf)/2)
+		for i := 0; i+1 < len(buf); i += 2 {
+			units = append(units, uint16(buf[i])|uint16(buf[i+1])<<8)
+		}
+		return string(utf16.Decode(units))
 	default:
 		panic(common.NewTypeErrorf(rt, common.ErrUnknownEncoding, "Unknown encoding: %s", encoding))
 	}

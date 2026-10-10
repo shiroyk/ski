@@ -35,16 +35,7 @@ var bufferSkipTests = map[string]string{
 // reason so the suite stays green, see the node modules for the missing
 // features.
 var bufferKnownFailures = map[string]string{
-	// numeric encodings
-	"test-buffer-ascii.js":          "ascii encoding is not implemented",
-	"test-buffer-bytelength.js":     "ascii encoding is not implemented",
-	"test-buffer-slice.js":          "utf16le encoding is not implemented",
-	"test-buffer-tostring-range.js": "ascii encoding is not implemented",
-	"test-buffer-tostring.js":       "encoding names are case insensitive in node, UTF8 is not supported",
-	"test-buffer-write.js":          "the ascii, ucs2 and utf16le encodings are not implemented",
-
 	// static methods
-	"test-buffer-isencoding.js":      "Buffer.isEncoding is not implemented",
 	"test-buffer-isascii.js":         "Buffer.isAscii is not implemented",
 	"test-buffer-isutf8.js":          "Buffer.isUtf8 is not implemented",
 	"test-buffer-swap.js":            "Buffer.prototype.swap16, swap32 and swap64 are not implemented",
@@ -64,9 +55,10 @@ var bufferKnownFailures = map[string]string{
 	"test-buffer-pending-deprecation.js":           "node deprecation warnings are not implemented",
 
 	// runtime features
-	"test-buffer-alloc.js":               "the engine typed array length error message differs",
+	"test-buffer-alloc.js":               "requires the engine limits and Buffer.allocUnsafe pool",
 	"test-buffer-copy.js":                "requires SharedArrayBuffer",
 	"test-buffer-tostring-rangeerror.js": "requires the V8 string length limit",
+	"test-buffer-write.js":               "the internal asciiWrite, latin1Write and utf8Write methods are not implemented",
 	"test-buffer-write-utf8-two-byte.js": "Buffer.prototype.subarray returns a Uint8Array",
 }
 
