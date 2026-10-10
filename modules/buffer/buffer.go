@@ -23,8 +23,8 @@ type Buffer struct{}
 func (b *Buffer) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 	ctor := rt.ToValue(b.constructor).ToObject(rt)
 	proto := b.prototype(rt)
-	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
-	_ = ctor.SetPrototype(proto)
+	_ = proto.DefineDataProperty("constructor", ctor, sobek.FLAG_TRUE, sobek.FLAG_TRUE, sobek.FLAG_FALSE)
+	_ = ctor.SetPrototype(rt.Get("Uint8Array").ToObject(rt))
 	_ = ctor.Set("prototype", proto)
 
 	// Static methods
@@ -41,13 +41,7 @@ func (b *Buffer) Instantiate(rt *sobek.Runtime) (sobek.Value, error) {
 
 func (b *Buffer) prototype(rt *sobek.Runtime) *sobek.Object {
 	p := rt.NewObject()
-
-	u8 := rt.Get("Uint8Array")
-	if u8 == nil {
-		panic(rt.NewTypeError("Uint8Array is not defined"))
-	}
-	_ = p.SetPrototype(u8.ToObject(rt).Prototype())
-	_ = p.SetSymbol(sobek.SymToStringTag, func(sobek.FunctionCall) sobek.Value { return rt.ToValue("Buffer") })
+	_ = p.SetPrototype(types.Prototype(rt, "Uint8Array"))
 
 	_ = p.Set("toString", b.toString)
 	_ = p.Set("toJSON", b.toJSON)
@@ -147,7 +141,7 @@ func (b *Buffer) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *sob
 		if size < 0 {
 			panic(rt.NewTypeError("Buffer size must be a non-negative integer"))
 		}
-		return newBuffer(rt, call.This, make([]byte, size))
+		return newBuffer(rt, make([]byte, size))
 	} else {
 		return b.from(sobek.FunctionCall{This: call.This, Arguments: call.Arguments}, rt).(*sobek.Object)
 	}
@@ -159,11 +153,11 @@ func (*Buffer) from(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 	switch arg.ExportType() {
 	case types.TypeBytes:
-		return newBuffer(rt, call.This, arg.Export().([]byte))
+		return newBuffer(rt, arg.Export().([]byte))
 	case types.TypeArrayBuffer:
-		return newBuffer(rt, call.This, arg.Export().(sobek.ArrayBuffer).Bytes())
+		return newBuffer(rt, arg.Export().(sobek.ArrayBuffer).Bytes())
 	case types.TypeString:
-		buf := newBuffer(rt, call.This, decode(rt, arg.String(), call.Argument(1)))
+		buf := newBuffer(rt, decode(rt, arg.String(), call.Argument(1)))
 		return buf
 	default:
 		obj, ok := arg.(*sobek.Object)
@@ -177,7 +171,7 @@ func (*Buffer) from(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 						src[i] = byte(item.ToInteger())
 					}
 				}
-				return newBuffer(rt, call.This, src)
+				return newBuffer(rt, src)
 			}
 		}
 	}
@@ -191,7 +185,7 @@ func (*Buffer) alloc(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		panic(rt.NewTypeError("Buffer size must be a non-negative integer"))
 	}
 
-	buf := newBuffer(rt, call.This, make([]byte, size))
+	buf := newBuffer(rt, make([]byte, size))
 
 	if fill := call.Argument(1); !sobek.IsUndefined(fill) {
 		fn, ok := sobek.AssertFunction(buf.Get("fill"))
@@ -209,7 +203,7 @@ func (*Buffer) alloc(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 
 // isBuffer returns true if the value is a buffer
 func (*Buffer) isBuffer(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	return rt.ToValue(rt.InstanceOf(call.Argument(0), call.This.(*sobek.Object)))
+	return rt.ToValue(IsBuffer(rt, call.Argument(0)))
 }
 
 // byteLength returns the byte length of a string when encoded using encoding.
@@ -260,7 +254,7 @@ func (*Buffer) concat(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 		totalLength = int(uint64(v.ToInteger()))
 	}
 
-	return newBuffer(rt, call.This, data.Bytes()[:totalLength])
+	return newBuffer(rt, data.Bytes()[:totalLength])
 }
 
 // toString decodes buf to a string according to the specified character encoding in encoding.
@@ -293,23 +287,14 @@ func (*Buffer) equals(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 // compare compares buf with target and returns a number indicating whether buf comes before, after,
 // or is the same as target in sort order
 func (*Buffer) compare(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	var buf1, buf2 []byte
-	b1 := call.Argument(0)
-	if !IsBuffer(rt, b1) {
+	b1, b2 := call.Argument(0), call.Argument(1)
+	if IsBuffer(rt, call.This) {
+		b1, b2 = call.This, call.Argument(0)
+	}
+	if !IsBuffer(rt, b1) || !IsBuffer(rt, b2) {
 		panic(rt.NewTypeError("Argument must be a Buffer"))
 	}
-	if IsBuffer(rt, call.This) {
-		buf1 = call.This.Export().([]byte)
-		buf2 = b1.Export().([]byte)
-	} else {
-		buf1 = b1.Export().([]byte)
-		b2 := call.Argument(1)
-		if !IsBuffer(rt, b2) {
-			panic(rt.NewTypeError("Argument must be a Buffer"))
-		}
-		buf2 = b2.Export().([]byte)
-	}
-	return rt.ToValue(bytes.Compare(buf1, buf2))
+	return rt.ToValue(bytes.Compare(b1.Export().([]byte), b2.Export().([]byte)))
 }
 
 // copy copies data from a region of buf to a region in target, even if the target memory region overlaps with buf.
@@ -887,22 +872,10 @@ func (*Buffer) writeUIntLE(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Val
 }
 
 // newBuffer creates a new buffer with the given data
-func newBuffer(rt *sobek.Runtime, this sobek.Value, data []byte) *sobek.Object {
-	u8 := rt.Get("Uint8Array")
-	if u8 == nil {
-		panic(rt.NewTypeError("Uint8Array is undefined"))
-	}
-	ctor, ok := sobek.AssertConstructor(u8)
-	if !ok {
-		panic(rt.NewTypeError("Uint8Array is not a constructor"))
-	}
-	bufCtor := this.(*sobek.Object).Get("constructor").(*sobek.Object)
-	object, err := ctor(bufCtor, rt.ToValue(rt.NewArrayBuffer(data)))
-	if err != nil {
-		panic(err)
-	}
-	_ = object.SetSymbol(symBuffer, symBuffer)
-	return object
+func newBuffer(rt *sobek.Runtime, data []byte) *sobek.Object {
+	buf := types.New(rt, "Uint8Array", rt.ToValue(rt.NewArrayBuffer(data)))
+	_ = buf.SetPrototype(types.Prototype(rt, "Buffer"))
+	return buf
 }
 
 // toBuffer converts a value to a buffer
@@ -1082,8 +1055,6 @@ func checkUint(rt *sobek.Runtime, v uint64, byteLength int64) {
 	}
 	throwRangeError(rt, "value", 0, maxUint, v)
 }
-
-var symBuffer = sobek.NewSymbol("Symbol.__buffer__")
 
 type buffer []byte
 

@@ -92,6 +92,88 @@ func TestBuffer(t *testing.T) {
 		}
 	})
 
+	t.Run("prototype", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    string
+			expected bool
+		}{
+			{
+				name:     "constructor inherits from Uint8Array",
+				input:    `Object.getPrototypeOf(Buffer) === Uint8Array`,
+				expected: true,
+			},
+			{
+				name:     "prototype inherits from Uint8Array.prototype",
+				input:    `Object.getPrototypeOf(Buffer.prototype) === Uint8Array.prototype`,
+				expected: true,
+			},
+			{
+				name:     "constructor is not the prototype",
+				input:    `Object.getPrototypeOf(Buffer) === Buffer.prototype`,
+				expected: false,
+			},
+			{
+				name:     "byteLength is an own property of the constructor",
+				input:    `Object.getOwnPropertyDescriptor(Buffer, "byteLength") !== undefined && Buffer.byteLength("hello") === 5`,
+				expected: true,
+			},
+			{
+				name:     "toStringTag is inherited",
+				input:    `Object.getOwnPropertyDescriptor(Buffer.prototype, Symbol.toStringTag) === undefined`,
+				expected: true,
+			},
+			{
+				name:     "toString tag",
+				input:    `Object.prototype.toString.call(Buffer.from("a")) === "[object Uint8Array]"`,
+				expected: true,
+			},
+			{
+				name:     "buffer is an instance of both",
+				input:    `Buffer.from("a") instanceof Buffer && Buffer.from("a") instanceof Uint8Array`,
+				expected: true,
+			},
+			{
+				name:     "new buffer is an instance of Buffer",
+				input:    `new Buffer(2) instanceof Buffer`,
+				expected: true,
+			},
+			{
+				name:     "constructor is writable and configurable",
+				input:    `Object.getOwnPropertyDescriptors(Buffer.prototype).constructor.writable && Object.getOwnPropertyDescriptors(Buffer.prototype).constructor.configurable`,
+				expected: true,
+			},
+			{
+				name:     "isBuffer follows the prototype chain",
+				input:    `Buffer.isBuffer(Object.create(Buffer.prototype)) && !Buffer.isBuffer(Buffer.prototype)`,
+				expected: true,
+			},
+			{
+				name:     "isBuffer ignores this",
+				input:    `Buffer.isBuffer.call(null, Buffer.alloc(1))`,
+				expected: true,
+			},
+			{
+				name:     "static compare",
+				input:    `Buffer.compare(Buffer.from("a"), Buffer.from("b")) === -1`,
+				expected: true,
+			},
+			{
+				name:     "instance compare",
+				input:    `Buffer.from("b").compare(Buffer.from("a")) === 1`,
+				expected: true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, err := vm.RunString(ctx, tt.input)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result.ToBoolean())
+			})
+		}
+	})
+
 	t.Run("static methods", func(t *testing.T) {
 		t.Run("from", func(t *testing.T) {
 			tests := []struct {

@@ -22,12 +22,9 @@ func GetReader(value sobek.Value) (io.Reader, string, bool) {
 	}
 }
 
-// IsBuffer returns true if the value is a IsBuffer.
+// IsBuffer returns true if the value is a Buffer.
 func IsBuffer(rt *sobek.Runtime, value sobek.Value) bool {
-	if value.ToObject(rt).GetSymbol(symBuffer) == symBuffer {
-		return true
-	}
-	return false
+	return !types.IsNil(value) && rt.InstanceOf(value, rt.Get("Buffer").ToObject(rt))
 }
 
 // GetBuffer returns the underlying byte buffer from a ArrayBuffer, TypedArray, DataView, Buffer.
