@@ -13,6 +13,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBufferObjectBounds(t *testing.T) {
+	t.Parallel()
+	vm := modulestest.New()
+	ctx := context.Background()
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name: "fake buffer",
+			input: `
+				function FakeBuffer() {}
+				Object.setPrototypeOf(FakeBuffer, Buffer);
+				Object.setPrototypeOf(FakeBuffer.prototype, Buffer.prototype);
+				const fake = new FakeBuffer();
+				assert.throws(() => Buffer.from(fake), TypeError);
+				assert.throws(() => Buffer.compare(fake, Buffer.alloc(0)), TypeError);
+				assert.throws(() => Buffer.concat([fake, fake]), TypeError);
+				assert.throws(() => fake.equals(Buffer.alloc(0)), TypeError);
+				assert.throws(() => fake.toString(), TypeError);
+				assert.throws(() => fake.write("foo"), TypeError);
+				assert.throws(() => fake.fill(0), TypeError);
+				assert.throws(() => fake.readFloatLE(0), TypeError);
+				assert.throws(() => fake.writeFloatLE(0), TypeError);
+			`,
+		},
+		{
+			name: "write offset",
+			input: `
+				assert.throws(() => Buffer.alloc(9).write("foo", -1), RangeError);
+				assert.throws(() => Buffer.alloc(9).write("foo", 10), RangeError);
+			`,
+		},
+		{
+			name: "fill range",
+			input: `
+				assert.throws(() => Buffer.alloc(9).fill(0, 10), RangeError);
+				assert.throws(() => Buffer.alloc(9).fill(0, 0, 10), RangeError);
+			`,
+		},
+		{
+			name: "allocation size",
+			input: `
+				const max = 9007199254740991 + 1;
+				assert.throws(() => Buffer(max), RangeError);
+				assert.throws(() => Buffer.alloc(max), RangeError);
+				assert.throws(() => Buffer.from({ length: max }), RangeError);
+			`,
+		},
+		{
+			name: "concat length",
+			input: `
+				assert.throws(() => Buffer.concat([Buffer.from("hello")], -2), RangeError);
+			`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := vm.RunString(ctx, tt.input)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestBuffer(t *testing.T) {
 	t.Parallel()
 	vm := modulestest.New()

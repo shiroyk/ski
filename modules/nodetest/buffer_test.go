@@ -36,11 +36,14 @@ var bufferSkipTests = map[string]string{
 // features.
 var bufferKnownFailures = map[string]string{
 	// numeric encodings
-	"test-buffer-ascii.js":               "ascii encoding is not implemented",
-	"test-buffer-slice.js":               "utf16le encoding is not implemented",
-	"test-buffer-tostring-range.js":      "ascii encoding is not implemented",
-	"test-buffer-write-utf8-two-byte.js": "ascii encoding is not implemented",
-	"test-buffer-tostring.js":            "encoding names are case insensitive in node, UTF8 is not supported",
+	"test-buffer-ascii.js":          "ascii encoding is not implemented",
+	"test-buffer-slice.js":          "utf16le encoding is not implemented",
+	"test-buffer-tostring-range.js": "ascii encoding is not implemented",
+	"test-buffer-tostring.js":       "encoding names are case insensitive in node, UTF8 is not supported",
+
+	// node write() returns the number of bytes written, the ski write() returns
+	// the buffer itself
+	"test-buffer-write-utf8-two-byte.js": "node write() returns the number of bytes written",
 
 	// static methods
 	"test-buffer-bigint64.js":                  "Buffer.allocUnsafe is not implemented",
@@ -92,10 +95,10 @@ var bufferKnownFailures = map[string]string{
 	"test-buffer-constructor-deprecation-error.js": "node deprecation warnings are not implemented",
 	"test-buffer-pending-deprecation.js":           "node deprecation warnings are not implemented",
 
-	// panics in the ski buffer module
-	"test-buffer-fakes.js":           "fake Buffer objects panic on a type assertion in GetBuffer",
-	"test-buffer-over-max-length.js": "panics with makeslice out of range instead of a RangeError",
-	"test-buffer-write.js":           "panics with slice bounds out of range instead of a RangeError",
+	// node error codes are not implemented, the write test also needs the
+	// ascii, ucs2 and utf16le encodings
+	"test-buffer-write.js":           "node error codes, the write() return value and the ascii, ucs2 and utf16le encodings are not implemented",
+	"test-buffer-over-max-length.js": "node error codes and Buffer.allocUnsafe are not implemented",
 }
 
 // TestNodeBuffer runs the upstream node buffer test suite.

@@ -37,7 +37,8 @@ func GetBuffer(rt *sobek.Runtime, value sobek.Value) ([]byte, bool) {
 	default:
 		switch {
 		case IsBuffer(rt, value):
-			return value.Export().([]byte), true
+			data, ok := value.Export().([]byte)
+			return data, ok
 		case rt.InstanceOf(value, rt.Get("DataView").(*sobek.Object)):
 			fallthrough
 		case types.IsTypedArray(rt, value):
