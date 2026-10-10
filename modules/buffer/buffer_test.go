@@ -1330,6 +1330,57 @@ func TestBuffer(t *testing.T) {
 			}
 		})
 
+		t.Run("toJSON", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				input    string
+				expected string
+			}{
+				{
+					name:     "stringify buffer",
+					input:    `JSON.stringify(Buffer.from("abc"))`,
+					expected: `{"type":"Buffer","data":[97,98,99]}`,
+				},
+				{
+					name:     "stringify toJSON result",
+					input:    `JSON.stringify(Buffer.from("abc").toJSON())`,
+					expected: `{"type":"Buffer","data":[97,98,99]}`,
+				},
+				{
+					name:     "bytes",
+					input:    `JSON.stringify(Buffer.from([0, 127, 255]))`,
+					expected: `{"type":"Buffer","data":[0,127,255]}`,
+				},
+				{
+					name:     "empty",
+					input:    `JSON.stringify(Buffer.alloc(0))`,
+					expected: `{"type":"Buffer","data":[]}`,
+				},
+				{
+					name:     "nested",
+					input:    `JSON.stringify({ buf: Buffer.from("a") })`,
+					expected: `{"buf":{"type":"Buffer","data":[97]}}`,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					result, err := vm.RunString(ctx, tt.input)
+					require.NoError(t, err)
+					assert.Equal(t, tt.expected, result.String())
+				})
+			}
+
+			t.Run("returns an object", func(t *testing.T) {
+				result, err := vm.RunString(ctx, `
+					const json = Buffer.from("abc").toJSON();
+					typeof json === "object" && json.type === "Buffer" && Array.isArray(json.data) && json.data[0] === 97;
+				`)
+				require.NoError(t, err)
+				assert.True(t, result.ToBoolean())
+			})
+		})
+
 		t.Run("copy", func(t *testing.T) {
 			tests := []struct {
 				name     string

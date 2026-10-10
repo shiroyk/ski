@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -265,12 +264,15 @@ func (*Buffer) toString(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value 
 
 // toJSON returns a JSON representation of buffer.
 func (*Buffer) toJSON(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
-	this := toBuffer(rt, call.This)
-	b, _ := json.Marshal(map[string]any{
-		"type": "Buffer",
-		"data": this,
-	})
-	return rt.ToValue(string(b))
+	buf := toBuffer(rt, call.This)
+	data := make([]any, len(buf))
+	for i, b := range buf {
+		data[i] = b
+	}
+	ret := rt.NewObject()
+	_ = ret.Set("type", "Buffer")
+	_ = ret.Set("data", rt.NewArray(data...))
+	return ret
 }
 
 // equals returns true if both buf and otherBuffer have exactly the same bytes
