@@ -149,7 +149,13 @@ func ValueType(value sobek.Value) string {
 	case value.ExportType() == TypeBool:
 		return "boolean"
 	}
-	return "object"
+	if _, ok := value.(*sobek.Object); ok {
+		if value.ExportType() == TypeFunc {
+			return "function"
+		}
+		return "object"
+	}
+	return "symbol"
 }
 
 // Iterate returns a sequence of the elements of the value and the number of

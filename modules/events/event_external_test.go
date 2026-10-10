@@ -31,7 +31,7 @@ type externalTarget struct {
 var _ events.EventTarget = (*externalTarget)(nil)
 
 func TestExternalEventTarget(t *testing.T) {
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	rt := vm.Runtime()
 	// A subclass prototype inherits the EventTarget prototype, like
 	// AbortSignal.prototype does.
@@ -65,7 +65,7 @@ func TestExternalEventTarget(t *testing.T) {
 }
 
 func TestExternalEvent(t *testing.T) {
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	rt := vm.Runtime()
 	target := events.NewEventTarget(rt)
 

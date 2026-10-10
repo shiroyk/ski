@@ -10,7 +10,7 @@ import (
 
 func TestCustomEvent(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	t.Run("custom event", func(t *testing.T) {

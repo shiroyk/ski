@@ -21,7 +21,7 @@ func newResponse(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 
 func TestReadableStream(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+	vm := modulestest.New(js.WithInitial(func(rt *sobek.Runtime) {
 		_ = rt.Set("Response", newResponse)
 	}))
 	ctx := context.Background()

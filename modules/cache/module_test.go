@@ -11,7 +11,7 @@ import (
 
 func TestCacheModule(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+	vm := modulestest.New(js.WithInitial(func(rt *sobek.Runtime) {
 		cache := Module{NewCache()}
 		instantiate, err := cache.Instantiate(rt)
 		if err != nil {

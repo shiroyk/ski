@@ -14,7 +14,7 @@ import (
 
 func TestSignalCancel(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	// New returns a cancel function that aborts the signal from any goroutine.
@@ -62,7 +62,7 @@ func TestSignalCancel(t *testing.T) {
 
 func TestOnAbort(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	var calls []string
@@ -118,7 +118,7 @@ func TestOnAbort(t *testing.T) {
 
 func TestAbortSignalAny(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	_, err := vm.RunModule(ctx, `
@@ -217,7 +217,7 @@ func TestAbortSignalAny(t *testing.T) {
 
 func TestSignalTimeout(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	result, err := vm.RunModule(context.Background(), `
 		export default () => new Promise((resolve) => {
 			const signal = AbortSignal.timeout(5);
@@ -236,7 +236,7 @@ func TestSignalTimeout(t *testing.T) {
 
 func TestAbortSignal(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	t.Run("abort", func(t *testing.T) {

@@ -25,7 +25,7 @@ func (v *valuesContext) SetValue(key, value any) {
 func TestExt(t *testing.T) {
 	t.Parallel()
 	t.Run("context values", func(t *testing.T) {
-		vm := modulestest.New(t)
+		vm := modulestest.New()
 
 		ctx := &valuesContext{context.Background(), map[any]any{"test": "value"}}
 

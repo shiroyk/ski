@@ -10,7 +10,7 @@ import (
 )
 
 func TestModule(t *testing.T) {
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	t.Run("btoa", func(t *testing.T) {

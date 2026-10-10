@@ -296,3 +296,28 @@ func TestCheck(t *testing.T) {
 		}
 	})
 }
+
+func TestValueType(t *testing.T) {
+	vm := js.NewVM()
+	cases := []struct {
+		script string
+		result string
+	}{
+		{`"1"`, "string"},
+		{`1`, "number"},
+		{`1.1`, "number"},
+		{`BigInt(1)`, "bigint"},
+		{`undefined`, "undefined"},
+		{`null`, "null"},
+		{`true`, "boolean"},
+		{`() => {}`, "function"},
+		{`({"foo":1})`, "object"},
+		{`Symbol.iterator`, "symbol"},
+	}
+
+	for _, c := range cases {
+		value, err := vm.RunString(context.Background(), c.script)
+		require.NoError(t, err)
+		assert.Equal(t, c.result, ValueType(value))
+	}
+}

@@ -4,95 +4,62 @@ package modulestest
 import (
 	"context"
 	"errors"
-	"fmt"
-	"testing"
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
-	"github.com/stretchr/testify/assert"
+	"github.com/shiroyk/ski/modules"
 )
 
-type VM struct{ js.VM }
+type VM struct {
+	modules.Loader
+	js.VM
+}
 
 func (vm *VM) RunModule(ctx context.Context, source string, args ...any) (ret sobek.Value, err error) {
-	module, err := js.CompileModule("", source)
+	module, err := vm.CompileModule("", source)
 	if err != nil {
 		return nil, err
 	}
-	return vm.VM.RunModule(ctx, module, args...)
+	err = vm.Run(ctx, func() error {
+		instance := vm.Runtime().GetModuleInstance(module)
+		if instance == nil {
+			if err = module.Link(); err != nil {
+				return err
+			}
+			promise := vm.Runtime().CyclicModuleRecordEvaluate(module, vm.ResolveModule)
+			switch promise.State() {
+			case sobek.PromiseStateRejected:
+				return errors.New(promise.Result().String())
+			case sobek.PromiseStateFulfilled:
+			default:
+			}
+			instance = vm.Runtime().GetModuleInstance(module)
+		}
+		call, ok := sobek.AssertFunction(instance.GetBindingValue("default"))
+		if !ok {
+			ret = sobek.Undefined()
+			return nil
+		}
+
+		values := make([]sobek.Value, len(args))
+		for i, arg := range args {
+			values[i] = vm.Runtime().ToValue(arg)
+		}
+
+		ret, err = call(sobek.Undefined(), values...)
+		return err
+	})
+	return
 }
 
 // New returns a test VM instance
-func New(t testing.TB, opts ...js.Option) VM {
+func New(opts ...js.Option) VM {
 	vm := js.NewVM(opts...)
-	obj := vm.Runtime().NewObject()
-	_ = obj.Set("equal", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
-		a, err := js.Unwrap(call.Argument(0))
-		if err != nil {
-			js.Throw(vm, err)
-		}
-		b, err := js.Unwrap(call.Argument(1))
-		if err != nil {
-			js.Throw(vm, err)
-		}
-		var msg string
-		if !sobek.IsUndefined(call.Argument(2)) {
-			msg = call.Argument(2).String()
-		}
-		if !assert.Equal(t, b, a, msg) {
-			js.Throw(vm, fmt.Errorf("not equal: %#v != %#v", b, a))
-		}
-		return
-	})
-	_ = obj.Set("contains", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
-		a, err := js.Unwrap(call.Argument(0))
-		if err != nil {
-			js.Throw(vm, err)
-		}
-		b, err := js.Unwrap(call.Argument(1))
-		if err != nil {
-			js.Throw(vm, err)
-		}
-		var msg string
-		if !sobek.IsUndefined(call.Argument(2)) {
-			msg = call.Argument(2).String()
-		}
-		if !assert.Contains(t, b, a, msg) {
-			js.Throw(vm, fmt.Errorf("not contains: %#v != %#v", b, a))
-		}
-		return
-	})
-	_ = obj.Set("regexp", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
-		a, err := js.Unwrap(call.Argument(0))
-		if err != nil {
-			js.Throw(vm, err)
-		}
-		b, err := js.Unwrap(call.Argument(1))
-		if err != nil {
-			js.Throw(vm, err)
-		}
-		var msg string
-		if !sobek.IsUndefined(call.Argument(2)) {
-			msg = call.Argument(2).String()
-		}
-		if !assert.Regexp(t, b, a, msg) {
-			js.Throw(vm, fmt.Errorf("not match: %#v != %#v", b, a))
-		}
-		return
-	})
-	_ = obj.Set("true", func(call sobek.FunctionCall, vm *sobek.Runtime) (ret sobek.Value) {
-		var msg string
-		if !sobek.IsUndefined(call.Argument(1)) {
-			msg = call.Argument(1).String()
-		}
-		if !assert.True(t, call.Argument(0).ToBoolean(), msg) {
-			js.Throw(vm, errors.New("should be true"))
-		}
-		return
-	})
-
-	_ = vm.Runtime().Set("assert", obj)
-	return VM{vm}
+	loader := modules.NewLoader()
+	rt := vm.Runtime()
+	loader.EnableRequire(rt).EnableImportModuleDynamically(rt).InitGlobal(rt)
+	_ = rt.Set("assert", Assert(rt))
+	return VM{loader, vm}
 }
 
 // PromiseResult get the promise resolve result

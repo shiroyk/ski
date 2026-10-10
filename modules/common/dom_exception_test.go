@@ -10,7 +10,7 @@ import (
 
 func TestDOMException(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 
 	_, err := vm.RunModule(context.Background(), `
 		const err = new DOMException('msg', 'AbortError');

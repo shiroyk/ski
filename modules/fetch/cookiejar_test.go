@@ -33,7 +33,7 @@ func (m *mockCookieJar) RemoveCookie(u *pkgurl.URL) {
 func TestCookieJarModule(t *testing.T) {
 	t.Parallel()
 	jar := &mockCookieJar{}
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+	vm := modulestest.New(js.WithInitial(func(rt *sobek.Runtime) {
 		module := &CookieJarModule{CookieJar: jar}
 		cookieJar, err := module.Instantiate(rt)
 		assert.NoError(t, err)

@@ -18,7 +18,7 @@ type probeDict struct {
 
 func TestExportDict(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	rt := vm.Runtime()
 
 	export := func(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {

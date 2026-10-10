@@ -11,7 +11,7 @@ import (
 
 func TestTextDecoder(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	t.Run("constructor", func(t *testing.T) {

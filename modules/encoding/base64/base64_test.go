@@ -13,7 +13,7 @@ import (
 func TestBase64(t *testing.T) {
 	t.Parallel()
 
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+	vm := modulestest.New(js.WithInitial(func(rt *sobek.Runtime) {
 		instantiate, _ := new(Base64).Instantiate(rt)
 		_ = rt.Set("base64", instantiate)
 	}))

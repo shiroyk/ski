@@ -10,7 +10,7 @@ import (
 )
 
 func TestHashAlgorithms(t *testing.T) {
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+	vm := modulestest.New(js.WithInitial(func(rt *sobek.Runtime) {
 		c := new(Crypto)
 		instance, _ := c.Instantiate(rt)
 		_ = rt.Set("crypto", instance)
@@ -42,7 +42,7 @@ func TestHashAlgorithms(t *testing.T) {
 }
 
 func TestHMac(t *testing.T) {
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+	vm := modulestest.New(js.WithInitial(func(rt *sobek.Runtime) {
 		c := new(Crypto)
 		instance, _ := c.Instantiate(rt)
 		_ = rt.Set("crypto", instance)

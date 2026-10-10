@@ -11,7 +11,7 @@ import (
 
 func TestEventTarget(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	t.Run("addEventListener", func(t *testing.T) {

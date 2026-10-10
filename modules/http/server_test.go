@@ -20,7 +20,7 @@ import (
 
 func TestHttpServer(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t, js.WithInitial(func(rt *sobek.Runtime) {
+	vm := modulestest.New(js.WithInitial(func(rt *sobek.Runtime) {
 		value, _ := new(Server).Instantiate(rt)
 		_ = rt.Set("serve", value)
 	}))

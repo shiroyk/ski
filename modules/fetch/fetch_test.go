@@ -17,7 +17,7 @@ import (
 
 func TestFetch(t *testing.T) {
 	t.Parallel()
-	vm := modulestest.New(t)
+	vm := modulestest.New()
 	ctx := context.Background()
 
 	t.Run("basic request", func(t *testing.T) {
