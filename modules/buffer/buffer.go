@@ -678,6 +678,10 @@ func (*Buffer) copy(call sobek.FunctionCall, rt *sobek.Runtime) sobek.Value {
 	data := make([]byte, sourceEnd-sourceStart)
 	buffer(this).readAt(data, sourceStart)
 
+	if targetStart > int64(len(target)) {
+		return rt.ToValue(0)
+	}
+
 	// node returns the number of bytes copied
 	return rt.ToValue(copy(target[targetStart:], data))
 }
