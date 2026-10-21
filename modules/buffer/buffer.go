@@ -1377,9 +1377,9 @@ func decode(rt *sobek.Runtime, src string, enc sobek.Value) []byte {
 	case "hex":
 		return decodeHex(src)
 	case "base64":
-		return decodeBase64(src, false)
+		return decodeBase64(src)
 	case "base64url":
-		return decodeBase64(src, true)
+		return decodeBase64(src)
 	case "latin1":
 		// node writes the code unit truncated to 8 bits
 		decoded := make([]byte, 0, len(src))
@@ -1427,40 +1427,26 @@ func normalizeEncoding(name string) string {
 
 // decodeBase64 decodes the base64 string like node, the characters that are
 // not part of the alphabet and the padding are ignored.
-func decodeBase64(src string, url bool) []byte {
-	decoded := make([]byte, 0, len(src)*3/4)
-	var buf uint32
-	bits := 0
-	for i := 0; i < len(src); i++ {
-		value, ok := base64Value(src[i], url)
-		if !ok {
-			continue
-		}
-		buf = buf<<6 | uint32(value)
-		bits += 6
-		if bits >= 8 {
-			bits -= 8
-			decoded = append(decoded, byte(buf>>bits))
-		}
-	}
+func decodeBase64(src string) []byte {
+	src = strings.Map(base64Value, src)
+	decoded, _ := base64.RawStdEncoding.DecodeString(src)
 	return decoded
 }
 
-// base64Value returns the value of a base64 digit.
-func base64Value(char byte, url bool) (byte, bool) {
-	switch {
-	case char >= 'A' && char <= 'Z':
-		return char - 'A', true
-	case char >= 'a' && char <= 'z':
-		return char - 'a' + 26, true
-	case char >= '0' && char <= '9':
-		return char - '0' + 52, true
-	case char == '+' || (url && char == '-'):
-		return 62, true
-	case char == '/' || (url && char == '_'):
-		return 63, true
+func base64Value(r rune) rune {
+	if r == '-' {
+		return '+'
 	}
-	return 0, false
+	if r == '_' {
+		return '/'
+	}
+	if (r >= 'A' && r <= 'Z') ||
+		(r >= 'a' && r <= 'z') ||
+		(r >= '0' && r <= '9') ||
+		r == '+' || r == '/' {
+		return r
+	}
+	return -1
 }
 
 // decodeHex decodes the hex string like node does, the decoding stops at the
