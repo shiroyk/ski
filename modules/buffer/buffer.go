@@ -1690,7 +1690,7 @@ func (b buffer) writeAt(data []byte, offset int64) int64 {
 func (b buffer) fill(offset, end int, buf []byte) {
 	if len(buf) > len(b) {
 		b.writeAt(buf[:len(b)], int64(offset))
-	} else {
+	} else if len(buf) > 0 {
 		for i := offset; i < end; {
 			i += copy(b[i:], buf)
 		}
