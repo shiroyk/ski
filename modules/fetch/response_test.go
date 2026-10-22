@@ -16,7 +16,7 @@ func TestResponse(t *testing.T) {
 
 	t.Run("constructor", func(t *testing.T) {
 		result, err := vm.RunModule(ctx, `
-		export default () => {
+		export default async () => {
 			const response = new Response("hello world", {
 				status: 201,
 				statusText: "Created",
@@ -32,17 +32,19 @@ func TestResponse(t *testing.T) {
 				contentType: response.headers.get("content-type"),
 				customHeader: response.headers.get("x-custom"),
 				type: response.type,
+				stream: await new Response(response.body).text()
 			};
 		}
 		`)
 		require.NoError(t, err)
-		obj := result.ToObject(vm.Runtime())
+		obj := modulestest.PromiseResult(result).ToObject(vm.Runtime())
 		assert.True(t, obj.Get("ok").ToBoolean())
 		assert.Equal(t, int64(201), obj.Get("status").ToInteger())
 		assert.Equal(t, "Created", obj.Get("statusText").String())
 		assert.Equal(t, "text/plain", obj.Get("contentType").String())
 		assert.Equal(t, "test", obj.Get("customHeader").String())
 		assert.Equal(t, "default", obj.Get("type").String())
+		assert.Equal(t, "hello world", obj.Get("stream").String())
 	})
 
 	t.Run("response body methods", func(t *testing.T) {

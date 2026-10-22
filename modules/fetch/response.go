@@ -111,6 +111,8 @@ func (r *Response) constructor(call sobek.ConstructorCall, rt *sobek.Runtime) *s
 		case url.TypeURLSearchParams:
 			res.body = strings.NewReader(arg.String())
 			setContentType(res.headers, "application/x-www-form-urlencoded;charset=UTF-8")
+		case stream.TypeReadableStream:
+			res.body = stream.GetStreamSource(rt, arg)
 		default:
 			if v, t, ok := buffer.GetReader(arg); ok {
 				all, err := buffer.ReadAll(v)
