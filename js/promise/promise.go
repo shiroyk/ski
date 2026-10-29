@@ -5,6 +5,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/shiroyk/ski/js"
+	"github.com/shiroyk/ski/js/types"
 )
 
 // Callback is a function that receives a function to resolve/reject the promise.
@@ -112,16 +113,12 @@ func Resolve(rt *sobek.Runtime, value any) sobek.Value {
 	return rt.ToValue(promise)
 }
 
-// Result returns the promise result, if it not promise return origin value.
-func Result(value sobek.Value) (any, error) {
-	if value == nil {
-		return nil, nil
+// Value returns the promise value, if it not promise return origin value.
+func Value(value sobek.Value) (sobek.Value, error) {
+	if !types.IsPromise(value) {
+		return value, nil
 	}
-	v := value.Export()
-	promise, ok := v.(*sobek.Promise)
-	if !ok {
-		return v, nil
-	}
+	promise := value.Export().(*sobek.Promise)
 	switch promise.State() {
 	case sobek.PromiseStateRejected:
 		if ex, ok := promise.Result().Export().(error); ok {
@@ -129,8 +126,17 @@ func Result(value sobek.Value) (any, error) {
 		}
 		return nil, errors.New(promise.Result().String())
 	case sobek.PromiseStateFulfilled:
-		return promise.Result().Export(), nil
+		return promise.Result(), nil
 	default:
 		return nil, errors.New("unexpected promise pending state")
 	}
+}
+
+// Result returns the promise result, if it not promise return origin value.
+func Result(value sobek.Value) (any, error) {
+	result, err := Value(value)
+	if err != nil {
+		return nil, err
+	}
+	return result.Export(), nil
 }
