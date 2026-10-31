@@ -409,24 +409,20 @@ func (s *httpServer) writeError(w http.ResponseWriter, r *http.Request, done fun
 		}
 		err = errNotResponse
 	} else {
-		switch p := result.Export().(*sobek.Promise); p.State() {
-		case sobek.PromiseStateRejected:
-			if ex, ok := p.Result().Export().(error); ok {
-				err = ex
-			} else {
-				err = errors.New(p.Result().String())
-			}
-		case sobek.PromiseStateFulfilled:
+		var wg sync.WaitGroup
+		wg.Add(1)
+		_ = promise.Then(s.rt, result, func(value sobek.Value) {
+			defer wg.Done()
 			if res, ok := fetch.ToResponse(result); ok {
 				s.writeResponse(w, r, done, res)
-				return
+			} else {
+				err = errNotResponse
 			}
-			err = errNotResponse
-		default:
-			if err = s.handlePendingPromise(w, r, done, result); err == nil {
-				return
-			}
-		}
+		}, func(err1 error) {
+			err = err1
+			wg.Done()
+		})
+		wg.Wait()
 	}
 
 EX:
@@ -438,57 +434,18 @@ EX:
 
 // handlePromise handles promise result
 func (s *httpServer) handlePromise(w http.ResponseWriter, r *http.Request, done func(), result sobek.Value) {
-	var err error
-	switch p := result.Export().(*sobek.Promise); p.State() {
-	case sobek.PromiseStateRejected:
-		if ex, ok := p.Result().Export().(error); ok {
-			err = ex
-		} else {
-			err = errors.New(p.Result().String())
-		}
-	case sobek.PromiseStateFulfilled:
-		if res, ok := fetch.ToResponse(p.Result()); ok {
-			s.writeResponse(w, r, done, res)
-		} else {
-			err = errNotResponse
-		}
-	default:
-		err = s.handlePendingPromise(w, r, done, result)
-	}
-	if err != nil {
-		s.writeError(w, r, done, err)
-	}
-}
-
-// handlePendingPromise handles a pending promise with resolve and reject callbacks
-func (s *httpServer) handlePendingPromise(w http.ResponseWriter, r *http.Request, done func(), promise sobek.Value) error {
-	object := promise.(*sobek.Object)
-	then, ok := sobek.AssertFunction(object.Get("then"))
-	if !ok {
-		return errNotResponse
-	}
-
-	resolve := s.rt.ToValue(func(call sobek.FunctionCall) sobek.Value {
-		if res, ok := fetch.ToResponse(call.Argument(0)); ok {
+	err := promise.Then(s.rt, result, func(value sobek.Value) {
+		if res, ok := fetch.ToResponse(value); ok {
 			s.writeResponse(w, r, done, res)
 		} else {
 			s.writeError(w, r, done, errNotResponse)
 		}
-		return sobek.Undefined()
+	}, func(err error) {
+		s.writeError(w, r, done, err)
 	})
-
-	reject := s.rt.ToValue(func(call sobek.FunctionCall) sobek.Value {
-		v := call.Argument(0)
-		if v.ExportType() == types.TypeError {
-			s.writeError(w, r, done, v.Export().(error))
-		} else {
-			s.writeError(w, r, done, errors.New(v.String()))
-		}
-		return sobek.Undefined()
-	})
-
-	_, err := then(object, resolve, reject)
-	return err
+	if err != nil {
+		s.writeError(w, r, done, err)
+	}
 }
 
 func (s *httpServer) logger() *slog.Logger { return js.Logger(js.Context(s.rt)) }

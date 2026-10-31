@@ -121,8 +121,8 @@ func Value(value sobek.Value) (sobek.Value, error) {
 	promise := value.Export().(*sobek.Promise)
 	switch promise.State() {
 	case sobek.PromiseStateRejected:
-		if ex, ok := promise.Result().Export().(error); ok {
-			return nil, ex
+		if promise.Result().ExportType() == types.TypeError {
+			return nil, promise.Result().Export().(error)
 		}
 		return nil, errors.New(promise.Result().String())
 	case sobek.PromiseStateFulfilled:
@@ -139,4 +139,42 @@ func Result(value sobek.Value) (any, error) {
 		return nil, err
 	}
 	return result.Export(), nil
+}
+
+// Then schedules callback functions for the eventual completion of a Promise
+func Then(rt *sobek.Runtime, promise sobek.Value, resolve func(sobek.Value), reject func(error)) error {
+	if !types.IsPromise(promise) {
+		return errors.New("value is not a Promise")
+	}
+	p := promise.Export().(*sobek.Promise)
+	switch p.State() {
+	case sobek.PromiseStateRejected:
+		if p.Result().ExportType() == types.TypeError {
+			reject(p.Result().Export().(error))
+		} else {
+			reject(errors.New(p.Result().String()))
+		}
+	case sobek.PromiseStateFulfilled:
+		resolve(p.Result())
+	default:
+		res := rt.ToValue(func(call sobek.FunctionCall) sobek.Value {
+			resolve(call.Argument(0))
+			return sobek.Undefined()
+		})
+		rej := rt.ToValue(func(call sobek.FunctionCall) sobek.Value {
+			if p.Result().ExportType() == types.TypeError {
+				reject(p.Result().Export().(error))
+			} else {
+				reject(errors.New(call.Argument(0).String()))
+			}
+			return sobek.Undefined()
+		})
+		then, ok := sobek.AssertFunction(promise.ToObject(rt).Get("then"))
+		if !ok {
+			return errors.New("Promise.then method is not a function")
+		}
+		_, err := then(promise, res, rej)
+		return err
+	}
+	return nil
 }

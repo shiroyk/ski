@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -84,6 +85,28 @@ func TestPromise(t *testing.T) {
 			})
 		})
 
+	})
+
+	t.Run("then", func(t *testing.T) {
+		rt := vm.Runtime()
+		var wg sync.WaitGroup
+		err := vm.Run(t.Context(), func() error {
+			v := New(rt, func(callback Callback) {
+				callback(func() (any, error) {
+					return "foo", nil
+				})
+			})
+			wg.Add(1)
+			return Then(rt, v, func(value sobek.Value) {
+				defer wg.Done()
+				require.EqualValues(t, "foo", value.String())
+			}, func(err error) {
+				defer wg.Done()
+				require.NoError(t, err)
+			})
+		})
+		wg.Wait()
+		require.NoError(t, err)
 	})
 
 	t.Run("example", func(t *testing.T) {
